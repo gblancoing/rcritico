@@ -21,7 +21,6 @@ const tablas = [
 
 const reportes = [
   { value: 'reporte9', label: 'Flujo Financiero SAP' },
-  { value: 'reporte7', label: 'Analisis Cascada (v/s)' },
   { value: 'reporte6', label: 'Curva S - Acumulados' },
   { value: 'reporte1', label: 'Curva S - Parciales' },
   // Agrega más reportes si los necesitas
@@ -159,6 +158,7 @@ const Vectores = ({ proyectoId }) => {
   const [tablaNpcAcumulado, setTablaNpcAcumulado] = useState([]); // NUEVO
   const [tablaApiParcial, setTablaApiParcial] = useState([]); // NUEVO
   const [tablaApiAcumulada, setTablaApiAcumulada] = useState([]); // NUEVO
+  const [tablaFinancieroSap, setTablaFinancieroSap] = useState([]); // NUEVO: Tabla financiero_sap
   const [cargandoTabla, setCargandoTabla] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -207,6 +207,18 @@ const Vectores = ({ proyectoId }) => {
     'CONTINGENCIA': 'CT'
   };
 
+  // Nombres optimizados para encabezados de tabla
+  const nombresEncabezados = {
+    'MO': 'Construcción',
+    'IC': 'Indirectos',
+    'EM': 'Equipos',
+    'IE': 'Ingeniería',
+    'SC': 'Servicios',
+    'AD': 'Administración',
+    'CL': 'Costos Esp.',
+    'CT': 'Contingencia'
+  };
+
   const normalizar = str => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 
   // Función helper para cargar datos de una tabla específica
@@ -218,8 +230,11 @@ const Vectores = ({ proyectoId }) => {
         const response = await fetch(`http://localhost/financiero/api/datos_financieros.php?proyecto_id=${proyectoId}&tabla=${tabla}`);
         const data = await response.json();
         if (data.success) {
-          setter(data.datos);
+          // La API datos_financieros.php devuelve los datos en data.datos
+          console.log(`Datos cargados para ${tabla}:`, data.datos);
+          setter(data.datos || []);
         } else {
+          console.log(`Error cargando ${tabla}:`, data.error);
           setter([]);
         }
       } else {
@@ -227,7 +242,8 @@ const Vectores = ({ proyectoId }) => {
         const response = await fetch(`/api/vectores/${tabla}.php`);
         const data = await response.json();
         if (data.success) {
-          setter(data.data);
+          // La API individual devuelve los datos en data.data
+          setter(data.data || []);
         } else {
           setter([]);
         }
@@ -258,6 +274,8 @@ const Vectores = ({ proyectoId }) => {
       cargarDatosTabla('api_parcial', setTablaApiParcial);
     } else if (seleccion === 'api_acumulada') {
       cargarDatosTabla('api_acumulada', setTablaApiAcumulada);
+    } else if (seleccion === 'reporte9') {
+      cargarDatosTabla('financiero_sap', setTablaFinancieroSap);
     }
   }, [seleccion, proyectoId, importando]); // recarga al importar y cuando cambia el proyecto
 
@@ -307,7 +325,7 @@ const Vectores = ({ proyectoId }) => {
   
   // --- useEffect para cargar todos los datos cuando se seleccionan reportes que los necesitan ---
   useEffect(() => {
-    if (seleccion === 'reporte6' || seleccion === 'reporte7' || seleccion === 'reporte9') {
+    if (seleccion === 'reporte6' || seleccion === 'reporte9') {
       cargarDatosInforme();
     }
   }, [seleccion, proyectoId]);
@@ -403,8 +421,30 @@ const Vectores = ({ proyectoId }) => {
 
   const mapExcelRow = (row) => {
     const r = normalizeKeys(row);
+    
+    // Si es reporte9 (Flujo Financiero SAP), mapear campos específicos
+    if (seleccion === 'reporte9') {
+      return {
+        proyecto_id: proyectoId || 1,
+        id_sap: r['ID_SAP'] || r['ID SAP'] || '',
+        version_sap: r['VERSION_SAP'] || r['VERSION SAP'] || '',
+        descripcion: r['DESCRIPCION'] || r['DESCRIPCIÓN'] || '',
+        grupo_version: r['GRUPO_VERSION'] || r['GRUPO VERSION'] || '',
+        periodo: excelDateToMysql(r['PERIODO']),
+        MO: cleanMonto(r['MO']),
+        IC: cleanMonto(r['IC']),
+        EM: cleanMonto(r['EM']),
+        IE: cleanMonto(r['IE']),
+        SC: cleanMonto(r['SC']),
+        AD: cleanMonto(r['AD']),
+        CL: cleanMonto(r['CL']),
+        CT: cleanMonto(r['CT'])
+      };
+    }
+    
+    // Mapeo estándar para otras tablas
     return {
-      proyecto_id: 1,
+      proyecto_id: proyectoId || 1,
       centro_costo: r['CENTRO COSTO'] || '',
       periodo: excelDateToMysql(r['PERIODO']),
       tipo: r['TIPO'] || '',
@@ -459,10 +499,14 @@ const Vectores = ({ proyectoId }) => {
       if (seleccion === 'npc_acumulado') endpoint = '/api/importaciones/importar_npc_acumulado.php';
       if (seleccion === 'api_parcial') endpoint = '/api/importaciones/importar_api_parcial.php';
       if (seleccion === 'api_acumulada') endpoint = '/api/importaciones/importar_api_acumulado.php';
+      if (seleccion === 'reporte9') endpoint = '/api/importaciones/importar_financiero_sap.php';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: datosMapeados })
+        body: JSON.stringify({ 
+          rows: datosMapeados,
+          proyecto_id: proyectoId || 1
+        })
       });
       const result = await res.json();
       if (result.success) {
@@ -1269,15 +1313,7 @@ const Vectores = ({ proyectoId }) => {
               <span role="img" aria-label="barrer">🧹</span>
             </button>
           </div>
-          {/* Selector de vector - Solo visible en reporte9 (Flujo Financiero SAP) */}
-          {seleccion === 'reporte9' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <label style={{ fontWeight: 700, color: '#16355D', marginRight: 8, fontSize: 11 }}>Vector:</label>
-              <select value={vectorTranspuesta} onChange={e => setVectorTranspuesta(e.target.value)} style={{ padding: '6px 12px', borderRadius: 6, border: '1.5px solid #16355D', fontWeight: 600, fontSize: 13 }}>
-                {vectoresTranspuesta.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-              </select>
-            </div>
-          )}
+
         </div>
       )}
       {/* Modal de importación */}
@@ -1305,7 +1341,9 @@ const Vectores = ({ proyectoId }) => {
             flexDirection: 'column',
             alignItems: 'center',
           }}>
-            <h3 style={{ color: '#16355D', marginBottom: 18, fontWeight: 700 }}>Importar datos de Real Parcial</h3>
+            <h3 style={{ color: '#16355D', marginBottom: 18, fontWeight: 700 }}>
+              {seleccion === 'reporte9' ? 'Importar datos de Flujo Financiero SAP' : 'Importar datos de Real Parcial'}
+            </h3>
             {/* Botón moderno para elegir archivo */}
             <label htmlFor="file-upload" style={{
               background: '#FFD000',
@@ -1372,6 +1410,32 @@ const Vectores = ({ proyectoId }) => {
             </button>
             {importMessage && (
               <div style={{ color: importMessage.includes('éxito') ? 'green' : 'red', marginTop: 12 }}>{importMessage}</div>
+            )}
+            
+            {/* Información de formato para SAP */}
+            {seleccion === 'reporte9' && (
+              <div style={{
+                backgroundColor: '#e3f2fd',
+                border: '1px solid #2196f3',
+                borderRadius: '5px',
+                padding: '15px',
+                marginTop: '15px',
+                fontSize: '12px'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#1976d2', fontSize: '13px' }}>Formato Requerido para SAP:</h4>
+                <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
+                  <p><strong>Columnas requeridas:</strong></p>
+                  <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                    <li><strong>ID_SAP:</strong> Identificador único del registro SAP</li>
+                    <li><strong>VERSION_SAP:</strong> Versión del sistema SAP</li>
+                    <li><strong>DESCRIPCION:</strong> Descripción del registro</li>
+                    <li><strong>GRUPO_VERSION:</strong> Grupo de versión</li>
+                    <li><strong>PERIODO:</strong> Fecha en formato DD-MM-YYYY</li>
+                    <li><strong>MO, IC, EM, IE, SC, AD, CL, CT:</strong> Montos para cada categoría</li>
+                  </ul>
+                  <p><strong>Nota:</strong> Los registros existentes con el mismo ID_SAP serán actualizados.</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -1787,7 +1851,7 @@ const Vectores = ({ proyectoId }) => {
               </div>
             </div>
           </div>
-        ) : (seleccion === 'reporte6' || seleccion === 'reporte7' || seleccion === 'reporte9') ? null : (
+        ) : (seleccion === 'reporte6' || seleccion === 'reporte9') ? null : (
           seleccion !== 'reporte9' && (
             <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
               <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Datos importados en la base de datos:</h4>
@@ -1844,10 +1908,10 @@ const Vectores = ({ proyectoId }) => {
           )
         )
       )}
-      {(seleccion === 'reporte6' || seleccion === 'reporte7') && (
+      {(seleccion === 'reporte6') && (
         <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
           <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>
-            {seleccion === 'reporte6' ? 'Curva S - Evolución de Acumulados' : 'Análisis Cascada (v/s)'}
+            Curva S - Evolución de Acumulados
           </h4>
           {/* Filtros de fecha y barredor */}
           <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end', marginBottom: 12 }}>
@@ -2043,7 +2107,7 @@ const Vectores = ({ proyectoId }) => {
           )}
           {/* Tabla resumen de acumulados por categoría y tipo */}
           <div style={{ width: '100%', margin: '32px 0 0 0', overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', fontSize: 13, minWidth: 700 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', fontSize: 13, minWidth: 900 }}>
               <thead>
                 <tr style={{ background: '#0a3265', color: '#fff' }}>
                   <th style={{ padding: '8px 12px', borderTopLeftRadius: 10 }}>Categoría VP</th>
@@ -2051,11 +2115,8 @@ const Vectores = ({ proyectoId }) => {
                   <th style={{ padding: '8px 12px', textAlign: 'center' }}>V0 Acumulado USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(B)</span></th>
                   <th style={{ padding: '8px 12px', textAlign: 'center' }}>NPC Acumulado USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(C)</span></th>
                   <th style={{ padding: '8px 12px', textAlign: 'center' }}>API Acumulado USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(D)</span></th>
-                  {/* Las columnas de cascada solo en reporte7 */}
-                  {seleccion === 'reporte7' && <>
-                    <th style={{ padding: '8px 12px', textAlign: 'center', borderLeft: '3px solid #e53935' }}>Cascada V0 <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A-B)</span></th>
-                    <th style={{ padding: '8px 12px', borderTopRightRadius: 10, textAlign: 'center' }}>Cascada API <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A-D)</span></th>
-                  </>}
+                  <th style={{ padding: '8px 12px', textAlign: 'center', borderLeft: '3px solid #e53935' }}>Cascada V0 <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A-B)</span></th>
+                  <th style={{ padding: '8px 12px', borderTopRightRadius: 10, textAlign: 'center' }}>Cascada API <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A-D)</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -2078,6 +2139,8 @@ const Vectores = ({ proyectoId }) => {
                   const montoV0 = getMontoFinalFiltrado(tablaV0Acumulada);
                   const montoNPC = getMontoFinalFiltrado(tablaNpcAcumulado);
                   const montoReal = getMontoFinalFiltrado(tablaRealAcumulado);
+                  const cascadaV0 = montoReal - montoV0;
+                  const cascadaAPI = montoReal - montoAPI;
 
                   return (
                     <tr key={cat}>
@@ -2086,15 +2149,12 @@ const Vectores = ({ proyectoId }) => {
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoV0 > 0 ? montoV0.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoNPC > 0 ? montoNPC.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoAPI > 0 ? montoAPI.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
-                      {/* Columnas de cascada solo en reporte7 */}
-                      {seleccion === 'reporte7' && <>
-                        <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: montoReal - montoV0 > 0 ? '#1ecb4f' : montoReal - montoV0 < 0 ? '#ff4444' : '#666', borderLeft: '3px solid #e53935' }}>
-                          {montoReal > 0 || montoV0 > 0 ? (montoReal - montoV0).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
-                        </td>
-                        <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: montoReal - montoAPI > 0 ? '#1ecb4f' : montoReal - montoAPI < 0 ? '#ff4444' : '#666' }}>
-                          {montoReal > 0 || montoAPI > 0 ? (montoReal - montoAPI).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
-                        </td>
-                      </>}
+                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: cascadaV0 > 0 ? '#1ecb4f' : cascadaV0 < 0 ? '#ff4444' : '#666', borderLeft: '3px solid #e53935' }}>
+                        {montoReal > 0 || montoV0 > 0 ? cascadaV0.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: cascadaAPI > 0 ? '#1ecb4f' : cascadaAPI < 0 ? '#ff4444' : '#666' }}>
+                        {montoReal > 0 || montoAPI > 0 ? cascadaAPI.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
+                      </td>
                     </tr>
                   );
                 })}
@@ -2165,62 +2225,60 @@ const Vectores = ({ proyectoId }) => {
                       return sumaFiltrada > 0 ? sumaFiltrada.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0';
                     })()}
                   </td>
-                  {seleccion === 'reporte7' && <>
-                    <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700, borderLeft: '3px solid #e53935' }}>
-                      {(() => {
-                        // Cascada V0: Total Real - Total V0
-                        const totalReal = categorias.reduce((acc, cat) => {
-                          const key = normalizar(cat);
-                          const arrFiltrado = tablaRealAcumulado.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
-                          const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
-                          if (registros.length > 0) {
-                            const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
-                            return acc + Number(ultimo.monto) || 0;
-                          }
-                          return acc;
-                        }, 0);
-                        const totalV0 = categorias.reduce((acc, cat) => {
-                          const key = normalizar(cat);
-                          const arrFiltrado = tablaV0Acumulada.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
-                          const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
-                          if (registros.length > 0) {
-                            const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
-                            return acc + Number(ultimo.monto) || 0;
-                          }
-                          return acc;
-                        }, 0);
-                        const diferencia = totalReal - totalV0;
-                        return diferencia !== 0 ? diferencia.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0';
-                      })()}
-                    </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
-                      {(() => {
-                        // Cascada API: Total Real - Total API
-                        const totalReal = categorias.reduce((acc, cat) => {
-                          const key = normalizar(cat);
-                          const arrFiltrado = tablaRealAcumulado.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
-                          const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
-                          if (registros.length > 0) {
-                            const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
-                            return acc + Number(ultimo.monto) || 0;
-                          }
-                          return acc;
-                        }, 0);
-                        const totalAPI = categorias.reduce((acc, cat) => {
-                          const key = normalizar(cat);
-                          const arrFiltrado = tablaApiAcumulada.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
-                          const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
-                          if (registros.length > 0) {
-                            const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
-                            return acc + Number(ultimo.monto) || 0;
-                          }
-                          return acc;
-                        }, 0);
-                        const diferencia = totalReal - totalAPI;
-                        return diferencia !== 0 ? diferencia.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0';
-                      })()}
-                    </td>
-                  </>}
+                  <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700, borderLeft: '3px solid #e53935' }}>
+                    {(() => {
+                      // Cascada V0: Total Real - Total V0
+                      const totalReal = categorias.reduce((acc, cat) => {
+                        const key = normalizar(cat);
+                        const arrFiltrado = tablaRealAcumulado.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
+                        const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
+                        if (registros.length > 0) {
+                          const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
+                          return acc + Number(ultimo.monto) || 0;
+                        }
+                        return acc;
+                      }, 0);
+                      const totalV0 = categorias.reduce((acc, cat) => {
+                        const key = normalizar(cat);
+                        const arrFiltrado = tablaV0Acumulada.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
+                        const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
+                        if (registros.length > 0) {
+                          const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
+                          return acc + Number(ultimo.monto) || 0;
+                        }
+                        return acc;
+                      }, 0);
+                      const diferencia = totalReal - totalV0;
+                      return diferencia !== 0 ? diferencia.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0';
+                    })()}
+                  </td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
+                    {(() => {
+                      // Cascada API: Total Real - Total API
+                      const totalReal = categorias.reduce((acc, cat) => {
+                        const key = normalizar(cat);
+                        const arrFiltrado = tablaRealAcumulado.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
+                        const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
+                        if (registros.length > 0) {
+                          const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
+                          return acc + Number(ultimo.monto) || 0;
+                        }
+                        return acc;
+                      }, 0);
+                      const totalAPI = categorias.reduce((acc, cat) => {
+                        const key = normalizar(cat);
+                        const arrFiltrado = tablaApiAcumulada.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
+                        const registros = arrFiltrado.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
+                        if (registros.length > 0) {
+                          const ultimo = registros.reduce((a, b) => (a.periodo > b.periodo ? a : b));
+                          return acc + Number(ultimo.monto) || 0;
+                        }
+                        return acc;
+                      }, 0);
+                      const diferencia = totalReal - totalAPI;
+                      return diferencia !== 0 ? diferencia.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '0';
+                    })()}
+                  </td>
                 </tr>
                 <tr style={{ background: '#e6f0fa', fontWeight: 700 }}>
                   <td style={{ padding: '8px 12px', color: '#0a3265' }}>% AV. FINANCIERO ACUM.</td>
@@ -2325,32 +2383,35 @@ const Vectores = ({ proyectoId }) => {
                       return sumaTotal > 0 ? (sumaFiltrada / sumaTotal * 100).toFixed(2) + '%' : '0%';
                     })()}
                   </td>
-                  {seleccion === 'reporte7' && <>
-                    <td style={{ padding: '8px 12px', textAlign: 'center', borderLeft: '3px solid #e53935' }}>-</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>-</td>
-                  </>}
+                  <td style={{ padding: '8px 12px', textAlign: 'center', borderLeft: '3px solid #e53935' }}>-</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>-</td>
                 </tr>
               </tbody>
             </table>
           </div>
+          {/* GRÁFICOS DE CASCADA - ANÁLISIS DE ACUMULADOS - Solo para reporte6 */}
+          {seleccion === 'reporte6' && (
+            <div style={{ marginTop: 32, textAlign: 'center' }}>
+              <h4 style={{ color: '#0a3265', fontWeight: 700, marginBottom: 24 }}>Gráficos de Cascada - Análisis de Acumulados</h4>
+              <div style={{ display: 'flex', flexDirection: 'row', gap: 32, justifyContent: 'center', alignItems: 'flex-start', width: '100%', flexWrap: 'nowrap' }}>
+                <div style={{ flex: '1 1 420px', maxWidth: '48%', minWidth: 340 }}>
+                  <GraficoCascadaAcumulativa
+                    data={prepararDatosCascadaAcumulativa(categorias, tablaV0Acumulada, tablaRealAcumulado, 'V0')}
+                    titulo="Cascada V0 (A-B) - Acumulados (M$USD)"
+                  />
+                </div>
+                <div style={{ flex: '1 1 420px', maxWidth: '48%', minWidth: 340 }}>
+                  <GraficoCascadaAcumulativa
+                    data={prepararDatosCascadaAcumulativa(categorias, tablaApiAcumulada, tablaRealAcumulado, 'API')}
+                    titulo="Cascada API (A-D) - Acumulados (M$USD)"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
-      {seleccion === 'reporte7' && (
-        <div style={{ display: 'flex', flexDirection: 'row', gap: 32, justifyContent: 'center', alignItems: 'flex-start', width: '100%', flexWrap: 'nowrap' }}>
-          <div style={{ flex: '1 1 420px', maxWidth: '48%', minWidth: 340 }}>
-            <GraficoCascadaAcumulativa
-              data={prepararDatosCascadaAcumulativa(categorias, tablaV0Acumulada, tablaRealAcumulado, 'V0')}
-              titulo="Cascada V0 (A-B) - Real vs V0 (M$USD)"
-            />
-          </div>
-          <div style={{ flex: '1 1 420px', maxWidth: '48%', minWidth: 340 }}>
-            <GraficoCascadaAcumulativa
-              data={prepararDatosCascadaAcumulativa(categorias, tablaApiAcumulada, tablaRealAcumulado, 'API')}
-              titulo="Cascada API (A-D) - Real vs API (M$USD)"
-            />
-          </div>
-        </div>
-      )}
+
       {seleccion === 'reporte8' && (
         <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
           <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Flujo Financiero SAP</h4>
@@ -2531,8 +2592,9 @@ const Vectores = ({ proyectoId }) => {
       )}
       {seleccion === 'reporte9' && (
         <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
-          <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Tabla Transpuesta</h4>
-          {/* Filtros divididos en dos columnas */}
+          <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Flujo Financiero SAP</h4>
+          
+          {/* Filtros y botón de importación */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
             {/* Columna izquierda: Filtros de fecha */}
             <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
@@ -2543,7 +2605,7 @@ const Vectores = ({ proyectoId }) => {
                   value={fechaDesde}
                   onChange={e => setFechaDesde(e.target.value)}
                   style={{
-                    border: '2px solidrgb(29, 105, 219)',
+                    border: '2px solid rgb(29, 105, 219)',
                     borderRadius: 6,
                     padding: '6px 10px',
                     fontSize: 10,
@@ -2560,7 +2622,7 @@ const Vectores = ({ proyectoId }) => {
                   value={fechaHasta}
                   onChange={e => setFechaHasta(e.target.value)}
                   style={{
-                    border: '2px solidrgb(51, 153, 255)',
+                    border: '2px solid rgb(51, 153, 255)',
                     borderRadius: 6,
                     padding: '6px 10px',
                     fontSize: 10,
@@ -2589,16 +2651,28 @@ const Vectores = ({ proyectoId }) => {
               </button>
             </div>
             
-            {/* Columna derecha: Filtro de vector */}
+            {/* Columna derecha: Botón de importación */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <label style={{ fontWeight: 700, color: '#16355D', marginRight: 8, fontSize: 11 }}>Vector:</label>
-              <select value={vectorTranspuesta} onChange={e => setVectorTranspuesta(e.target.value)} style={{ padding: '6px 12px', borderRadius: 6, border: '1.5px solid #16355D', fontWeight: 600, fontSize: 13 }}>
-                {vectoresTranspuesta.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-              </select>
+              <button
+                onClick={() => setShowImportModal(true)}
+                style={{
+                  background: '#FFD000',
+                  color: '#16355D',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  fontWeight: 700,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px #0001',
+                }}
+              >
+                📁 Importar Excel
+              </button>
             </div>
           </div>
           
-          {/* Tarjetas KPI para Tabla Transpuesta */}
+          {/* Tarjetas KPI para Flujo Financiero SAP */}
           <div style={{
             width: '100%',
             margin: '16px 0 0 0',
@@ -2614,16 +2688,12 @@ const Vectores = ({ proyectoId }) => {
               margin: 0,
               padding: 0,
             }}>
-              {categorias.map(cat => {
-                const key = normalizar(cat);
-                // Obtener datos del vector seleccionado
-                let data = [];
-                if (vectorTranspuesta === 'real_parcial') data = tablaRealParcial;
-                if (vectorTranspuesta === 'v0_parcial') data = tablaV0Parcial;
-                if (vectorTranspuesta === 'npc_parcial') data = tablaNpcParcial;
-                if (vectorTranspuesta === 'api_parcial') data = tablaApiParcial;
+              {Object.entries(categoriasConCodigos).map(([categoria, codigo]) => {
+                // Debug: verificar el estado de tablaFinancieroSap
+                console.log('tablaFinancieroSap:', tablaFinancieroSap, 'tipo:', typeof tablaFinancieroSap, 'es array:', Array.isArray(tablaFinancieroSap));
                 
                 // Aplicar filtros de fecha
+                let data = Array.isArray(tablaFinancieroSap) ? tablaFinancieroSap : [];
                 if (fechaDesde) {
                   data = data.filter(row => row.periodo >= fechaDesde);
                 }
@@ -2632,20 +2702,17 @@ const Vectores = ({ proyectoId }) => {
                 }
                 
                 // Calcular total por categoría
-                const registros = data.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === key);
-                const total = registros.reduce((acc, row) => acc + (Number(row.monto) || 0), 0);
+                const total = data.reduce((acc, row) => acc + (Number(row[codigo]) || 0), 0);
                 
                 // Calcular total general para el porcentaje
-                const totalGeneral = categorias.reduce((acc, categoria) => {
-                  const keyCat = normalizar(categoria);
-                  const registrosCat = data.filter(row => normalizar(row.detalle_factorial || 'Sin Detalle') === keyCat);
-                  return acc + registrosCat.reduce((a, row) => a + (Number(row.monto) || 0), 0);
+                const totalGeneral = Object.values(categoriasConCodigos).reduce((acc, cod) => {
+                  return acc + data.reduce((a, row) => a + (Number(row[cod]) || 0), 0);
                 }, 0);
                 
                 const porcentaje = totalGeneral > 0 ? ((total / totalGeneral) * 100) : 0;
                 
                 return (
-                  <div key={cat} style={{
+                  <div key={categoria} style={{
                     minWidth: 54,
                     minHeight: 16,
                     background: '#fff',
@@ -2660,7 +2727,7 @@ const Vectores = ({ proyectoId }) => {
                     marginBottom: 2,
                     fontSize: 10,
                   }}>
-                    <div style={{ color: '#1ecb4f', fontWeight: 600, fontSize: 9, marginBottom: 1, textAlign: 'center', lineHeight: 1.1 }}>{cat}</div>
+                    <div style={{ color: '#1ecb4f', fontWeight: 600, fontSize: 9, marginBottom: 1, textAlign: 'center', lineHeight: 1.1 }}>{codigo}</div>
                     <div style={{ color: '#16355D', fontWeight: 700, fontSize: 10, lineHeight: 1.1 }}>
                       USD {Number(total).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                     </div>
@@ -2688,16 +2755,11 @@ const Vectores = ({ proyectoId }) => {
                 fontSize: 12,
               }}>
                 <div style={{ color: '#FFD000', fontWeight: 700, fontSize: 11, marginBottom: 2, textAlign: 'center', lineHeight: 1.1 }}>
-                  TOTAL FILTRO
+                  TOTAL SAP
                 </div>
                 <div style={{ color: '#fff', fontWeight: 900, fontSize: 15, lineHeight: 1.1 }}>
                   USD {(() => {
-                    let data = [];
-                    if (vectorTranspuesta === 'real_parcial') data = tablaRealParcial;
-                    if (vectorTranspuesta === 'v0_parcial') data = tablaV0Parcial;
-                    if (vectorTranspuesta === 'npc_parcial') data = tablaNpcParcial;
-                    if (vectorTranspuesta === 'api_parcial') data = tablaApiParcial;
-                    
+                    let data = Array.isArray(tablaFinancieroSap) ? tablaFinancieroSap : [];
                     if (fechaDesde) {
                       data = data.filter(row => row.periodo >= fechaDesde);
                     }
@@ -2705,7 +2767,9 @@ const Vectores = ({ proyectoId }) => {
                       data = data.filter(row => row.periodo <= fechaHasta);
                     }
                     
-                    const total = data.reduce((acc, row) => acc + (Number(row.monto) || 0), 0);
+                    const total = Object.values(categoriasConCodigos).reduce((acc, codigo) => {
+                      return acc + data.reduce((a, row) => a + (Number(row[codigo]) || 0), 0);
+                    }, 0);
                     return Number(total).toLocaleString('en-US', { maximumFractionDigits: 0 });
                   })()}
                 </div>
@@ -2713,7 +2777,116 @@ const Vectores = ({ proyectoId }) => {
             </div>
           </div>
           
-          <TablaTranspuesta />
+          {/* Tabla de datos de Flujo Financiero SAP */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              background: '#fff',
+              borderRadius: 8,
+              boxShadow: '0 2px 8px #0001',
+              overflow: 'hidden',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{
+                background: '#16355D',
+                color: '#fff',
+                padding: '12px 16px',
+                fontWeight: 700,
+                fontSize: 14,
+                borderBottom: '1px solid #e0e0e0'
+              }}>
+                Datos de Flujo Financiero SAP
+              </div>
+              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ background: '#f5f5f5', position: 'sticky', top: 0 }}>
+                    <tr>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>ID SAP</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Versión</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Descripción</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Grupo</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Período</th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['MO']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(MO)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['IC']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(IC)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['EM']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(EM)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['IE']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(IE)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['SC']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(SC)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['AD']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(AD)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['CL']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(CL)</span>
+                        </div>
+                      </th>
+                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['CT']}</span>
+                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(CT)</span>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      let data = Array.isArray(tablaFinancieroSap) ? tablaFinancieroSap : [];
+                      if (fechaDesde) {
+                        data = data.filter(row => row.periodo >= fechaDesde);
+                      }
+                      if (fechaHasta) {
+                        data = data.filter(row => row.periodo <= fechaHasta);
+                      }
+                      return data.map((row, index) => (
+                        <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.id_sap}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.version_sap}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.descripcion}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.grupo_version}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.periodo}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.MO || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.IC || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.EM || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.IE || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.SC || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.AD || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.CL || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.CT || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       <div style={{ marginTop: 32 }}>
