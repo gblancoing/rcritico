@@ -515,7 +515,11 @@ const Vectores = ({ proyectoId }) => {
         setSelectedFile(null);
         setExcelData([]);
       } else {
-        setImportMessage('Error al importar: ' + (result.error || ''));
+        let errorMessage = 'Error al importar: ' + (result.error || '');
+        if (result.errors && result.errors.length > 0) {
+          errorMessage += '\n\nErrores específicos:\n' + result.errors.join('\n');
+        }
+        setImportMessage(errorMessage);
       }
     } catch (e) {
       setImportMessage('Error de red o servidor');
@@ -1107,10 +1111,10 @@ const Vectores = ({ proyectoId }) => {
           <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', fontSize: 13, minWidth: 700 }}>
             <thead>
               <tr>
-                <th style={{ padding: '8px 12px', borderTopLeftRadius: 10, background: '#0a3265', color: '#fff', position: 'sticky', top: 0, zIndex: 3 }}>MES</th>
+                <th style={{ padding: '12px 16px', borderTopLeftRadius: 10, background: '#0a3265', color: '#fff', position: 'sticky', top: 0, zIndex: 3, fontSize: 16, fontWeight: 600, fontFamily: 'Arial, sans-serif', lineHeight: '1.2' }}>MES</th>
                 {categorias.map(cat => (
-                  <th key={cat} style={{ padding: '8px 12px', textAlign: 'center', background: '#0a3265', color: '#fff', position: 'sticky', top: 0, zIndex: 3 }}>
-                    {cat} <span style={{ color: '#1ecb4f', fontWeight: 'bold' }}>({categoriasConCodigos[cat]})</span>
+                  <th key={cat} style={{ padding: '12px 16px', textAlign: 'center', background: '#0a3265', color: '#fff', position: 'sticky', top: 0, zIndex: 3, fontSize: 16, fontWeight: 600, fontFamily: 'Arial, sans-serif', lineHeight: '1.2' }}>
+                    <span style={{ color: '#fff', fontWeight: 600, fontSize: 16, fontFamily: 'Arial, sans-serif', lineHeight: '1.2' }}>{cat}</span> <span style={{ color: '#1ecb4f', fontWeight: 600, fontSize: 16, fontFamily: 'Arial, sans-serif', lineHeight: '1.2' }}>({categoriasConCodigos[cat]})</span>
                   </th>
                 ))}
               </tr>
@@ -2786,73 +2790,63 @@ const Vectores = ({ proyectoId }) => {
               overflow: 'hidden',
               border: '1px solid #e0e0e0'
             }}>
-              <div style={{
-                background: '#16355D',
-                color: '#fff',
-                padding: '12px 16px',
-                fontWeight: 700,
-                fontSize: 14,
-                borderBottom: '1px solid #e0e0e0'
-              }}>
-                Datos de Flujo Financiero SAP
-              </div>
               <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ background: '#f5f5f5', position: 'sticky', top: 0 }}>
+                  <thead style={{ background: '#16355D', position: 'sticky', top: 0 }}>
                     <tr>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>ID SAP</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Versión</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Descripción</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Grupo</th>
-                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700 }}>Período</th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['MO']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(MO)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['IC']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(IC)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['EM']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(EM)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['IE']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(IE)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['SC']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(SC)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['AD']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(AD)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['CL']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(CL)</span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center' }}>{nombresEncabezados['CT']}</span>
-                          <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(CT)</span>
-                        </div>
-                      </th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>ID SAP</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Versión</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Descripción</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Grupo</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Período</th>
+                                              <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['MO']}</span>
+                            <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(MO)</span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['IC']}</span>
+                            <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(IC)</span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['EM']}</span>
+                            <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(EM)</span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['IE']}</span>
+                            <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(IE)</span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['SC']}</span>
+                            <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(SC)</span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['AD']}</span>
+                            <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(AD)</span>
+                          </div>
+                        </th>
+                                                 <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                             <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['CL']}</span>
+                             <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(CL)</span>
+                           </div>
+                         </th>
+                         <th style={{ padding: '10px 6px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, minWidth: '90px' }}>
+                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                             <span style={{ fontSize: 9, lineHeight: 1.1, textAlign: 'center', color: '#fff' }}>{nombresEncabezados['CT']}</span>
+                             <span style={{ fontSize: 8, color: '#1ecb4f', fontWeight: 'bold' }}>(CT)</span>
+                           </div>
+                         </th>
                     </tr>
                   </thead>
                   <tbody>
