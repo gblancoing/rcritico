@@ -1,0 +1,210 @@
+/* Sidebar base */
+.sidebar {
+  width: 260px;
+  background: rgba(0, 43, 127, 0.92); /* Azul translúcido */
+  color: #fff;
+  height: 100vh;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.09);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  position: fixed;
+  top: 0; /* Comienza desde la parte superior */
+  left: 0;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+  z-index: 100;
+  border-right: 6px solid #F2A900; /* Dorado Codelco */
+  transition: width 0.2s;
+}
+
+.sidebar.fijado {
+  border-right: 6px solid #F2A900;
+}
+
+/* Header del sidebar refinado */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 80px 24px 12px 24px;
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: transparent;
+  border-bottom: 1px solid #232b43;
+  margin-bottom: 0;
+}
+.sidebar-logo {
+  background: #fff;
+  color: #1a2235;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.sidebar-title {
+  color: #F2A900;
+  font-size: 1.08em;
+  font-weight: 700;
+  background: none;
+  padding: 0;
+}
+
+.sidebar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.sidebar-list li {
+  padding: 14px 24px 14px 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 1.04rem;
+  font-weight: 500;
+  position: relative;
+  transition: background 0.18s, color 0.18s;
+  border-left: 0 solid transparent;
+  text-align: left;
+  background: none;
+}
+.sidebar-list li .sidebar-icon {
+  margin-right: 14px;
+  font-size: 1.18em;
+  min-width: 22px;
+  text-align: center;
+}
+.sidebar-list li .sidebar-text {
+  flex: 1;
+}
+.sidebar-list li.activo {
+  background: #F2A900;
+  color: #1a2235;
+  font-weight: bold;
+  border-left: 0 solid #F2A900;
+  box-shadow: none;
+  z-index: 1;
+}
+.sidebar-list li.activo .sidebar-icon {
+  color: #1a2235;
+}
+.sidebar-list li:hover:not(.activo) {
+  background: rgba(242,169,0,0.10);
+  color: #F2A900;
+}
+.sidebar-list li .sidebar-active-bar {
+  position: absolute;
+  left: -6px;
+  top: 0;
+  height: 100%;
+  width: 6px;
+  background: #F2A900;
+  border-radius: 0 6px 6px 0;
+  box-shadow: 1px 0 6px #F2A90033;
+}
+
+.sidebar-separator {
+  border: none;
+  border-top: 1px solid #232b43;
+  margin: 0 18px 0 18px;
+}
+
+.sidebar-fijar-btn {
+  background: #fff;
+  color: #1a2235;
+  border: none;
+  padding: 16px 0 16px 0;
+  width: 100%;
+  font-size: 1.01rem;
+  cursor: pointer;
+  border-top: 1px solid #232b43;
+  transition: background 0.18s, color 0.18s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+.sidebar-fijar-btn:hover {
+  background: #F2A900;
+  color: #1a2235;
+}
+.sidebar-fijar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e6e6e6;
+  color: #1a2235;
+  font-size: 1em;
+  margin-right: 4px;
+  transition: background 0.18s, color 0.18s;
+}
+.sidebar-fijar-icon.fijado {
+  background: #F2A900;
+  color: #1a2235;
+}
+.sidebar-fijar-text {
+  font-size: 1em;
+}
+
+/* RESPONSIVE: Sidebar colapsado en pantallas pequeñas */
+@media (max-width: 900px) {
+  .sidebar {
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    border-right: 4px solid #F2A900;
+    padding: 0;
+  }
+  .sidebar-header {
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0 8px 0;
+  }
+  .sidebar-title {
+    display: none;
+  }
+  .sidebar-list li {
+    padding: 12px 0 12px 0;
+    justify-content: center;
+  }
+  .sidebar-list li .sidebar-text {
+    display: none;
+  }
+  .sidebar-separator {
+    margin: 0 8px 0 8px;
+  }
+  .sidebar-fijar-btn {
+    font-size: 0.9em;
+    padding: 10px 0;
+  }
+  .sidebar-fijar-text {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .sidebar {
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+  }
+  .sidebar-header {
+    padding: 8px 0 4px 0;
+  }
+  .sidebar-list li {
+    padding: 8px 0 8px 0;
+  }
+} 
