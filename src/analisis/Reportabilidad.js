@@ -516,7 +516,7 @@ const Reportabilidad = ({ proyectoId }) => {
     fechaDesde,
     fechaHasta
   }) => {
-    // Estados para importación
+    // Estados para importación de predictividad
     const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
     const [excelData, setExcelData] = useState([]);
     const [importando, setImportando] = useState(false);
@@ -525,12 +525,6 @@ const Reportabilidad = ({ proyectoId }) => {
     const [codigoAutorizacion, setCodigoAutorizacion] = useState('');
     const [errorCodigo, setErrorCodigo] = useState('');
     const fileInputRef = useRef(null);
-    
-    // Estados separados para importación PREDICTIVIDAD_PARCIAL
-    const [archivoSeleccionadoParcial, setArchivoSeleccionadoParcial] = useState(null);
-    const [excelDataParcial, setExcelDataParcial] = useState([]);
-    const [importandoParcial, setImportandoParcial] = useState(false);
-    const fileInputRefParcial = useRef(null);
 
     // Estados para datos de predictividad
     const [proyeccionFinanciera, setProyeccionFinanciera] = useState(0);
@@ -538,10 +532,6 @@ const Reportabilidad = ({ proyectoId }) => {
     const [realFinanciera, setRealFinanciera] = useState(0);
     const [realFisica, setRealFisica] = useState(0);
     const [cargandoDatos, setCargandoDatos] = useState(false);
-
-
-
-
 
     // Función para obtener datos de proyección financiera desde financiero_sap
     const obtenerProyeccionFinanciera = async () => {
@@ -709,6 +699,59 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
+    // Función para obtener proyección física desde la tabla predictividad
+    const obtenerProyeccionFisica = async () => {
+      try {
+        // Construir URL con filtros
+        let url = `${API_BASE}/predictividad/obtener_proyeccion_fisica.php`;
+        const params = new URLSearchParams();
+        
+        if (proyectoId) {
+          params.append('proyecto_id', proyectoId);
+        }
+        
+        if (fechaDesde) {
+          // Convertir formato YYYY-MM a MM-YYYY para la tabla predictividad
+          const [year, month] = fechaDesde.split('-');
+          const periodoInicio = `${month}-${year}`;
+          params.append('periodo_inicio', periodoInicio);
+        }
+        
+        if (fechaHasta) {
+          // Convertir formato YYYY-MM a MM-YYYY para la tabla predictividad
+          const [year, month] = fechaHasta.split('-');
+          const periodoFin = `${month}-${year}`;
+          params.append('periodo_fin', periodoFin);
+        }
+        
+        if (params.toString()) {
+          url += '?' + params.toString();
+        }
+        
+        console.log('🔍 Consultando proyección física desde predictividad:', url);
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        console.log('📊 Respuesta proyección física:', data);
+        
+        if (data.success) {
+          const valorProyeccion = parseFloat(data.proyeccion_fisica?.porcentaje_total) || 0;
+          setProyeccionFisica(valorProyeccion);
+          
+          console.log('✅ Proyección física actualizada:', valorProyeccion);
+          console.log('📋 Total registros encontrados:', data.proyeccion_fisica?.total_registros);
+          console.log('💰 Monto USD:', data.proyeccion_fisica?.monto_usd);
+        } else {
+          console.log('⚠️ No se encontraron datos de proyección física en predictividad');
+          setProyeccionFisica(0);
+        }
+      } catch (error) {
+        console.error('❌ Error de conexión proyección física:', error);
+        setProyeccionFisica(0);
+      }
+    };
+
     // Función para calcular la desviación financiera
     const calcularDesviacionFinanciera = () => {
       if (proyeccionFinanciera > 0 && realFinanciera >= 0) {
@@ -745,34 +788,16 @@ const Reportabilidad = ({ proyectoId }) => {
       };
     };
 
-    // Cargar datos al montar el componente y cuando cambien los filtros
-    useEffect(() => {
-      if (proyectoId) {
-        console.log('🔄 Actualizando datos de predictividad por cambio de filtros');
-        obtenerProyeccionFinanciera();
-        obtenerRealFinanciera();
-        obtenerRealFisica();
-      }
-    }, [proyectoId, fechaDesde, fechaHasta]);
+    // FUNCIONES DE IMPORTACIÓN PARA TABLA PREDICTIVIDAD
 
-    // Validar que data sea un array válido
-    const datosValidos = Array.isArray(data) ? data : [];
-    
-    // Agrupar datos por tipo (Física y Financiera)
-    const datosFisicos = datosValidos.filter(item => (item.tipo || 'Fisica') === 'Fisica');
-    const datosFinancieros = datosValidos.filter(item => (item.tipo || 'Fisica') === 'Financiera');
-    
-    // Obtener el período más reciente para mostrar en el título
-    const periodoActual = datosValidos.length > 0 ? datosValidos[0].mes : 'Mayo - Junio / 2025';
-
-    // Funciones para importación PREDICTIVIDAD
-    const handleFileSelectPredictividad = (event) => {
+    // Función para seleccionar archivo Excel
+    const handleFileSelect = (event) => {
       const file = event.target.files[0];
       if (!file) return;
       
       const extension = file.name.split('.').pop().toLowerCase();
       if (!['xlsx', 'xls'].includes(extension)) {
-        setMensajeImportacion('📊 Solo se permiten archivos Excel (.xlsx, .xls) para PREDICTIVIDAD');
+        setMensajeImportacion('❌ Solo se permiten archivos Excel (.xlsx, .xls)');
         setTipoMensaje('error');
         setArchivoSeleccionado(null);
         return;
@@ -791,125 +816,318 @@ const Reportabilidad = ({ proyectoId }) => {
         setExcelData(data);
         
         if (data.length > 0) {
-          console.log('📊 PREDICTIVIDAD - Nombres de columnas:', Object.keys(data[0]));
-          console.log('📊 PREDICTIVIDAD - Primera fila:', data[0]);
+          console.log('📊 Columnas detectadas:', Object.keys(data[0]));
+          console.log('📊 Primera fila:', data[0]);
+          console.log('📊 Total filas:', data.length);
         }
       };
       reader.readAsBinaryString(file);
     };
 
-    // Funciones para importación PREDICTIVIDAD_PARCIAL
-    const handleFileSelectParcial = (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      const extension = file.name.split('.').pop().toLowerCase();
-      if (!['xlsx', 'xls'].includes(extension)) {
-        setMensajeImportacion('📈 Solo se permiten archivos Excel (.xlsx, .xls) para PREDICTIVIDAD_PARCIAL');
-        setTipoMensaje('error');
-        setArchivoSeleccionadoParcial(null);
-        return;
-      }
-
-      setArchivoSeleccionadoParcial(file);
-      setMensajeImportacion('');
-
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        setExcelDataParcial(data);
-        
-        if (data.length > 0) {
-          console.log('📈 PREDICTIVIDAD_PARCIAL - Nombres de columnas:', Object.keys(data[0]));
-          console.log('📈 PREDICTIVIDAD_PARCIAL - Primera fila:', data[0]);
-        }
-      };
-      reader.readAsBinaryString(file);
-    };
-
+    // Función para convertir fechas de Excel a formato YYYY-MM-DD (para campos DATE)
     const excelDateToMysql = (excelDate) => {
-      // Si es string tipo fecha
-      if (typeof excelDate === 'string' && excelDate.includes('-')) {
-        const parts = excelDate.split('-');
-        if (parts.length === 3 && parts[2].length === 4) {
-          // DD-MM-YYYY a YYYY-MM-DD
-          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      console.log('🔍 JS - CONVERSIÓN DE FECHA A YYYY-MM-DD:');
+      console.log('  📅 Valor recibido:', excelDate);
+      console.log('  📅 Tipo:', typeof excelDate);
+      
+      if (!excelDate || excelDate === '' || excelDate === null || excelDate === undefined) {
+        console.log('❌ JS - Fecha vacía, retornando cadena vacía');
+        return '';
+      }
+      
+      // Si es un número (número de serie Excel)
+      if (!isNaN(excelDate) && typeof excelDate === 'number') {
+        console.log('🔢 JS - Procesando número de Excel:', excelDate);
+        
+        // Algoritmo simple para convertir número de Excel a fecha
+        const excelEpoch = new Date(1900, 0, 1);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        let adjustedDays = excelDate - 1;
+        if (excelDate > 59) adjustedDays--;
+        
+        const resultDate = new Date(excelEpoch.getTime() + (adjustedDays * msPerDay));
+        
+        if (!isNaN(resultDate.getTime())) {
+          const year = resultDate.getFullYear();
+          const month = String(resultDate.getMonth() + 1).padStart(2, '0');
+          const day = String(resultDate.getDate()).padStart(2, '0');
+          const converted = `${year}-${month}-${day}`;
+          console.log('✅ JS - Convertido número Excel a YYYY-MM-DD:', `${excelDate} -> "${converted}"`);
+          return converted;
+        } else {
+          console.log('❌ JS - Error calculando fecha desde número Excel');
+          return '';
         }
-        return excelDate;
       }
-      // Si es número (número de serie Excel)
-      if (typeof excelDate === 'number') {
-        const date = XLSX.SSF.parse_date_code(excelDate);
-        if (!date) return '';
-        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+      
+      // Si es string, procesar formato DD-MM-YYYY
+      const dateStr = String(excelDate).trim();
+      console.log('📅 JS - Fecha como string:', `"${dateStr}"`);
+      
+      if (dateStr.includes('-')) {
+        const parts = dateStr.split('-');
+        console.log('📅 JS - Partes de fecha:', parts);
+        
+        if (parts.length === 3) {
+          if (parts[2].length === 4) {
+            // Formato DD-MM-YYYY -> convertir a YYYY-MM-DD
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            const converted = `${year}-${month}-${day}`;
+            console.log('✅ JS - Convertido DD-MM-YYYY a YYYY-MM-DD:', `"${dateStr}" -> "${converted}"`);
+            return converted;
+          } else if (parts[0].length === 4) {
+            // Ya está en formato YYYY-MM-DD
+            const year = parts[0];
+            const month = parts[1].padStart(2, '0');
+            const day = parts[2].padStart(2, '0');
+            const converted = `${year}-${month}-${day}`;
+            console.log('✅ JS - Formato YYYY-MM-DD mantenido:', `"${dateStr}" -> "${converted}"`);
+            return converted;
+          }
+        }
       }
+      
+      console.log('⚠️ JS - Formato no reconocido, retornando cadena vacía');
       return '';
     };
 
+    // Función para normalizar nombres de columnas
     const normalizeKeys = (row) => {
       const newRow = {};
       Object.keys(row).forEach(key => {
-        newRow[key.trim().toLowerCase()] = row[key];
+        newRow[key.trim().toLowerCase().replace(/\s+/g, '_')] = row[key];
       });
       return newRow;
     };
 
-    // Función para mapear Excel de PREDICTIVIDAD_PARCIAL
-    const mapExcelRowParcial = (row) => {
-      const r = normalizeKeys(row);
+    // Función para convertir porcentajes
+    const parsePercentage = (value) => {
+      console.log('🔢 JS PARSEPERCENTAGE - Iniciando conversión:');
+      console.log('  Valor original:', value);
+      console.log('  Tipo:', typeof value);
       
-      const tipo = r['tipo'] || '';
-      const periodo = excelDateToMysql(r['periodo']);
-      const cat_vp = r['cat_vp'] || '';
-      const detalle_factorial = r['detalle_factorial'] || '';
-      
-      // Procesar monto con separadores de miles
-      let monto = r['monto'] || 0;
-      if (typeof monto === 'string') {
-        // Eliminar separadores de miles (puntos) y convertir a número
-        monto = monto.replace(/\./g, '');
-        monto = parseFloat(monto) || 0;
-      } else {
-        monto = parseFloat(monto) || 0;
+      if (!value || value === '' || value === null || value === undefined) {
+        console.log('  ✅ JS - Valor vacío, retornando 0');
+        return 0;
       }
       
-      return {
-        tipo: tipo,
-        periodo: periodo,
-        cat_vp: cat_vp,
-        detalle_factorial: detalle_factorial,
-        monto: monto
-      };
+      let numero = 0;
+      
+      // Si es un número (viene de Excel como decimal)
+      if (typeof value === 'number') {
+        numero = value;
+        console.log('  📊 JS - Es número:', numero);
+        
+        // Si es un número muy pequeño (< 1), probablemente viene de formato porcentaje de Excel
+        // Multiplicar por 100 para obtener el valor que el usuario espera
+        if (numero > 0 && numero < 1) {
+          numero = numero * 100;
+          console.log('  🔄 JS - Detectado formato porcentaje Excel, multiplicado por 100:', numero);
+        }
+      } else {
+        // Si es string, procesarlo como antes
+        let str = String(value).trim();
+        console.log('  Como string:', str);
+        
+        if (str === '') {
+          console.log('  ✅ JS - String vacío después de trim, retornando 0');
+          return 0;
+        }
+        
+        // Remover el símbolo % si existe
+        if (str.includes('%')) {
+          str = str.replace('%', '');
+          console.log('  Después de quitar %:', str);
+        }
+        
+        // Reemplazar coma por punto para parseFloat
+        str = str.replace(',', '.');
+        console.log('  Después de coma->punto:', str);
+        
+        numero = parseFloat(str);
+        console.log('  Resultado parseFloat:', numero);
+      }
+      
+      console.log('  ¿Es NaN?:', isNaN(numero));
+      
+      const resultado = isNaN(numero) ? 0 : parseFloat(numero.toFixed(2));
+      console.log('🔢 JS PARSEPERCENTAGE - Resultado final:', resultado);
+      
+      return resultado;
     };
 
-    const handleImportar = async () => {
-      console.log('📈 Iniciando importación a tabla PREDICTIVIDAD_PARCIAL');
+    // Función para mapear filas del Excel a formato de base de datos
+    const mapExcelRow = (row) => {
+      const r = normalizeKeys(row);
       
-      // Verificar que hay archivo seleccionado para PARCIAL
-      if (!archivoSeleccionadoParcial || excelDataParcial.length === 0) {
-        setMensajeImportacion('📈 Por favor selecciona un archivo Excel válido para PREDICTIVIDAD_PARCIAL');
+      console.log('📊 ============ PROCESANDO FILA EXCEL ============');
+      console.log('📊 Datos originales del Excel:', row);
+      console.log('📊 Datos normalizados:', r);
+      console.log('📊 Claves disponibles:', Object.keys(r));
+      
+      // COMPARACIÓN ESPECÍFICA: ¿Por qué periodo_prediccion funciona pero periodo_cierre_real no?
+      console.log('🔍 COMPARACIÓN DE CAMPOS DE FECHA EN EXCEL:');
+      console.log('  📅 periodo_prediccion en datos originales:', row['periodo_prediccion']);
+      console.log('  📅 periodo_prediccion en datos normalizados:', r['periodo_prediccion']);
+      console.log('  📅 periodo_cierre_real en datos originales:', row['periodo_cierre_real']);
+      console.log('  📅 periodo_cierre_real en datos normalizados:', r['periodo_cierre_real']);
+      
+      // Buscar variaciones de periodo_cierre_real en los datos
+      console.log('🔍 BÚSQUEDA DE CLAVES RELACIONADAS CON CIERRE/REAL:');
+      Object.keys(row).forEach(key => {
+        if (key.toLowerCase().includes('cierre') || key.toLowerCase().includes('real')) {
+          console.log(`  - ORIGINAL '${key}':`, row[key]);
+        }
+      });
+      Object.keys(r).forEach(key => {
+        if (key.includes('cierre') || key.includes('real')) {
+          console.log(`  - NORMALIZADA '${key}':`, r[key]);
+        }
+      });
+      
+      // Buscar claves de forma más flexible
+      let periodoPrediccionKey = null;
+      let porcentajePredicidoKey = null;
+      let periodoCierreRealKey = null;
+      let valorRealPorcentajeKey = null;
+      
+      // Búsqueda exacta primero
+      Object.keys(r).forEach(key => {
+        if (key === 'periodo_prediccion') periodoPrediccionKey = key;
+        if (key === 'porcentaje_predicido') porcentajePredicidoKey = key;
+        if (key === 'periodo_cierre_real') periodoCierreRealKey = key;
+        if (key === 'valor_real_porcentaje') valorRealPorcentajeKey = key;
+      });
+      
+      // Si no se encuentran las claves exactas, buscar alternativas
+      if (!periodoPrediccionKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('periodo') && key.includes('prediccion')) {
+            periodoPrediccionKey = key;
+          }
+        });
+      }
+      
+      if (!porcentajePredicidoKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('porcentaje') && key.includes('predicido')) {
+            porcentajePredicidoKey = key;
+          }
+        });
+      }
+      
+      if (!periodoCierreRealKey) {
+        console.log('🔍 periodo_cierre_real no encontrado, buscando alternativas...');
+        Object.keys(r).forEach(key => {
+          if (key.includes('periodo') && key.includes('cierre') && key.includes('real')) {
+            periodoCierreRealKey = key;
+            console.log('✅ Encontrada clave alternativa para periodo_cierre_real:', key);
+          }
+        });
+        
+        // Si aún no se encuentra, buscar solo con "cierre" y "real"
+        if (!periodoCierreRealKey) {
+          Object.keys(r).forEach(key => {
+            if (key.includes('cierre') && key.includes('real')) {
+              periodoCierreRealKey = key;
+              console.log('✅ Encontrada clave con cierre+real:', key);
+            }
+          });
+        }
+        
+        // Como último recurso, buscar solo "real" que contenga fecha
+        if (!periodoCierreRealKey) {
+          Object.keys(r).forEach(key => {
+            if (key.includes('real') && r[key] && String(r[key]).includes('-')) {
+              periodoCierreRealKey = key;
+              console.log('✅ Encontrada clave con "real" que parece fecha:', key);
+            }
+          });
+        }
+      }
+      
+      if (!valorRealPorcentajeKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('valor') && key.includes('real')) {
+            valorRealPorcentajeKey = key;
+          }
+        });
+      }
+      
+      console.log('🔍 CLAVES FINALES DETECTADAS:');
+      console.log('  - periodo_prediccion:', periodoPrediccionKey);
+      console.log('  - porcentaje_predicido:', porcentajePredicidoKey);
+      console.log('  - periodo_cierre_real:', periodoCierreRealKey);
+      console.log('  - valor_real_porcentaje:', valorRealPorcentajeKey);
+      
+      // Procesar los valores con logging detallado
+      console.log('🔄 PROCESANDO VALORES:');
+      
+      const periodo_prediccion = periodoPrediccionKey ? excelDateToMysql(r[periodoPrediccionKey]) : '';
+      console.log('📅 periodo_prediccion procesado:', periodo_prediccion, '← de:', r[periodoPrediccionKey]);
+      
+      const porcentaje_predicido = porcentajePredicidoKey ? parsePercentage(r[porcentajePredicidoKey]) : 0;
+      console.log('📊 porcentaje_predicido procesado:', porcentaje_predicido, '← de:', r[porcentajePredicidoKey]);
+      
+      const periodo_cierre_real = periodoCierreRealKey ? excelDateToMysql(r[periodoCierreRealKey]) : '';
+      console.log('📅 periodo_cierre_real procesado:', periodo_cierre_real, '← de:', r[periodoCierreRealKey]);
+      
+      const valor_real_porcentaje = valorRealPorcentajeKey ? parsePercentage(r[valorRealPorcentajeKey]) : 0;
+      console.log('📊 valor_real_porcentaje procesado:', valor_real_porcentaje, '← de:', r[valorRealPorcentajeKey]);
+      
+      // Verificación especial para periodo_cierre_real
+      if (!periodo_cierre_real && periodoCierreRealKey) {
+        console.log('🚨 PROBLEMA EN JS: periodo_cierre_real vacío después del procesamiento');
+        console.log('  - Clave usada:', periodoCierreRealKey);
+        console.log('  - Valor original:', r[periodoCierreRealKey]);
+        console.log('  - Tipo del valor:', typeof r[periodoCierreRealKey]);
+      }
+      
+      // Si periodo_cierre_real está vacío, usar periodo_prediccion como fallback
+      let periodo_cierre_real_final = periodo_cierre_real;
+      if (!periodo_cierre_real && periodo_prediccion) {
+        console.log('⚠️ JS - Usando periodo_prediccion como fallback para periodo_cierre_real');
+        periodo_cierre_real_final = periodo_prediccion;
+      }
+      
+      const mappedRow = {
+        periodo_prediccion: periodo_prediccion,
+        porcentaje_predicido: porcentaje_predicido,
+        periodo_cierre_real: periodo_cierre_real_final,
+        valor_real_porcentaje: valor_real_porcentaje
+      };
+      
+      console.log('📊 FILA MAPEADA FINAL:', mappedRow);
+      console.log('📊 ============ FIN PROCESAMIENTO FILA EXCEL ============');
+      
+      return mappedRow;
+    };
+
+    // Función principal de importación
+    const handleImportar = async () => {
+      console.log('📊 Iniciando importación a tabla PREDICTIVIDAD');
+      
+      if (!archivoSeleccionado || excelData.length === 0) {
+        setMensajeImportacion('❌ Por favor selecciona un archivo Excel válido');
         setTipoMensaje('error');
         return;
       }
-      
+
       // Verificar autorización antes de importar
       if (!autorizado) {
-        console.log('📈 Requiere autorización para PREDICTIVIDAD_PARCIAL');
+        console.log('🔐 Requiere autorización para importar');
         setShowAuthModal(true);
         return;
       }
 
       // Si ya está autorizado, ejecutar la importación directamente
-      ejecutarImportacionParcial();
+      ejecutarImportacion();
     };
 
     // Función para validar código de autorización
     const validarCodigoAutorizacion = async () => {
-      // Código secreto: codelco2025$
       const codigoCorrecto = 'codelco2025$';
       
       if (codigoAutorizacion.trim() === codigoCorrecto) {
@@ -920,7 +1138,7 @@ const Reportabilidad = ({ proyectoId }) => {
         
         // Continuar automáticamente con la importación después de validar
         setTimeout(() => {
-          ejecutarImportacionParcial();
+          ejecutarImportacion();
         }, 100);
         
         return true;
@@ -930,82 +1148,10 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
-    // Función separada para ejecutar la importación PARCIAL
-    const ejecutarImportacionParcial = async () => {
-      if (!archivoSeleccionadoParcial || excelDataParcial.length === 0) {
-        setMensajeImportacion('📈 Por favor selecciona un archivo Excel válido para PREDICTIVIDAD_PARCIAL');
-        setTipoMensaje('error');
-        return;
-      }
-
-      setImportandoParcial(true);
-      setMensajeImportacion('');
-
-      try {
-        // Mapear los datos antes de enviar usando la función para parcial
-        const datosMapeados = excelDataParcial.map(mapExcelRowParcial);
-        
-        // Verificar que proyectoId esté disponible
-        if (!proyectoId) {
-          setMensajeImportacion('📈 Error: No hay proyecto seleccionado');
-          setTipoMensaje('error');
-          return;
-        }
-        
-        console.log('📈 Datos a enviar para PREDICTIVIDAD_PARCIAL:', datosMapeados);
-        
-        const response = await fetch(`${API_BASE}/predictividad/importar_real_parcial_predictivo.php`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            rows: datosMapeados,
-            proyecto_id: proyectoId || 1 // Enviar el proyecto_id actual o default
-          }),
-        });
-
-        const result = await response.json();
-        console.log('📈 Respuesta del servidor PARCIAL:', result);
-
-        if (result.success) {
-          const mensajeExito = `📈 ¡Importación a PREDICTIVIDAD_PARCIAL completada! Se han importado ${result.inserted} registros a la tabla predictividad_parcial.`;
-          setMensajeImportacion(mensajeExito);
-          setTipoMensaje('success');
-          setArchivoSeleccionadoParcial(null);
-          setExcelDataParcial([]);
-          if (fileInputRefParcial.current) {
-            fileInputRefParcial.current.value = '';
-          }
-          // No recargar datos inmediatamente para evitar re-renderizado
-          // Los datos se recargarán cuando el usuario cambie de pestaña o recargue la página
-          
-          // Limpiar el mensaje después de 5 segundos para que el usuario pueda verlo
-          setTimeout(() => {
-            setMensajeImportacion('');
-            setTipoMensaje('');
-          }, 5000);
-        } else {
-          if (result.errores && Array.isArray(result.errores)) {
-            setMensajeImportacion('📈 Errores en importación a PREDICTIVIDAD_PARCIAL: ' + result.errores.join(', '));
-          } else {
-            setMensajeImportacion(result.error || '📈 Error en importación a PREDICTIVIDAD_PARCIAL');
-          }
-          setTipoMensaje('error');
-        }
-      } catch (error) {
-        console.error('📈 Error completo PARCIAL:', error);
-        setMensajeImportacion('📈 Error de conexión: ' + error.message);
-        setTipoMensaje('error');
-      } finally {
-        setImportandoParcial(false);
-      }
-    };
-
-    // Función para manejar la importación de datos a la tabla predictividad
-    const handleImportarPredictividad = async () => {
-      console.log('📊 Iniciando importación a tabla PREDICTIVIDAD');
-
+    // Función para ejecutar la importación
+    const ejecutarImportacion = async () => {
       if (!archivoSeleccionado || excelData.length === 0) {
-        setMensajeImportacion('📊 Por favor selecciona un archivo Excel válido para PREDICTIVIDAD');
+        setMensajeImportacion('❌ Por favor selecciona un archivo Excel válido');
         setTipoMensaje('error');
         return;
       }
@@ -1014,108 +1160,19 @@ const Reportabilidad = ({ proyectoId }) => {
       setMensajeImportacion('');
 
       try {
+        // Mapear los datos antes de enviar
+        const datosMapeados = excelData.map(mapExcelRow);
+        
         // Verificar que proyectoId esté disponible
         if (!proyectoId) {
-          setMensajeImportacion('📊 Error: No hay proyecto seleccionado');
+          setMensajeImportacion('❌ Error: No hay proyecto seleccionado');
           setTipoMensaje('error');
           return;
         }
-
-        // Función para normalizar nombres de columnas
-        const normalizeColumnName = (columnName) => {
-          return columnName
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, '_')
-            .replace(/[^\w]/g, '_')
-            .replace(/_+/g, '_')
-            .replace(/^_|_$/g, '');
-        };
-
-        // Función para convertir porcentajes
-        const parsePercentage = (value) => {
-          if (!value || value === '') return 0;
-          let str = String(value).trim();
-          if (str.includes('%')) {
-            str = str.replace('%', '');
-          }
-          str = str.replace(',', '.');
-          const num = parseFloat(str);
-          return isNaN(num) ? 0 : num;
-        };
-
-        // Mapear los datos de predictividad antes de enviar
-        const datosMapeados = excelData.map((row, index) => {
-          console.log(`📊 Procesando fila ${index + 1}:`, row);
-          
-          // Normalizar keys para mapear flexiblemente
-          const normalizedRow = {};
-          Object.keys(row).forEach(key => {
-            const normalizedKey = normalizeColumnName(key);
-            normalizedRow[normalizedKey] = row[key];
-            console.log(`  ${key} -> ${normalizedKey}: ${row[key]}`);
-          });
-
-                     // Mapear con nombres flexibles - busca cualquier columna que contenga las palabras clave
-           const mappedRow = {
-             periodo_prediccion: normalizedRow['periodo_prediccion'] || 
-                               Object.keys(normalizedRow).find(key => 
-                                 key.includes('periodo') && key.includes('pred')
-                               ) ? normalizedRow[Object.keys(normalizedRow).find(key => 
-                                 key.includes('periodo') && key.includes('pred')
-                               )] : '',
-             porcentaje_predicido: parsePercentage(normalizedRow['porcentaje_predicido'] || 
-                               Object.keys(normalizedRow).find(key => 
-                                 key.includes('porcentaje') && key.includes('pred')
-                               ) ? normalizedRow[Object.keys(normalizedRow).find(key => 
-                                 key.includes('porcentaje') && key.includes('pred')
-                               )] : 0),
-             periodo_cierre_real: normalizedRow['periodo_cierre_real'] || 
-                               Object.keys(normalizedRow).find(key => 
-                                 (key.includes('periodo') || key.includes('cierre')) && key.includes('real')
-                               ) ? normalizedRow[Object.keys(normalizedRow).find(key => 
-                                 (key.includes('periodo') || key.includes('cierre')) && key.includes('real')
-                               )] : '',
-             valor_real_porcentaje: parsePercentage(normalizedRow['valor_real_porcentaje'] || 
-                               Object.keys(normalizedRow).find(key => 
-                                 key.includes('valor') && key.includes('real')
-                               ) ? normalizedRow[Object.keys(normalizedRow).find(key => 
-                                 key.includes('valor') && key.includes('real')
-                               )] : 0)
-           };
-
-          console.log(`📊 Fila ${index + 1} mapeada:`, mappedRow);
-          return mappedRow;
-        });
-
-        console.log('📊 Datos originales del Excel:', excelData);
-        console.log('📊 Columnas detectadas en Excel:', excelData.length > 0 ? Object.keys(excelData[0]) : []);
-        console.log('📊 Datos mapeados para enviar:', datosMapeados);
-        console.log('📊 Total de filas a procesar:', datosMapeados.length);
-
-        // Validar que tenemos las columnas básicas
-        if (excelData.length > 0) {
-          const primeraFila = excelData[0];
-          const columnasExcel = Object.keys(primeraFila);
-          console.log('📊 Análisis de columnas del Excel:');
-          columnasExcel.forEach(col => {
-            console.log(`  - "${col}" (normalizada: "${normalizeColumnName(col)}")`);
-          });
-
-          // Verificar si tenemos las columnas mínimas necesarias
-          const columnasNormalizadas = columnasExcel.map(normalizeColumnName);
-          const tieneColumnasBasicas = 
-            columnasNormalizadas.some(col => col.includes('periodo') && col.includes('pred')) &&
-            columnasNormalizadas.some(col => col.includes('porcentaje') && col.includes('pred')) &&
-            columnasNormalizadas.some(col => col.includes('periodo') && (col.includes('cierre') || col.includes('real'))) &&
-            columnasNormalizadas.some(col => col.includes('valor') && col.includes('real'));
-
-          if (!tieneColumnasBasicas) {
-            console.warn('⚠️ Las columnas del Excel no coinciden con el formato esperado');
-            console.log('📊 Formato esperado: periodo_prediccion, porcentaje_predicido, periodo_cierre_real, valor_real_porcentaje');
-          }
-        }
+        
+        console.log('📊 Datos mapeados a enviar:', datosMapeados);
+        console.log('📊 Proyecto ID:', proyectoId);
+        console.log('📊 Total filas a procesar:', datosMapeados.length);
         
         const response = await fetch(`${API_BASE}/predictividad/importar_predictividad.php`, {
           method: 'POST',
@@ -1127,10 +1184,10 @@ const Reportabilidad = ({ proyectoId }) => {
         });
 
         const result = await response.json();
-        console.log('Respuesta del servidor predictividad:', result);
+        console.log('📊 Respuesta del servidor:', result);
 
         if (result.success) {
-          const mensajeExito = `📊 ¡Importación a PREDICTIVIDAD completada! Se han importado ${result.inserted} de ${result.total_rows} registros a la tabla predictividad.`;
+          const mensajeExito = `✅ ¡Importación completada exitosamente! Se han importado ${result.inserted} de ${result.total_rows} registros a la tabla PREDICTIVIDAD.`;
           setMensajeImportacion(mensajeExito);
           setTipoMensaje('success');
           setArchivoSeleccionado(null);
@@ -1146,82 +1203,25 @@ const Reportabilidad = ({ proyectoId }) => {
           }, 5000);
         } else {
           if (result.errores && Array.isArray(result.errores)) {
-            const mensajeError = '📊 Errores en importación a PREDICTIVIDAD: ' + result.errores.join(', ');
-            setMensajeImportacion(mensajeError + '\n\n💡 Sugerencias:\n1. Verifique que las columnas del Excel coincidan exactamente: periodo_prediccion, porcentaje_predicido, periodo_cierre_real, valor_real_porcentaje\n2. Descargue la plantilla oficial usando el botón "📥 Plantilla"\n3. Las fechas deben estar en formato DD-MM-YYYY\n4. Los porcentajes pueden usar coma decimal (ej: 1,70%)');
+            setMensajeImportacion('❌ Errores en la importación: ' + result.errores.join(', '));
           } else {
-            const mensajeError = result.error || '📊 Error en importación a PREDICTIVIDAD';
-            setMensajeImportacion(mensajeError + '\n\n💡 Descargue la plantilla oficial y verifique el formato de las columnas.');
+            setMensajeImportacion(result.error || '❌ Error en la importación');
           }
           setTipoMensaje('error');
         }
       } catch (error) {
-        console.error('Error completo en importación predictividad:', error);
-        setMensajeImportacion('Error de conexión: ' + error.message);
+        console.error('❌ Error completo:', error);
+        setMensajeImportacion('❌ Error de conexión: ' + error.message);
         setTipoMensaje('error');
       } finally {
         setImportando(false);
       }
     };
 
+    // Función para descargar plantilla Excel
     const descargarPlantilla = async () => {
       try {
-        // Crear plantilla basada en la estructura de tu Excel
-        const plantillaData = [
-          {
-            'ID': 1,
-            'PROYECTO': 'EMBALSE CARÉN',
-            'CENTRO COSTO': 'T21C404 8a-9a',
-            'PERIODO': '01-07-2021',
-            'TIPO': 'COSTO DIRECTO',
-            'CAT_VP': 'MO',
-            'DETALLE_FACTORIAL': 'CONSTRUCCION',
-            'MONTO': '15491'
-          },
-          {
-            'ID': 2,
-            'PROYECTO': 'EMBALSE CARÉN',
-            'CENTRO COSTO': 'T21C404 8a-9a',
-            'PERIODO': '01-08-2021',
-            'TIPO': 'COSTO DIRECTO',
-            'CAT_VP': 'MO',
-            'DETALLE_FACTORIAL': 'CONSTRUCCION',
-            'MONTO': '16540'
-          },
-          {
-            'ID': 3,
-            'PROYECTO': 'EMBALSE CARÉN',
-            'CENTRO COSTO': 'T21C404 8a-9a',
-            'PERIODO': '01-09-2021',
-            'TIPO': 'COSTO DIRECTO',
-            'CAT_VP': 'MO',
-            'DETALLE_FACTORIAL': 'CONSTRUCCION',
-            'MONTO': '82140'
-          }
-        ];
-
-        // Crear workbook y worksheet
-        const ws = XLSX.utils.json_to_sheet(plantillaData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Predictividad Parcial');
-
-        // Descargar archivo
-        const fileName = proyectoId ? `predictividad_parcial_proyecto_${proyectoId}.xlsx` : 'plantilla_predictividad_parcial.xlsx';
-        XLSX.writeFile(wb, fileName);
-        
-        // Mostrar mensaje de éxito
-        setMensajeImportacion(`Archivo descargado exitosamente: ${fileName}`);
-        setTipoMensaje('success');
-        
-      } catch (error) {
-        console.error('Error al descargar plantilla:', error);
-        setMensajeImportacion('Error al descargar la plantilla: ' + error.message);
-        setTipoMensaje('error');
-      }
-    };
-
-    const descargarPlantillaPredictividad = async () => {
-      try {
-        // Crear plantilla para la tabla predictividad con las 4 columnas requeridas
+        // Crear plantilla con datos de ejemplo basados en la imagen
         const plantillaData = [
           {
             'periodo_prediccion': '31-12-2024',
@@ -1267,19 +1267,46 @@ const Reportabilidad = ({ proyectoId }) => {
         XLSX.utils.book_append_sheet(wb, ws, 'Predictividad');
 
         // Descargar archivo
-        const fileName = proyectoId ? `predictividad_proyecto_${proyectoId}.xlsx` : 'plantilla_predictividad.xlsx';
+        const fileName = proyectoId ? `plantilla_predictividad_proyecto_${proyectoId}.xlsx` : 'plantilla_predictividad.xlsx';
         XLSX.writeFile(wb, fileName);
         
         // Mostrar mensaje de éxito
-        setMensajeImportacion(`Plantilla de predictividad descargada: ${fileName}`);
+        setMensajeImportacion(`✅ Plantilla descargada exitosamente: ${fileName}`);
         setTipoMensaje('success');
         
+        // Limpiar mensaje después de 3 segundos
+        setTimeout(() => {
+          setMensajeImportacion('');
+          setTipoMensaje('');
+        }, 3000);
+        
       } catch (error) {
-        console.error('Error al descargar plantilla de predictividad:', error);
-        setMensajeImportacion('Error al descargar la plantilla: ' + error.message);
+        console.error('❌ Error al descargar plantilla:', error);
+        setMensajeImportacion('❌ Error al descargar la plantilla: ' + error.message);
         setTipoMensaje('error');
       }
     };
+
+    // Cargar datos al montar el componente y cuando cambien los filtros
+    useEffect(() => {
+      if (proyectoId) {
+        console.log('🔄 Actualizando datos de predictividad por cambio de filtros');
+        obtenerProyeccionFinanciera();
+        obtenerRealFinanciera();
+        obtenerRealFisica();
+        obtenerProyeccionFisica();
+      }
+    }, [proyectoId, fechaDesde, fechaHasta]);
+
+    // Validar que data sea un array válido
+    const datosValidos = Array.isArray(data) ? data : [];
+    
+    // Agrupar datos por tipo (Física y Financiera)
+    const datosFisicos = datosValidos.filter(item => (item.tipo || 'Fisica') === 'Fisica');
+    const datosFinancieros = datosValidos.filter(item => (item.tipo || 'Fisica') === 'Financiera');
+    
+    // Obtener el período más reciente para mostrar en el título
+    const periodoActual = datosValidos.length > 0 ? datosValidos[0].mes : 'Mayo - Junio / 2025';
 
     return (
     <div style={{ width: '100%', padding: '20px' }}>
@@ -1293,14 +1320,14 @@ const Reportabilidad = ({ proyectoId }) => {
         }}>
           <h3 style={{ color: '#16355D', margin: 0 }}>PREDICTIVIDAD</h3>
           
-          {/* Sección de importación a tabla PREDICTIVIDAD_PARCIAL */}
+          {/* Sección de importación - Funcionalidad completa */}
           <div style={{ 
             display: 'flex', 
             flexDirection: 'column',
             gap: '10px',
             alignItems: 'flex-end'
           }}>
-            {/* Etiqueta para tabla Predictividad Parcial */}
+            {/* Etiqueta para identificar la sección */}
             <div style={{
               backgroundColor: '#6f42c1',
               color: 'white',
@@ -1309,10 +1336,10 @@ const Reportabilidad = ({ proyectoId }) => {
               fontSize: '11px',
               fontWeight: 'bold'
             }}>
-              📈 TABLA: PREDICTIVIDAD_PARCIAL
+              📈 IMPORTACIÓN DE DATOS
             </div>
             
-            {/* Botones para tabla Predictividad Parcial */}
+            {/* Botones con funcionalidad completa */}
             <div style={{ 
               display: 'flex', 
               gap: '6px', 
@@ -1332,6 +1359,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   alignItems: 'center',
                   gap: '4px'
                 }}
+                title="Ver información del formato requerido"
               >
                 <span style={{ fontSize: '12px' }}>ℹ️</span>
                 Formato
@@ -1351,13 +1379,14 @@ const Reportabilidad = ({ proyectoId }) => {
                   alignItems: 'center',
                   gap: '4px'
                 }}
+                title="Descargar plantilla Excel con formato correcto"
               >
                 <span style={{ fontSize: '12px' }}>📥</span>
                 Plantilla
               </button>
 
               <button
-                onClick={() => fileInputRefParcial.current?.click()}
+                onClick={() => fileInputRef.current?.click()}
                 style={{
                   backgroundColor: '#007bff',
                   color: 'white',
@@ -1370,6 +1399,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   alignItems: 'center',
                   gap: '4px'
                 }}
+                title="Seleccionar archivo Excel para importar"
               >
                 <span style={{ fontSize: '12px' }}>📁</span>
                 Archivo
@@ -1377,35 +1407,35 @@ const Reportabilidad = ({ proyectoId }) => {
 
               <button
                 onClick={handleImportar}
-                disabled={!archivoSeleccionadoParcial || importandoParcial}
+                disabled={!archivoSeleccionado || importando}
                 style={{
-                  backgroundColor: importandoParcial ? '#6c757d' : '#6f42c1',
+                  backgroundColor: (!archivoSeleccionado || importando) ? '#6c757d' : '#6f42c1',
                   color: 'white',
                   border: 'none',
                   padding: '6px 10px',
                   borderRadius: '4px',
-                  cursor: importandoParcial ? 'not-allowed' : 'pointer',
+                  cursor: (!archivoSeleccionado || importando) ? 'not-allowed' : 'pointer',
                   fontSize: '11px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  opacity: importandoParcial ? 0.6 : 1
+                  opacity: (!archivoSeleccionado || importando) ? 0.6 : 1
                 }}
+                title={archivoSeleccionado ? "Importar datos a la tabla predictividad" : "Primero selecciona un archivo"}
               >
                 <span style={{ fontSize: '12px' }}>📈</span>
-                {importandoParcial ? 'Importando...' : 'Importar'}
+                {importando ? 'Importando...' : 'Importar'}
               </button>
             </div>
-
           </div>
         </div>
 
-        {/* Input file oculto para predictividad_parcial */}
+        {/* Input file oculto */}
         <input
-          ref={fileInputRefParcial}
+          ref={fileInputRef}
           type="file"
           accept=".xlsx,.xls"
-          onChange={handleFileSelectParcial}
+          onChange={handleFileSelect}
           style={{ display: 'none' }}
         />
 
@@ -1418,31 +1448,14 @@ const Reportabilidad = ({ proyectoId }) => {
             padding: '15px',
             marginBottom: '15px'
           }}>
-            <h4 style={{ margin: '0 0 10px 0', color: '#1976d2' }}>📈 Formato para Tabla PREDICTIVIDAD_PARCIAL:</h4>
+            <h4 style={{ margin: '0 0 10px 0', color: '#1976d2' }}>📊 Formato Requerido para Tabla PREDICTIVIDAD:</h4>
             <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
-              <div style={{ 
-                backgroundColor: '#6f42c1', 
-                color: 'white', 
-                padding: '8px', 
-                borderRadius: '4px', 
-                marginBottom: '10px' 
-              }}>
-                <strong>📈 TABLA: PREDICTIVIDAD_PARCIAL (formato estándar)</strong>
-              </div>
-              
-              <p><strong>✅ Columnas requeridas en el Excel:</strong></p>
+              <p><strong>📋 Columnas requeridas (nombres exactos):</strong></p>
               <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                <li><strong>TIPO:</strong> Texto (ej: COSTO DIRECTO)</li>
-                <li><strong>PERIODO:</strong> Fecha en formato DD-MM-YYYY (ej: 01-07-2021)</li>
-                <li><strong>CAT_VP:</strong> Categoría VP (ej: MO, IC, EM)</li>
-                <li><strong>DETALLE_FACTORIAL:</strong> Descripción (ej: CONSTRUCCION)</li>
-                <li><strong>MONTO:</strong> Valor numérico (ej: 15491)</li>
-              </ul>
-              
-              <p><strong>🚫 Campos automáticos (NO incluir en Excel):</strong></p>
-              <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                <li><strong>ID, PROYECTO, CENTRO COSTO:</strong> Se generan automáticamente</li>
-                <li><strong>proyecto_id:</strong> Se toma del proyecto seleccionado</li>
+                <li><strong>periodo_prediccion:</strong> Fecha en formato DD-MM-YYYY (ej: 31-12-2024)</li>
+                <li><strong>porcentaje_predicido:</strong> Porcentaje con coma decimal (ej: 1,70%)</li>
+                <li><strong>periodo_cierre_real:</strong> Fecha en formato DD-MM-YYYY (ej: 31-01-2025)</li>
+                <li><strong>valor_real_porcentaje:</strong> Porcentaje con coma decimal (ej: 3,43%)</li>
               </ul>
               
               <div style={{
@@ -1453,55 +1466,40 @@ const Reportabilidad = ({ proyectoId }) => {
                 marginTop: '10px'
               }}>
                 <p style={{ margin: 0, color: '#155724', fontWeight: 'bold' }}>
-                  ✅ NOTA: Esta importación va directamente a la tabla predictividad_parcial.
+                  ✅ NOTA: Use la plantilla descargable para asegurar el formato correcto.
+                </p>
+              </div>
+              
+              <div style={{
+                backgroundColor: '#fff3cd',
+                border: '1px solid #ffeaa7',
+                borderRadius: '4px',
+                padding: '10px',
+                marginTop: '10px'
+              }}>
+                <p style={{ margin: 0, color: '#856404', fontWeight: 'bold' }}>
+                  ⚠️ IMPORTANTE: Los datos se almacenan en la tabla "predictividad".
                 </p>
               </div>
             </div>
           </div>
         )}
 
-
-
-        {/* Mensaje de importación */}
-        {mensajeImportacion && (
-          <div style={{
-            backgroundColor: tipoMensaje === 'success' ? '#d4edda' : '#f8d7da',
-            border: `2px solid ${tipoMensaje === 'success' ? '#28a745' : '#dc3545'}`,
-            borderRadius: '8px',
-            padding: '15px 20px',
-            marginBottom: '20px',
-            color: tipoMensaje === 'success' ? '#155724' : '#721c24',
-            fontSize: '16px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            animation: 'slideIn 0.3s ease-out'
-          }}>
-            <span style={{ fontSize: '20px' }}>
-              {tipoMensaje === 'success' ? '✅' : '❌'}
-            </span>
-            <span>{mensajeImportacion}</span>
-          </div>
-        )}
-
-        {/* Archivos seleccionados */}
-        {/* Archivo seleccionado para PREDICTIVIDAD_PARCIAL */}
-        {archivoSeleccionadoParcial && (
+        {/* Archivo seleccionado */}
+        {archivoSeleccionado && (
           <div style={{
             backgroundColor: '#d1ecf1',
-            border: '1px solid #20c997',
+            border: '1px solid #bee5eb',
             borderRadius: '5px',
             padding: '10px 15px',
             marginBottom: '15px'
           }}>
-            <strong>📈 PREDICTIVIDAD_PARCIAL - Archivo seleccionado:</strong> {archivoSeleccionadoParcial.name} 
-            ({excelDataParcial.length} filas detectadas)
+            <strong>📂 Archivo seleccionado:</strong> {archivoSeleccionado.name} 
+            <span style={{ marginLeft: '10px', color: '#0c5460' }}>
+              ({excelData.length} filas detectadas)
+            </span>
           </div>
         )}
-
-
 
         {/* Modal de autorización */}
         {showAuthModal && (
@@ -1535,7 +1533,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   lineHeight: '1.5',
                   color: '#666'
                 }}>
-                  Para importar datos de predictividad parcial, se requiere un código de autorización.
+                  Para importar datos a la tabla PREDICTIVIDAD, se requiere un código de autorización.
                 </p>
               </div>
               
@@ -1657,6 +1655,30 @@ const Reportabilidad = ({ proyectoId }) => {
           </div>
         )}
 
+        {/* Mensaje de estado */}
+        {mensajeImportacion && (
+          <div style={{
+            backgroundColor: tipoMensaje === 'success' ? '#d4edda' : '#f8d7da',
+            border: `2px solid ${tipoMensaje === 'success' ? '#28a745' : '#dc3545'}`,
+            borderRadius: '8px',
+            padding: '15px 20px',
+            marginBottom: '20px',
+            color: tipoMensaje === 'success' ? '#155724' : '#721c24',
+            fontSize: '16px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            animation: 'slideIn 0.3s ease-out'
+          }}>
+            <span style={{ fontSize: '20px' }}>
+              {tipoMensaje === 'success' ? '✅' : '❌'}
+            </span>
+            <span>{mensajeImportacion}</span>
+          </div>
+        )}
+
         {/* Tabla de Predictividad */}
         <div style={{ 
           marginTop: '30px',
@@ -1695,6 +1717,7 @@ const Reportabilidad = ({ proyectoId }) => {
                 obtenerProyeccionFinanciera();
                 obtenerRealFinanciera();
                 obtenerRealFisica();
+                obtenerProyeccionFisica();
               }}
               disabled={cargandoDatos}
               style={{
@@ -1733,7 +1756,7 @@ const Reportabilidad = ({ proyectoId }) => {
               fontSize: '14px'
             }}>
               {/* Encabezados de columnas */}
-          <thead>
+              <thead>
                 <tr style={{
                   backgroundColor: '#f8f9fa',
                   borderBottom: '2px solid #dee2e6'
@@ -1787,17 +1810,17 @@ const Reportabilidad = ({ proyectoId }) => {
                   }}>
                     Nota
                   </th>
-            </tr>
-          </thead>
+                </tr>
+              </thead>
               
               {/* Cuerpo de la tabla */}
-          <tbody>
+              <tbody>
                 {/* Fila Financiera */}
                 <tr style={{
                   borderBottom: '1px solid #dee2e6',
                   backgroundColor: 'white'
                 }}>
-                <td style={{ 
+                  <td style={{ 
                     padding: '15px 20px',
                     borderRight: '1px solid #dee2e6',
                     position: 'relative'
@@ -1942,8 +1965,8 @@ const Reportabilidad = ({ proyectoId }) => {
                     color: '#6c757d'
                   }}>
                     -
-                </td>
-              </tr>
+                  </td>
+                </tr>
                 
                 {/* Fila Física */}
                 <tr style={{
@@ -2033,15 +2056,13 @@ const Reportabilidad = ({ proyectoId }) => {
                     -
                   </td>
                 </tr>
-          </tbody>
-        </table>
+              </tbody>
+            </table>
           </div>
+        </div>
       </div>
-    </div>
-  );
+    );
   };
-
-
 
   // Componente para el reporte de Eficiencia del Gasto
   const ReporteEficienciaGasto = ({ data }) => (
@@ -2346,24 +2367,7 @@ const Reportabilidad = ({ proyectoId }) => {
     const mapExcelRow = (row) => {
       const r = normalizeKeys(row);
       
-      // Debug: mostrar datos originales
-      console.log('Fila original:', row);
-      console.log('Fila normalizada:', r);
       
-      const vector = r['vector'] || '';
-      const periodo = excelDateToMysql(r['periodo']);
-      const parcial_periodo = parsePorcentaje(r['parcial_periodo']);
-      const porcentaje_periodo = parsePorcentaje(r['porcentaje_periodo']);
-      
-      // Debug: mostrar datos procesados
-      console.log('Datos procesados:', { vector, periodo, parcial_periodo, porcentaje_periodo });
-      
-      return {
-        vector: vector,
-        periodo: periodo,
-        parcial_periodo: parcial_periodo,
-        porcentaje_periodo: porcentaje_periodo
-      };
     };
 
     const handleImportar = async () => {
