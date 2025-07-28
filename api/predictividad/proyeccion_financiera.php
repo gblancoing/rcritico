@@ -18,10 +18,8 @@ try {
     $fechaHasta = $_GET['fecha_hasta'] ?? null;
     $proyectoId = $_GET['proyecto_id'] ?? null;
     
-
-    
-    // Construir la consulta base
-    $query = "SELECT SUM(monto) as total_proyeccion FROM predictividad_parcial WHERE 1=1";
+    // Construir la consulta base para sumar las categorías MO, IC, EM, IE, SC, AD, CL y CT
+    $query = "SELECT SUM(MO + IC + EM + IE + SC + AD + CL + CT) as total_proyeccion FROM financiero_sap WHERE 1=1";
     $params = [];
     
     // Agregar filtro de proyecto si se proporciona
@@ -41,8 +39,6 @@ try {
         $query .= " AND periodo <= ?";
         $params[] = $fechaHasta;
     }
-    
-
     
     // Preparar y ejecutar la consulta
     $stmt = $conn->prepare($query);
@@ -66,7 +62,13 @@ try {
         'success' => true,
         'total_proyeccion' => $total_proyeccion,
         'total_formateado' => $total_formateado,
-        'mensaje' => 'Consulta de proyección financiera realizada exitosamente'
+        'mensaje' => 'Consulta de proyección financiera realizada exitosamente desde financiero_sap',
+        'categorias_incluidas' => ['MO', 'IC', 'EM', 'IE', 'SC', 'AD', 'CL', 'CT'],
+        'filtros_aplicados' => [
+            'proyecto_id' => $proyectoId,
+            'fecha_desde' => $fechaDesde,
+            'fecha_hasta' => $fechaHasta
+        ]
     ];
     
     echo json_encode($response);
