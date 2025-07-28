@@ -702,8 +702,11 @@ const Reportabilidad = ({ proyectoId }) => {
     // Función para obtener proyección física desde la tabla predictividad
     const obtenerProyeccionFisica = async () => {
       try {
+        console.log('🚀 INICIANDO obtenerProyeccionFisica');
+        console.log('📋 Parámetros:', { proyectoId, fechaDesde, fechaHasta });
+        
         // Construir URL con filtros
-        let url = `${API_BASE}/predictividad/obtener_proyeccion_fisica.php`;
+        let url = `${API_BASE}/predictividad/proyeccion_fisica.php`;
         const params = new URLSearchParams();
         
         if (proyectoId) {
@@ -711,17 +714,13 @@ const Reportabilidad = ({ proyectoId }) => {
         }
         
         if (fechaDesde) {
-          // Convertir formato YYYY-MM a MM-YYYY para la tabla predictividad
-          const [year, month] = fechaDesde.split('-');
-          const periodoInicio = `${month}-${year}`;
-          params.append('periodo_inicio', periodoInicio);
+          // Enviar solo el año y mes para que el backend pueda extraer correctamente
+          params.append('fecha_desde', fechaDesde);
         }
         
         if (fechaHasta) {
-          // Convertir formato YYYY-MM a MM-YYYY para la tabla predictividad
-          const [year, month] = fechaHasta.split('-');
-          const periodoFin = `${month}-${year}`;
-          params.append('periodo_fin', periodoFin);
+          // Enviar solo el año y mes para que el backend pueda extraer correctamente
+          params.append('fecha_hasta', fechaHasta);
         }
         
         if (params.toString()) {
@@ -731,19 +730,24 @@ const Reportabilidad = ({ proyectoId }) => {
         console.log('🔍 Consultando proyección física desde predictividad:', url);
         
         const response = await fetch(url);
-        const data = await response.json();
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response ok:', response.ok);
         
+        const data = await response.json();
         console.log('📊 Respuesta proyección física:', data);
         
         if (data.success) {
-          const valorProyeccion = parseFloat(data.proyeccion_fisica?.porcentaje_total) || 0;
+          const valorProyeccion = parseFloat(data.total_proyeccion_fisica) || 0;
+          console.log('🔢 Valor proyección parseado:', valorProyeccion);
+          
           setProyeccionFisica(valorProyeccion);
           
           console.log('✅ Proyección física actualizada:', valorProyeccion);
-          console.log('📋 Total registros encontrados:', data.proyeccion_fisica?.total_registros);
-          console.log('💰 Monto USD:', data.proyeccion_fisica?.monto_usd);
+          console.log('📋 Total registros encontrados:', data.detalles?.total_registros);
+          console.log('📊 Formato:', data.total_formateado);
         } else {
           console.log('⚠️ No se encontraron datos de proyección física en predictividad');
+          console.log('❌ Error:', data.error);
           setProyeccionFisica(0);
         }
       } catch (error) {
@@ -777,6 +781,41 @@ const Reportabilidad = ({ proyectoId }) => {
       
       console.log('⚠️ No se puede calcular desviación financiera:');
       console.log(`   Real: ${realFinanciera}, Proyección: ${proyeccionFinanciera}`);
+      
+      return {
+        valor: 0,
+        porcentaje: '0.00',
+        tieneValor: false,
+        esPositiva: false,
+        esNegativa: false,
+        esNeutral: false
+      };
+    };
+
+    const calcularDesviacionFisica = () => {
+      if (proyeccionFisica > 0 && realFisica >= 0) {
+        // Fórmula: ((REAL - PROYECCIÓN) / PROYECCIÓN) * 100
+        const desviacion = ((realFisica - proyeccionFisica) / proyeccionFisica) * 100;
+        
+        console.log('📊 Calculando desviación física:');
+        console.log(`   Real: ${realFisica.toFixed(2)}%`);
+        console.log(`   Proyección: ${proyeccionFisica.toFixed(2)}%`);
+        console.log(`   Fórmula: ((${realFisica} - ${proyeccionFisica}) / ${proyeccionFisica}) * 100`);
+        console.log(`   Resultado: ${desviacion.toFixed(2)}%`);
+        console.log(`   Interpretación: ${desviacion > 0 ? 'Sobregasto' : desviacion < 0 ? 'Ahorro' : 'Sin desviación'}`);
+        
+        return {
+          valor: desviacion,
+          porcentaje: desviacion.toFixed(2),
+          tieneValor: true,
+          esPositiva: desviacion > 0,
+          esNegativa: desviacion < 0,
+          esNeutral: Math.abs(desviacion) < 0.01
+        };
+      }
+      
+      console.log('⚠️ No se puede calcular desviación física:');
+      console.log(`   Real: ${realFisica}, Proyección: ${proyeccionFisica}`);
       
       return {
         valor: 0,
@@ -1289,12 +1328,16 @@ const Reportabilidad = ({ proyectoId }) => {
 
     // Cargar datos al montar el componente y cuando cambien los filtros
     useEffect(() => {
+      console.log('🔄 useEffect ejecutándose con parámetros:', { proyectoId, fechaDesde, fechaHasta });
+      
       if (proyectoId) {
         console.log('🔄 Actualizando datos de predictividad por cambio de filtros');
         obtenerProyeccionFinanciera();
         obtenerRealFinanciera();
         obtenerRealFisica();
         obtenerProyeccionFisica();
+      } else {
+        console.log('⚠️ proyectoId no está disponible, no se ejecutan las funciones');
       }
     }, [proyectoId, fechaDesde, fechaHasta]);
 
@@ -1305,8 +1348,34 @@ const Reportabilidad = ({ proyectoId }) => {
     const datosFisicos = datosValidos.filter(item => (item.tipo || 'Fisica') === 'Fisica');
     const datosFinancieros = datosValidos.filter(item => (item.tipo || 'Fisica') === 'Financiera');
     
-    // Obtener el período más reciente para mostrar en el título
-    const periodoActual = datosValidos.length > 0 ? datosValidos[0].mes : 'Mayo - Junio / 2025';
+    // Obtener el período para mostrar en el título basado en los filtros de fecha
+    const obtenerPeriodoActual = () => {
+      if (fechaDesde && fechaHasta) {
+        if (fechaDesde === fechaHasta) {
+          // Mismo mes
+          const mes = fechaDesde.split('-')[1];
+          const anio = fechaDesde.split('-')[0];
+          const nombresMeses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+          ];
+          return `${nombresMeses[parseInt(mes) - 1]} ${anio}`;
+        } else {
+          // Rango de meses
+          const mesDesde = fechaDesde.split('-')[1];
+          const mesHasta = fechaHasta.split('-')[1];
+          const anio = fechaDesde.split('-')[0];
+          const nombresMeses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+          ];
+          return `${nombresMeses[parseInt(mesDesde) - 1]} - ${nombresMeses[parseInt(mesHasta) - 1]} ${anio}`;
+        }
+      }
+      return 'Período Actual';
+    };
+    
+    const periodoActual = obtenerPeriodoActual();
 
     return (
     <div style={{ width: '100%', padding: '20px' }}>
@@ -1696,56 +1765,22 @@ const Reportabilidad = ({ proyectoId }) => {
             position: 'relative'
           }}>
             <h2 style={{ 
-              margin: '0 0 10px 0', 
-              fontSize: '24px',
-              fontWeight: 'bold'
+              margin: '0 0 8px 0', 
+              fontSize: '26px',
+              fontWeight: 'bold',
+              letterSpacing: '1px'
             }}>
               PREDICTIVIDAD
             </h2>
             <p style={{ 
               margin: '0',
-              fontSize: '16px',
-              opacity: '0.9'
+              fontSize: '14px',
+              opacity: '0.85',
+              fontWeight: '300',
+              letterSpacing: '0.5px'
             }}>
-              Escenario proyectado (1 mes) {periodoActual}
+              Análisis de Proyecciones y Desviaciones - {periodoActual}
             </p>
-            
-            {/* Botón de actualización */}
-            <button
-              onClick={() => {
-                console.log('🔄 Actualizando datos de predictividad manualmente');
-                obtenerProyeccionFinanciera();
-                obtenerRealFinanciera();
-                obtenerRealFisica();
-                obtenerProyeccionFisica();
-              }}
-              disabled={cargandoDatos}
-              style={{
-                position: 'absolute',
-                top: '15px',
-                right: '20px',
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '50%',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: cargandoDatos ? 'not-allowed' : 'pointer',
-                color: 'white',
-                fontSize: '16px',
-                transition: 'all 0.3s ease',
-                opacity: cargandoDatos ? 0.6 : 1
-              }}
-              title="Actualizar datos financieros (SAP) y físicos (Cumplimiento)"
-            >
-              {cargandoDatos ? (
-                <span style={{ animation: 'spin 1s linear infinite' }}>⟳</span>
-              ) : (
-                '⟳'
-              )}
-            </button>
           </div>
 
           {/* Tabla de datos */}
@@ -2003,9 +2038,31 @@ const Reportabilidad = ({ proyectoId }) => {
                     textAlign: 'center',
                     borderRight: '1px solid #dee2e6',
                     fontWeight: '500',
-                    color: '#6c757d'
+                    color: cargandoDatos ? '#6c757d' : '#16355D',
+                    backgroundColor: cargandoDatos ? '#f8f9fa' : 'transparent'
                   }}>
-                    -
+                    {cargandoDatos ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                        <span style={{ fontSize: '12px', animation: 'spin 1s linear infinite' }}>⟳</span>
+                        <span style={{ fontSize: '12px' }}>Cargando...</span>
+                      </div>
+                    ) : proyeccionFisica > 0 ? (
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>
+                          {proyeccionFisica.toFixed(2)}%
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#28a745', marginTop: '2px' }}>
+                          ✅ Datos Predictividad
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ color: '#6c757d' }}>
+                        <div>-</div>
+                        <div style={{ fontSize: '10px', marginTop: '2px' }}>
+                          Sin datos
+                        </div>
+                      </div>
+                    )}
                   </td>
                   <td style={{
                     padding: '15px 20px',
@@ -2042,10 +2099,52 @@ const Reportabilidad = ({ proyectoId }) => {
                     padding: '15px 20px',
                     textAlign: 'center',
                     borderRight: '1px solid #dee2e6',
-                    fontWeight: '500',
-                    color: '#6c757d'
+                    fontWeight: '500'
                   }}>
-                    -
+                    {(() => {
+                      const desviacion = calcularDesviacionFisica();
+                      
+                      if (cargandoDatos) {
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                            <span style={{ fontSize: '12px', animation: 'spin 1s linear infinite' }}>⟳</span>
+                            <span style={{ fontSize: '12px', color: '#6c757d' }}>Calculando...</span>
+                          </div>
+                        );
+                      }
+                      
+                      if (!desviacion.tieneValor) {
+                        return (
+                          <div style={{ color: '#6c757d' }}>
+                            <div>-</div>
+                            <div style={{ fontSize: '10px', marginTop: '2px' }}>
+                              Sin datos
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div>
+                          <div style={{ 
+                            fontWeight: 'bold',
+                            color: desviacion.esPositiva ? '#dc3545' : 
+                                   desviacion.esNegativa ? '#28a745' : '#6c757d'
+                          }}>
+                            {desviacion.esPositiva ? '+' : ''}{desviacion.porcentaje}%
+                          </div>
+                          <div style={{ 
+                            fontSize: '10px', 
+                            marginTop: '2px',
+                            color: desviacion.esPositiva ? '#dc3545' : 
+                                   desviacion.esNegativa ? '#28a745' : '#6c757d'
+                          }}>
+                            {desviacion.esPositiva ? '📈 Sobregasto' : 
+                             desviacion.esNegativa ? '📉 Ahorro' : '📊 Sin desviación'}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td style={{
                     padding: '15px 20px',
