@@ -39,14 +39,14 @@ try {
 
     // Agregar filtros de período si se proporcionan
     if ($periodo_inicio && $periodo_fin) {
-        $sql .= " AND periodo_prediccion BETWEEN ? AND ?";
+        $sql .= " AND periodo_cierre_real BETWEEN ? AND ?";
         $params[] = $periodo_inicio;
         $params[] = $periodo_fin;
     } elseif ($periodo_inicio) {
-        $sql .= " AND periodo_prediccion >= ?";
+        $sql .= " AND periodo_cierre_real >= ?";
         $params[] = $periodo_inicio;
     } elseif ($periodo_fin) {
-        $sql .= " AND periodo_prediccion <= ?";
+        $sql .= " AND periodo_cierre_real <= ?";
         $params[] = $periodo_fin;
     }
 

@@ -499,7 +499,7 @@ const Reportabilidad = ({ proyectoId }) => {
       case 'eficiencia_gasto':
         return <ReporteEficienciaGasto data={datosReporte} />;
       case 'cumplimiento_fisico':
-        return <ReporteCumplimientoFisico data={datosReporte} autorizado={autorizado} setAutorizado={setAutorizado} />;
+        return <ReporteCumplimientoFisico data={datosReporte} autorizado={autorizado} setAutorizado={setAutorizado} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} datosCumplimientoFisico={datosCumplimientoFisico} filtroVector={filtroVector} setFiltroVector={setFiltroVector} />;
       default:
         return <div>Selecciona un reporte</div>;
     }
@@ -863,11 +863,12 @@ const Reportabilidad = ({ proyectoId }) => {
       reader.readAsBinaryString(file);
     };
 
-    // Función para convertir fechas de Excel a formato YYYY-MM-DD (para campos DATE)
+    // Función para convertir fechas de Excel a formato DD-MM-YYYY
     const excelDateToMysql = (excelDate) => {
-      console.log('🔍 JS - CONVERSIÓN DE FECHA A YYYY-MM-DD:');
+      console.log('🔍 JS - CONVERSIÓN DE FECHA A DD-MM-YYYY:');
       console.log('  📅 Valor recibido:', excelDate);
       console.log('  📅 Tipo:', typeof excelDate);
+      console.log('  📅 ¿Está vacío?', !excelDate || excelDate === '');
       
       if (!excelDate || excelDate === '' || excelDate === null || excelDate === undefined) {
         console.log('❌ JS - Fecha vacía, retornando cadena vacía');
@@ -878,20 +879,24 @@ const Reportabilidad = ({ proyectoId }) => {
       if (!isNaN(excelDate) && typeof excelDate === 'number') {
         console.log('🔢 JS - Procesando número de Excel:', excelDate);
         
-        // Algoritmo simple para convertir número de Excel a fecha
-        const excelEpoch = new Date(1900, 0, 1);
+        // Algoritmo manual para convertir número de Excel a fecha DD-MM-YYYY
+        const excelEpoch = new Date(1900, 0, 1); // 1 de enero de 1900
         const msPerDay = 24 * 60 * 60 * 1000;
-        let adjustedDays = excelDate - 1;
-        if (excelDate > 59) adjustedDays--;
+        
+        // Ajuste por el bug de Excel con 1900 siendo bisiesto
+        let adjustedDays = excelDate - 1; // Restar 1 porque Excel cuenta desde 1, no 0
+        if (excelDate > 59) adjustedDays--; // Ajuste por el día 60 ficticio de 1900
         
         const resultDate = new Date(excelEpoch.getTime() + (adjustedDays * msPerDay));
         
+        console.log('📅 JS - Fecha calculada:', resultDate);
+        
         if (!isNaN(resultDate.getTime())) {
-          const year = resultDate.getFullYear();
-          const month = String(resultDate.getMonth() + 1).padStart(2, '0');
           const day = String(resultDate.getDate()).padStart(2, '0');
-          const converted = `${year}-${month}-${day}`;
-          console.log('✅ JS - Convertido número Excel a YYYY-MM-DD:', `${excelDate} -> "${converted}"`);
+          const month = String(resultDate.getMonth() + 1).padStart(2, '0');
+          const year = String(resultDate.getFullYear());
+          const converted = `${day}-${month}-${year}`;
+          console.log('✅ JS - Convertido número Excel a DD-MM-YYYY:', `${excelDate} -> "${converted}"`);
           return converted;
         } else {
           console.log('❌ JS - Error calculando fecha desde número Excel');
@@ -899,33 +904,24 @@ const Reportabilidad = ({ proyectoId }) => {
         }
       }
       
-      // Si es string, procesar formato DD-MM-YYYY
       const dateStr = String(excelDate).trim();
       console.log('📅 JS - Fecha como string:', `"${dateStr}"`);
       
-      if (dateStr.includes('-')) {
+      // Si ya está en formato DD-MM-YYYY, retornarlo tal como está
+      if (dateStr.match(/^\d{1,2}-\d{1,2}-\d{4}$/)) {
+        console.log('✅ JS - Ya está en formato DD-MM-YYYY:', `"${dateStr}"`);
+        return dateStr;
+      }
+      
+      // Si está en formato YYYY-MM-DD, convertirlo a DD-MM-YYYY
+      if (dateStr.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
         const parts = dateStr.split('-');
-        console.log('📅 JS - Partes de fecha:', parts);
-        
-        if (parts.length === 3) {
-          if (parts[2].length === 4) {
-            // Formato DD-MM-YYYY -> convertir a YYYY-MM-DD
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            const year = parts[2];
-            const converted = `${year}-${month}-${day}`;
-            console.log('✅ JS - Convertido DD-MM-YYYY a YYYY-MM-DD:', `"${dateStr}" -> "${converted}"`);
-            return converted;
-          } else if (parts[0].length === 4) {
-            // Ya está en formato YYYY-MM-DD
-            const year = parts[0];
-            const month = parts[1].padStart(2, '0');
-            const day = parts[2].padStart(2, '0');
-            const converted = `${year}-${month}-${day}`;
-            console.log('✅ JS - Formato YYYY-MM-DD mantenido:', `"${dateStr}" -> "${converted}"`);
-            return converted;
-          }
-        }
+        const year = parts[0];
+        const month = parts[1].padStart(2, '0');
+        const day = parts[2].padStart(2, '0');
+        const converted = `${day}-${month}-${year}`;
+        console.log('✅ JS - Convertido YYYY-MM-DD a DD-MM-YYYY:', `"${dateStr}" -> "${converted}"`);
+        return converted;
       }
       
       console.log('⚠️ JS - Formato no reconocido, retornando cadena vacía');
@@ -935,173 +931,159 @@ const Reportabilidad = ({ proyectoId }) => {
     // Función para normalizar nombres de columnas
     const normalizeKeys = (row) => {
       const newRow = {};
+      console.log('🔧 NORMALIZANDO CLAVES:');
+      console.log('  📋 Claves originales:', Object.keys(row));
+      
       Object.keys(row).forEach(key => {
-        newRow[key.trim().toLowerCase().replace(/\s+/g, '_')] = row[key];
+        const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+        newRow[normalizedKey] = row[key];
+        console.log(`  🔄 "${key}" → "${normalizedKey}"`);
       });
+      
+      console.log('  ✅ Claves normalizadas:', Object.keys(newRow));
       return newRow;
     };
 
     // Función para convertir porcentajes
     const parsePercentage = (value) => {
-      console.log('🔢 JS PARSEPERCENTAGE - Iniciando conversión:');
-      console.log('  Valor original:', value);
-      console.log('  Tipo:', typeof value);
+      console.log('🔍 JS - PROCESANDO PORCENTAJE:');
+      console.log('  📊 Valor original:', value);
+      console.log('  📊 Tipo:', typeof value);
       
-      if (!value || value === '' || value === null || value === undefined) {
-        console.log('  ✅ JS - Valor vacío, retornando 0');
+      if (value === null || value === undefined || value === '') {
+        console.log('❌ JS - Valor vacío, retornando 0');
         return 0;
       }
       
-      let numero = 0;
+      let strValue = String(value).trim();
+      console.log('  📊 String inicial:', `"${strValue}"`);
       
-      // Si es un número (viene de Excel como decimal)
-      if (typeof value === 'number') {
-        numero = value;
-        console.log('  📊 JS - Es número:', numero);
-        
-        // Si es un número muy pequeño (< 1), probablemente viene de formato porcentaje de Excel
-        // Multiplicar por 100 para obtener el valor que el usuario espera
-        if (numero > 0 && numero < 1) {
-          numero = numero * 100;
-          console.log('  🔄 JS - Detectado formato porcentaje Excel, multiplicado por 100:', numero);
-        }
-      } else {
-        // Si es string, procesarlo como antes
-        let str = String(value).trim();
-        console.log('  Como string:', str);
-        
-        if (str === '') {
-          console.log('  ✅ JS - String vacío después de trim, retornando 0');
-          return 0;
-        }
-        
-        // Remover el símbolo % si existe
-        if (str.includes('%')) {
-          str = str.replace('%', '');
-          console.log('  Después de quitar %:', str);
-        }
-        
-        // Reemplazar coma por punto para parseFloat
-        str = str.replace(',', '.');
-        console.log('  Después de coma->punto:', str);
-        
-        numero = parseFloat(str);
-        console.log('  Resultado parseFloat:', numero);
+      // Eliminar el símbolo % si existe
+      if (strValue.includes('%')) {
+        strValue = strValue.replace('%', '');
+        console.log('  📊 Sin %:', `"${strValue}"`);
       }
       
-      console.log('  ¿Es NaN?:', isNaN(numero));
+      // Reemplazar comas por puntos
+      if (strValue.includes(',')) {
+        strValue = strValue.replace(',', '.');
+        console.log('  📊 Coma reemplazada por punto:', `"${strValue}"`);
+      }
       
-      const resultado = isNaN(numero) ? 0 : parseFloat(numero.toFixed(2));
-      console.log('🔢 JS PARSEPERCENTAGE - Resultado final:', resultado);
+      // Convertir a número
+      const resultado = parseFloat(strValue);
+      console.log('  📊 Número final:', resultado);
       
+      if (isNaN(resultado)) {
+        console.log('❌ JS - No es un número válido, retornando 0');
+        return 0;
+      }
+      
+      console.log('✅ JS - Porcentaje procesado:', `${value} -> ${resultado}`);
       return resultado;
     };
 
-    // Función para mapear filas del Excel a formato de base de datos
+    // Función para mapear filas del Excel a formato de predictividad
     const mapExcelRow = (row) => {
+      console.log('📊 ============ PROCESANDO FILA EXCEL PREDICTIVIDAD ============');
+      console.log('📊 Datos originales del Excel:', row);
+      console.log('📊 Claves originales del Excel:', Object.keys(row));
+      
+      // Verificar si periodo_cierre_real está en los datos originales
+      const tienePeriodoCierreReal = Object.keys(row).some(key => 
+        key.toLowerCase().includes('periodo') && 
+        key.toLowerCase().includes('cierre') && 
+        key.toLowerCase().includes('real')
+      );
+      console.log('🔍 ¿Tiene periodo_cierre_real en datos originales?', tienePeriodoCierreReal);
+      
       const r = normalizeKeys(row);
       
-      console.log('📊 ============ PROCESANDO FILA EXCEL ============');
-      console.log('📊 Datos originales del Excel:', row);
       console.log('📊 Datos normalizados:', r);
       console.log('📊 Claves disponibles:', Object.keys(r));
       
-      // COMPARACIÓN ESPECÍFICA: ¿Por qué periodo_prediccion funciona pero periodo_cierre_real no?
-      console.log('🔍 COMPARACIÓN DE CAMPOS DE FECHA EN EXCEL:');
-      console.log('  📅 periodo_prediccion en datos originales:', row['periodo_prediccion']);
-      console.log('  📅 periodo_prediccion en datos normalizados:', r['periodo_prediccion']);
-      console.log('  📅 periodo_cierre_real en datos originales:', row['periodo_cierre_real']);
-      console.log('  📅 periodo_cierre_real en datos normalizados:', r['periodo_cierre_real']);
-      
-      // Buscar variaciones de periodo_cierre_real en los datos
-      console.log('🔍 BÚSQUEDA DE CLAVES RELACIONADAS CON CIERRE/REAL:');
-      Object.keys(row).forEach(key => {
-        if (key.toLowerCase().includes('cierre') || key.toLowerCase().includes('real')) {
-          console.log(`  - ORIGINAL '${key}':`, row[key]);
-        }
-      });
-      Object.keys(r).forEach(key => {
-        if (key.includes('cierre') || key.includes('real')) {
-          console.log(`  - NORMALIZADA '${key}':`, r[key]);
-        }
-      });
-      
-      // Buscar claves de forma más flexible
+      // Buscar las claves correspondientes a los campos del Excel
       let periodoPrediccionKey = null;
       let porcentajePredicidoKey = null;
       let periodoCierreRealKey = null;
       let valorRealPorcentajeKey = null;
       
-      // Búsqueda exacta primero
+      // Búsqueda exacta primero (en minúsculas porque normalizeKeys convierte a minúsculas)
       Object.keys(r).forEach(key => {
-        if (key === 'periodo_prediccion') periodoPrediccionKey = key;
-        if (key === 'porcentaje_predicido') porcentajePredicidoKey = key;
-        if (key === 'periodo_cierre_real') periodoCierreRealKey = key;
-        if (key === 'valor_real_porcentaje') valorRealPorcentajeKey = key;
+        console.log('🔍 Revisando clave:', key, '→ valor:', r[key]);
+        if (key === 'periodo_prediccion') {
+          periodoPrediccionKey = key;
+          console.log('✅ Encontrada clave exacta periodo_prediccion');
+        }
+        if (key === 'porcentaje_predicido') {
+          porcentajePredicidoKey = key;
+          console.log('✅ Encontrada clave exacta porcentaje_predicido');
+        }
+        if (key === 'periodo_cierre_real') {
+          periodoCierreRealKey = key;
+          console.log('✅ Encontrada clave exacta periodo_cierre_real');
+        }
+        if (key === 'valor_real_porcentaje') {
+          valorRealPorcentajeKey = key;
+          console.log('✅ Encontrada clave exacta valor_real_porcentaje');
+        }
       });
       
       // Si no se encuentran las claves exactas, buscar alternativas
       if (!periodoPrediccionKey) {
+        console.log('🔍 Buscando alternativa para periodo_prediccion...');
         Object.keys(r).forEach(key => {
           if (key.includes('periodo') && key.includes('prediccion')) {
             periodoPrediccionKey = key;
+            console.log('✅ Encontrada clave alternativa periodo_prediccion:', key);
           }
         });
       }
       
       if (!porcentajePredicidoKey) {
+        console.log('🔍 Buscando alternativa para porcentaje_predicido...');
         Object.keys(r).forEach(key => {
           if (key.includes('porcentaje') && key.includes('predicido')) {
             porcentajePredicidoKey = key;
+            console.log('✅ Encontrada clave alternativa porcentaje_predicido:', key);
           }
         });
       }
       
       if (!periodoCierreRealKey) {
-        console.log('🔍 periodo_cierre_real no encontrado, buscando alternativas...');
+        console.log('🔍 Buscando alternativa para periodo_cierre_real...');
         Object.keys(r).forEach(key => {
+          console.log('  🔍 Revisando clave para periodo_cierre_real:', key);
           if (key.includes('periodo') && key.includes('cierre') && key.includes('real')) {
             periodoCierreRealKey = key;
-            console.log('✅ Encontrada clave alternativa para periodo_cierre_real:', key);
+            console.log('✅ Encontrada clave alternativa periodo_cierre_real:', key);
           }
         });
-        
-        // Si aún no se encuentra, buscar solo con "cierre" y "real"
-        if (!periodoCierreRealKey) {
-          Object.keys(r).forEach(key => {
-            if (key.includes('cierre') && key.includes('real')) {
-              periodoCierreRealKey = key;
-              console.log('✅ Encontrada clave con cierre+real:', key);
-            }
-          });
-        }
-        
-        // Como último recurso, buscar solo "real" que contenga fecha
-        if (!periodoCierreRealKey) {
-          Object.keys(r).forEach(key => {
-            if (key.includes('real') && r[key] && String(r[key]).includes('-')) {
-              periodoCierreRealKey = key;
-              console.log('✅ Encontrada clave con "real" que parece fecha:', key);
-            }
-          });
-        }
       }
       
       if (!valorRealPorcentajeKey) {
+        console.log('🔍 Buscando alternativa para valor_real_porcentaje...');
         Object.keys(r).forEach(key => {
-          if (key.includes('valor') && key.includes('real')) {
+          if (key.includes('valor') && key.includes('real') && key.includes('porcentaje')) {
             valorRealPorcentajeKey = key;
+            console.log('✅ Encontrada clave alternativa valor_real_porcentaje:', key);
           }
         });
       }
       
       console.log('🔍 CLAVES FINALES DETECTADAS:');
-      console.log('  - periodo_prediccion:', periodoPrediccionKey);
-      console.log('  - porcentaje_predicido:', porcentajePredicidoKey);
-      console.log('  - periodo_cierre_real:', periodoCierreRealKey);
-      console.log('  - valor_real_porcentaje:', valorRealPorcentajeKey);
+      console.log('  - periodo_prediccion:', periodoPrediccionKey, '→ valor:', r[periodoPrediccionKey]);
+      console.log('  - porcentaje_predicido:', porcentajePredicidoKey, '→ valor:', r[porcentajePredicidoKey]);
+      console.log('  - periodo_cierre_real:', periodoCierreRealKey, '→ valor:', r[periodoCierreRealKey]);
+      console.log('  - valor_real_porcentaje:', valorRealPorcentajeKey, '→ valor:', r[valorRealPorcentajeKey]);
       
-      // Procesar los valores con logging detallado
+      // Verificación específica de las claves
+      console.log('🔍 VERIFICACIÓN ESPECÍFICA:');
+      console.log('  - ¿periodo_prediccion encontrada?', !!periodoPrediccionKey);
+      console.log('  - ¿periodo_cierre_real encontrada?', !!periodoCierreRealKey);
+      console.log('  - Todas las claves disponibles:', Object.keys(r));
+      
+      // Procesar los valores
       console.log('🔄 PROCESANDO VALORES:');
       
       const periodo_prediccion = periodoPrediccionKey ? excelDateToMysql(r[periodoPrediccionKey]) : '';
@@ -1116,32 +1098,19 @@ const Reportabilidad = ({ proyectoId }) => {
       const valor_real_porcentaje = valorRealPorcentajeKey ? parsePercentage(r[valorRealPorcentajeKey]) : 0;
       console.log('📊 valor_real_porcentaje procesado:', valor_real_porcentaje, '← de:', r[valorRealPorcentajeKey]);
       
-      // Verificación especial para periodo_cierre_real
-      if (!periodo_cierre_real && periodoCierreRealKey) {
-        console.log('🚨 PROBLEMA EN JS: periodo_cierre_real vacío después del procesamiento');
-        console.log('  - Clave usada:', periodoCierreRealKey);
-        console.log('  - Valor original:', r[periodoCierreRealKey]);
-        console.log('  - Tipo del valor:', typeof r[periodoCierreRealKey]);
-      }
+      // DATOS FINALES QUE SE ENVIARÁN AL PHP
+      console.log('🚀 DATOS FINALES PARA ENVIAR AL PHP:');
+      console.log('  - periodo_prediccion:', periodo_prediccion);
+      console.log('  - porcentaje_predicido:', porcentaje_predicido, '(tipo:', typeof porcentaje_predicido, ')');
+      console.log('  - periodo_cierre_real:', periodo_cierre_real);
+      console.log('  - valor_real_porcentaje:', valor_real_porcentaje, '(tipo:', typeof valor_real_porcentaje, ')');
       
-      // Si periodo_cierre_real está vacío, usar periodo_prediccion como fallback
-      let periodo_cierre_real_final = periodo_cierre_real;
-      if (!periodo_cierre_real && periodo_prediccion) {
-        console.log('⚠️ JS - Usando periodo_prediccion como fallback para periodo_cierre_real');
-        periodo_cierre_real_final = periodo_prediccion;
-      }
-      
-      const mappedRow = {
+      return {
         periodo_prediccion: periodo_prediccion,
         porcentaje_predicido: porcentaje_predicido,
-        periodo_cierre_real: periodo_cierre_real_final,
+        periodo_cierre_real: periodo_cierre_real,
         valor_real_porcentaje: valor_real_porcentaje
       };
-      
-      console.log('📊 FILA MAPEADA FINAL:', mappedRow);
-      console.log('📊 ============ FIN PROCESAMIENTO FILA EXCEL ============');
-      
-      return mappedRow;
     };
 
     // Función principal de importación
@@ -1377,6 +1346,27 @@ const Reportabilidad = ({ proyectoId }) => {
     
     const periodoActual = obtenerPeriodoActual();
 
+    // Función para calcular la nota basada en la desviación
+    const calcularNota = (desviacion) => {
+      if (!desviacion || isNaN(desviacion)) {
+        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
+      }
+      
+      // Tomar el valor absoluto de la desviación
+      const desviacionAbsoluta = Math.abs(desviacion);
+      
+      // Aplicar la métrica de notas
+      if (desviacionAbsoluta > 15) {
+        return { numero: '1', descripcion: 'Requiere atención crítica', color: '#dc3545' };
+      } else if (desviacionAbsoluta > 10) {
+        return { numero: '3', descripcion: 'Requiere mejora', color: '#ffc107' };
+      } else if (desviacionAbsoluta >= 0) {
+        return { numero: '5', descripcion: 'Excelente cumplimiento', color: '#28a745' };
+      } else {
+        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
+      }
+    };
+
     return (
     <div style={{ width: '100%', padding: '20px' }}>
         <div style={{ 
@@ -1412,89 +1402,89 @@ const Reportabilidad = ({ proyectoId }) => {
             <div style={{ 
               display: 'flex', 
               gap: '6px', 
-              flexWrap: 'wrap'
-            }}>
-              <button
-                onClick={() => setShowFormatInfo(!showFormatInfo)}
-                style={{
-                  backgroundColor: '#17a2b8',
-                  color: 'white',
-                  border: 'none',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              onClick={() => setShowFormatInfo(!showFormatInfo)}
+              style={{
+                backgroundColor: '#17a2b8',
+                color: 'white',
+                border: 'none',
                   padding: '6px 10px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
+                borderRadius: '4px',
+                cursor: 'pointer',
                   fontSize: '11px',
-                  display: 'flex',
-                  alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                   gap: '4px'
-                }}
+              }}
                 title="Ver información del formato requerido"
-              >
+            >
                 <span style={{ fontSize: '12px' }}>ℹ️</span>
-                Formato
-              </button>
+              Formato
+            </button>
 
-              <button
-                onClick={descargarPlantilla}
-                style={{
-                  backgroundColor: '#28a745',
-                  color: 'white',
-                  border: 'none',
+            <button
+              onClick={descargarPlantilla}
+              style={{
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
                   padding: '6px 10px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
+                borderRadius: '4px',
+                cursor: 'pointer',
                   fontSize: '11px',
-                  display: 'flex',
-                  alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                   gap: '4px'
-                }}
+              }}
                 title="Descargar plantilla Excel con formato correcto"
-              >
+            >
                 <span style={{ fontSize: '12px' }}>📥</span>
-                Plantilla
-              </button>
+              Plantilla
+            </button>
 
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
                   padding: '6px 10px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
+                borderRadius: '4px',
+                cursor: 'pointer',
                   fontSize: '11px',
-                  display: 'flex',
-                  alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                   gap: '4px'
-                }}
+              }}
                 title="Seleccionar archivo Excel para importar"
-              >
+            >
                 <span style={{ fontSize: '12px' }}>📁</span>
-                Archivo
-              </button>
+              Archivo
+            </button>
 
-              <button
-                onClick={handleImportar}
-                disabled={!archivoSeleccionado || importando}
-                style={{
+            <button
+              onClick={handleImportar}
+              disabled={!archivoSeleccionado || importando}
+              style={{
                   backgroundColor: (!archivoSeleccionado || importando) ? '#6c757d' : '#6f42c1',
-                  color: 'white',
-                  border: 'none',
+                color: 'white',
+                border: 'none',
                   padding: '6px 10px',
-                  borderRadius: '4px',
+                borderRadius: '4px',
                   cursor: (!archivoSeleccionado || importando) ? 'not-allowed' : 'pointer',
                   fontSize: '11px',
-                  display: 'flex',
-                  alignItems: 'center',
+                display: 'flex',
+                alignItems: 'center',
                   gap: '4px',
                   opacity: (!archivoSeleccionado || importando) ? 0.6 : 1
-                }}
+              }}
                 title={archivoSeleccionado ? "Importar datos a la tabla predictividad" : "Primero selecciona un archivo"}
-              >
+            >
                 <span style={{ fontSize: '12px' }}>📈</span>
                 {importando ? 'Importando...' : 'Importar'}
-              </button>
+            </button>
             </div>
           </div>
         </div>
@@ -1537,9 +1527,9 @@ const Reportabilidad = ({ proyectoId }) => {
                 <p style={{ margin: 0, color: '#155724', fontWeight: 'bold' }}>
                   ✅ NOTA: Use la plantilla descargable para asegurar el formato correcto.
                 </p>
-              </div>
-              
-              <div style={{
+            </div>
+
+          <div style={{
                 backgroundColor: '#fff3cd',
                 border: '1px solid #ffeaa7',
                 borderRadius: '4px',
@@ -1565,7 +1555,7 @@ const Reportabilidad = ({ proyectoId }) => {
           }}>
             <strong>📂 Archivo seleccionado:</strong> {archivoSeleccionado.name} 
             <span style={{ marginLeft: '10px', color: '#0c5460' }}>
-              ({excelData.length} filas detectadas)
+            ({excelData.length} filas detectadas)
             </span>
           </div>
         )}
@@ -1791,7 +1781,7 @@ const Reportabilidad = ({ proyectoId }) => {
               fontSize: '14px'
             }}>
               {/* Encabezados de columnas */}
-              <thead>
+          <thead>
                 <tr style={{
                   backgroundColor: '#f8f9fa',
                   borderBottom: '2px solid #dee2e6'
@@ -1845,17 +1835,17 @@ const Reportabilidad = ({ proyectoId }) => {
                   }}>
                     Nota
                   </th>
-                </tr>
-              </thead>
+            </tr>
+          </thead>
               
               {/* Cuerpo de la tabla */}
-              <tbody>
+          <tbody>
                 {/* Fila Financiera */}
                 <tr style={{
                   borderBottom: '1px solid #dee2e6',
                   backgroundColor: 'white'
                 }}>
-                  <td style={{ 
+                <td style={{ 
                     padding: '15px 20px',
                     borderRight: '1px solid #dee2e6',
                     position: 'relative'
@@ -1891,7 +1881,7 @@ const Reportabilidad = ({ proyectoId }) => {
                     {cargandoDatos ? (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                         <span style={{ fontSize: '12px', animation: 'spin 1s linear infinite' }}>⟳</span>
-                        <span style={{ fontSize: '12px' }}>Cargando...</span>
+                      <span style={{ fontSize: '12px' }}>Cargando...</span>
                       </div>
                     ) : proyeccionFinanciera > 0 ? (
                       <div>
@@ -1922,7 +1912,7 @@ const Reportabilidad = ({ proyectoId }) => {
                     {cargandoDatos ? (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                         <span style={{ fontSize: '12px', animation: 'spin 1s linear infinite' }}>⟳</span>
-                        <span style={{ fontSize: '12px' }}>Cargando...</span>
+                      <span style={{ fontSize: '12px' }}>Cargando...</span>
                       </div>
                     ) : realFinanciera > 0 ? (
                       <div>
@@ -1986,8 +1976,8 @@ const Reportabilidad = ({ proyectoId }) => {
                             color: desviacion.esPositiva ? '#dc3545' : 
                                    desviacion.esNegativa ? '#28a745' : '#6c757d'
                           }}>
-                            {desviacion.esPositiva ? '📈 Sobregasto' : 
-                             desviacion.esNegativa ? '📉 Ahorro' : '📊 Sin desviación'}
+                            {desviacion.esPositiva ? '📈 Más Gasto' : 
+                             desviacion.esNegativa ? '📉 Menos Gasto' : '📊 Sin desviación'}
                           </div>
                         </div>
                       );
@@ -1999,9 +1989,22 @@ const Reportabilidad = ({ proyectoId }) => {
                     fontWeight: '500',
                     color: '#6c757d'
                   }}>
-                    -
-                  </td>
-                </tr>
+                    {(() => {
+                      const desviacion = calcularDesviacionFinanciera();
+                      const nota = calcularNota(desviacion.porcentaje);
+                      return (
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '16px', color: nota.color }}>
+                            {nota.numero}
+                          </div>
+                          <div style={{ fontSize: '10px', color: nota.color, marginTop: '2px' }}>
+                            {nota.descripcion}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                </td>
+              </tr>
                 
                 {/* Fila Física */}
                 <tr style={{
@@ -2139,8 +2142,8 @@ const Reportabilidad = ({ proyectoId }) => {
                             color: desviacion.esPositiva ? '#dc3545' : 
                                    desviacion.esNegativa ? '#28a745' : '#6c757d'
                           }}>
-                            {desviacion.esPositiva ? '📈 Sobregasto' : 
-                             desviacion.esNegativa ? '📉 Ahorro' : '📊 Sin desviación'}
+                            {desviacion.esPositiva ? '📈 Más Gasto' : 
+                             desviacion.esNegativa ? '📉 Menos Gasto' : '📊 Sin desviación'}
                           </div>
                         </div>
                       );
@@ -2152,15 +2155,28 @@ const Reportabilidad = ({ proyectoId }) => {
                     fontWeight: '500',
                     color: '#6c757d'
                   }}>
-                    -
+                    {(() => {
+                      const desviacion = calcularDesviacionFisica();
+                      const nota = calcularNota(desviacion.porcentaje);
+                      return (
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '16px', color: nota.color }}>
+                            {nota.numero}
+                          </div>
+                          <div style={{ fontSize: '10px', color: nota.color, marginTop: '2px' }}>
+                            {nota.descripcion}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                 </tr>
-              </tbody>
-            </table>
+          </tbody>
+        </table>
           </div>
-        </div>
       </div>
-    );
+    </div>
+  );
   };
 
   // Componente para el reporte de Eficiencia del Gasto
@@ -2214,7 +2230,7 @@ const Reportabilidad = ({ proyectoId }) => {
   );
 
   // Componente para el reporte de Cumplimiento Físico
-  const ReporteCumplimientoFisico = ({ data, autorizado, setAutorizado }) => {
+  const ReporteCumplimientoFisico = ({ data, autorizado, setAutorizado, proyectoId, fechaDesde, fechaHasta, datosCumplimientoFisico, filtroVector, setFiltroVector }) => {
     const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
     const [excelData, setExcelData] = useState([]);
     const [importando, setImportando] = useState(false);
@@ -2434,39 +2450,160 @@ const Reportabilidad = ({ proyectoId }) => {
 
     // Función para convertir formato de porcentaje con coma decimal a número
     const parsePorcentaje = (valor) => {
-      if (!valor || valor === '' || valor === null || valor === undefined) return 0;
+      console.log('🔍 JS - PARSEPORCENTAJE (cumplimiento_fisico):');
+      console.log('  📊 Valor original:', valor);
+      console.log('  📊 Tipo:', typeof valor);
+      
+      if (!valor || valor === '' || valor === null || valor === undefined) {
+        console.log('❌ JS - Valor vacío, retornando 0');
+        return 0;
+      }
       
       // Convertir a string si no lo es
       let strValor = String(valor).trim();
+      console.log('  📊 String inicial:', `"${strValor}"`);
       
       // Si está vacío después del trim, retornar 0
-      if (strValor === '') return 0;
+      if (strValor === '') {
+        console.log('❌ JS - String vacío después de trim, retornando 0');
+        return 0;
+      }
       
       // Remover el símbolo % si existe
       if (strValor.includes('%')) {
         strValor = strValor.replace('%', '');
+        console.log('  📊 Sin %:', `"${strValor}"`);
       }
       
-      // Reemplazar coma por punto para parseFloat
+      // Reemplazar coma por punto para parseFloat (mantener el valor tal como está)
+      if (strValor.includes(',')) {
       strValor = strValor.replace(',', '.');
-      
-      // Convertir a número
-      const numero = parseFloat(strValor);
-      
-      // Si el valor original tenía %, mantener el valor tal como está
-      // Si no tenía %, asumir que ya es un porcentaje completo
-      if (String(valor).includes('%')) {
-        return isNaN(numero) ? 0 : numero;
-      } else {
-        // Si no tenía %, asumir que es un valor decimal y convertirlo a porcentaje
-        return isNaN(numero) ? 0 : numero * 100;
+        console.log('  📊 Coma reemplazada por punto:', `"${strValor}"`);
       }
+      
+      // Convertir a número y retornar tal como está (ya es un porcentaje)
+      const numero = parseFloat(strValor);
+      console.log('  📊 Número final:', numero);
+      
+      if (isNaN(numero)) {
+        console.log('❌ JS - No es un número válido, retornando 0');
+        return 0;
+      }
+      
+      console.log('✅ JS - Porcentaje procesado (parsePorcentaje):', `${valor} -> ${numero}`);
+      return numero;
     };
 
     const mapExcelRow = (row) => {
       const r = normalizeKeys(row);
       
+      console.log('📊 ============ PROCESANDO FILA EXCEL CUMPLIMIENTO FÍSICO ============');
+      console.log('📊 Datos originales del Excel:', row);
+      console.log('📊 Datos normalizados:', r);
+      console.log('📊 Claves disponibles:', Object.keys(r));
       
+      // Buscar las claves correspondientes a los campos del Excel
+      let vectorKey = null;
+      let periodoKey = null;
+      let parcialPeriodoKey = null;
+      let porcentajePeriodoKey = null;
+      
+      // Búsqueda exacta primero
+      Object.keys(r).forEach(key => {
+        if (key === 'vector') vectorKey = key;
+        if (key === 'periodo') periodoKey = key;
+        if (key === 'parcial_periodo') parcialPeriodoKey = key;
+        if (key === 'porcentaje_periodo') porcentajePeriodoKey = key;
+      });
+      
+      // Si no se encuentran las claves exactas, buscar alternativas
+      if (!vectorKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('vector')) {
+            vectorKey = key;
+          }
+        });
+      }
+      
+      if (!periodoKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('periodo') && !key.includes('parcial') && !key.includes('porcentaje')) {
+            periodoKey = key;
+          }
+        });
+      }
+      
+      if (!parcialPeriodoKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('parcial') && key.includes('periodo')) {
+            parcialPeriodoKey = key;
+          }
+        });
+      }
+      
+      if (!porcentajePeriodoKey) {
+        Object.keys(r).forEach(key => {
+          if (key.includes('porcentaje') && key.includes('periodo')) {
+            porcentajePeriodoKey = key;
+          }
+        });
+      }
+      
+      console.log('🔍 CLAVES FINALES DETECTADAS:');
+      console.log('  - vector:', vectorKey);
+      console.log('  - periodo:', periodoKey);
+      console.log('  - parcial_periodo:', parcialPeriodoKey);
+      console.log('  - porcentaje_periodo:', porcentajePeriodoKey);
+      
+      // Procesar los valores
+      console.log('🔄 PROCESANDO VALORES:');
+      
+      const vector = vectorKey ? String(r[vectorKey]).trim().toUpperCase() : '';
+      console.log('📊 vector procesado:', vector, '← de:', r[vectorKey]);
+      
+      const periodo = periodoKey ? excelDateToMysql(r[periodoKey]) : '';
+      console.log('📅 periodo procesado:', periodo, '← de:', r[periodoKey]);
+      
+      // COMPARACIÓN ESPECÍFICA: parcial_periodo vs porcentaje_periodo
+      console.log('🔍 COMPARACIÓN PARCIAL vs PORCENTAJE:');
+      console.log('  📊 Valor original parcial_periodo:', r[parcialPeriodoKey], '(tipo:', typeof r[parcialPeriodoKey], ')');
+      console.log('  📊 Valor original porcentaje_periodo:', r[porcentajePeriodoKey], '(tipo:', typeof r[porcentajePeriodoKey], ')');
+      console.log('  📊 Clave parcial_periodo encontrada:', parcialPeriodoKey);
+      console.log('  📊 Clave porcentaje_periodo encontrada:', porcentajePeriodoKey);
+      
+      // VERIFICACIÓN ESPECÍFICA PARA DATOS PROBLEMÁTICOS
+      if (r[parcialPeriodoKey] === undefined || r[parcialPeriodoKey] === null || r[parcialPeriodoKey] === '') {
+        console.log('🚨 PROBLEMA DETECTADO: parcial_periodo está vacío o undefined');
+        console.log('  📊 Valor:', r[parcialPeriodoKey]);
+        console.log('  📊 Tipo:', typeof r[parcialPeriodoKey]);
+        console.log('  📊 Todas las claves disponibles:', Object.keys(r));
+      }
+      
+      const parcial_periodo = parcialPeriodoKey ? parsePorcentaje(r[parcialPeriodoKey]) : 0;
+      console.log('📊 parcial_periodo procesado:', parcial_periodo, '← de:', r[parcialPeriodoKey]);
+      
+      const porcentaje_periodo = porcentajePeriodoKey ? parsePorcentaje(r[porcentajePeriodoKey]) : 0;
+      console.log('📊 porcentaje_periodo procesado:', porcentaje_periodo, '← de:', r[porcentajePeriodoKey]);
+      
+      // DATOS FINALES QUE SE ENVIARÁN AL PHP
+      console.log('🚀 DATOS FINALES PARA ENVIAR AL PHP:');
+      console.log('  - vector:', vector);
+      console.log('  - periodo:', periodo);
+      console.log('  - parcial_periodo:', parcial_periodo, '(tipo:', typeof parcial_periodo, ')');
+      console.log('  - porcentaje_periodo:', porcentaje_periodo, '(tipo:', typeof porcentaje_periodo, ')');
+      
+      // VERIFICACIÓN FINAL
+      console.log('✅ VERIFICACIÓN FINAL:');
+      console.log('  - ¿parcial_periodo es igual a porcentaje_periodo?', parcial_periodo === porcentaje_periodo);
+      console.log('  - ¿parcial_periodo es 0?', parcial_periodo === 0);
+      console.log('  - ¿porcentaje_periodo es 0?', porcentaje_periodo === 0);
+      
+      return {
+        vector: vector,
+        periodo: periodo,
+        parcial_periodo: parcial_periodo,
+        porcentaje_periodo: porcentaje_periodo
+      };
     };
 
     const handleImportar = async () => {
@@ -2524,7 +2661,7 @@ const Reportabilidad = ({ proyectoId }) => {
           }
           // Recargar datos después de la importación
           setTimeout(() => {
-            cargarDatosReporte();
+            window.location.reload();
           }, 1000);
         } else {
           // Mostrar errores específicos si existen
@@ -2728,6 +2865,27 @@ const Reportabilidad = ({ proyectoId }) => {
         console.error('Error al descargar plantilla:', error);
         setMensajeImportacion('Error al descargar la plantilla: ' + error.message);
         setTipoMensaje('error');
+      }
+    };
+
+    // Función para calcular la nota basada en la desviación
+    const calcularNota = (desviacion) => {
+      if (!desviacion || isNaN(desviacion)) {
+        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
+      }
+      
+      // Tomar el valor absoluto de la desviación
+      const desviacionAbsoluta = Math.abs(desviacion);
+      
+      // Aplicar la métrica de notas
+      if (desviacionAbsoluta > 15) {
+        return { numero: '1', descripcion: 'Requiere atención crítica', color: '#dc3545' };
+      } else if (desviacionAbsoluta > 10) {
+        return { numero: '3', descripcion: 'Requiere mejora', color: '#ffc107' };
+      } else if (desviacionAbsoluta >= 0) {
+        return { numero: '5', descripcion: 'Excelente cumplimiento', color: '#28a745' };
+      } else {
+        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
       }
     };
 
@@ -3027,7 +3185,10 @@ const Reportabilidad = ({ proyectoId }) => {
                         fontWeight: 'bold',
                         color: '#16355D'
                       }}>
-                        {parseFloat(item.parcial_periodo || 0).toFixed(2)}%
+                        {(() => {
+                          const valor = parseFloat(item.parcial_periodo || 0);
+                          return valor.toFixed(2).replace('.', ',') + '%';
+                        })()}
                       </td>
                       <td style={{ 
                         padding: '8px', 
@@ -3036,7 +3197,10 @@ const Reportabilidad = ({ proyectoId }) => {
                         fontWeight: 'bold',
                         color: '#16355D'
                       }}>
-                        {parseFloat(item.porcentaje_periodo).toFixed(2)}%
+                        {(() => {
+                          const valor = parseFloat(item.porcentaje_periodo || 0);
+                          return valor.toFixed(2).replace('.', ',') + '%';
+                        })()}
                       </td>
                     </tr>
                   ))}
