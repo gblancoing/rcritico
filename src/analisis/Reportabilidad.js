@@ -185,6 +185,7 @@ const Reportabilidad = ({ proyectoId }) => {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroDescripcion, setFiltroDescripcion] = useState(''); // NUEVO: Filtro por descripción
   const [filtroVector, setFiltroVector] = useState('');
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [datosReporte, setDatosReporte] = useState([]);
@@ -195,6 +196,7 @@ const Reportabilidad = ({ proyectoId }) => {
   // Estados para mensajes de importación (movidos al componente padre)
   const [mensajeImportacion, setMensajeImportacion] = useState('');
   const [tipoMensaje, setTipoMensaje] = useState('');
+  const [descripcionesDisponibles, setDescripcionesDisponibles] = useState([]); // NUEVO: Lista de descripciones
 
   // Detectar el estado del sidebar izquierdo
   const [sidebarIzquierdoCollapsed, setSidebarIzquierdoCollapsed] = useState(false);
@@ -220,6 +222,30 @@ const Reportabilidad = ({ proyectoId }) => {
     
     return () => observer.disconnect();
   }, []);
+
+  // Cargar descripciones cuando cambie el proyecto
+  useEffect(() => {
+    if (proyectoId) {
+      obtenerDescripcionesDisponibles();
+    }
+  }, [proyectoId]);
+
+  // Función para obtener descripciones únicas de la tabla financiero_sap
+  const obtenerDescripcionesDisponibles = async () => {
+    try {
+      if (!proyectoId) return;
+      
+      const response = await fetch(`${API_BASE}/vectores/financiero_sap.php?proyecto_id=${proyectoId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const descripciones = [...new Set(data.data.map(row => row.descripcion).filter(desc => desc && desc.trim() !== ''))];
+        setDescripcionesDisponibles(descripciones.sort());
+      }
+    } catch (error) {
+      console.error('Error obteniendo descripciones:', error);
+    }
+  };
 
   // Calcular ancho dinámico basado en el estado del sidebar izquierdo
   const anchoSidebarIzquierdo = sidebarIzquierdoCollapsed ? 64 : 260;
@@ -495,6 +521,7 @@ const Reportabilidad = ({ proyectoId }) => {
           proyectoId={proyectoId}
           fechaDesde={fechaDesde}
           fechaHasta={fechaHasta}
+          filtroDescripcion={filtroDescripcion}
         />;
       case 'eficiencia_gasto':
         return <ReporteEficienciaGasto data={datosReporte} />;
@@ -514,7 +541,8 @@ const Reportabilidad = ({ proyectoId }) => {
     setTipoMensaje,
     proyectoId,
     fechaDesde,
-    fechaHasta
+    fechaHasta,
+    filtroDescripcion
   }) => {
     // Estados para importación de predictividad
     const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
@@ -532,6 +560,23 @@ const Reportabilidad = ({ proyectoId }) => {
     const [realFinanciera, setRealFinanciera] = useState(0);
     const [realFisica, setRealFisica] = useState(0);
     const [cargandoDatos, setCargandoDatos] = useState(false);
+
+    // Función para obtener descripciones únicas de la tabla financiero_sap
+    const obtenerDescripcionesDisponibles = async () => {
+      try {
+        if (!proyectoId) return;
+        
+        const response = await fetch(`${API_BASE}/vectores/financiero_sap.php?proyecto_id=${proyectoId}`);
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          const descripciones = [...new Set(data.data.map(row => row.descripcion).filter(desc => desc && desc.trim() !== ''))];
+          setDescripcionesDisponibles(descripciones.sort());
+        }
+      } catch (error) {
+        console.error('Error obteniendo descripciones:', error);
+      }
+    };
 
     // Función para obtener datos de proyección financiera desde financiero_sap
     const obtenerProyeccionFinanciera = async () => {
@@ -556,6 +601,9 @@ const Reportabilidad = ({ proyectoId }) => {
           const ultimoDia = new Date(parseInt(year), parseInt(month), 0).getDate();
           const fechaHastaCompleta = `${fechaHasta}-${ultimoDia.toString().padStart(2, '0')}`;
           params.append('fecha_hasta', fechaHastaCompleta);
+        }
+        if (filtroDescripcion) {
+          params.append('descripcion', filtroDescripcion);
         }
         
         if (params.toString()) {
@@ -1297,7 +1345,7 @@ const Reportabilidad = ({ proyectoId }) => {
 
     // Cargar datos al montar el componente y cuando cambien los filtros
     useEffect(() => {
-      console.log('🔄 useEffect ejecutándose con parámetros:', { proyectoId, fechaDesde, fechaHasta });
+      console.log('🔄 useEffect ejecutándose con parámetros:', { proyectoId, fechaDesde, fechaHasta, filtroDescripcion });
       
       if (proyectoId) {
         console.log('🔄 Actualizando datos de predictividad por cambio de filtros');
@@ -1308,7 +1356,7 @@ const Reportabilidad = ({ proyectoId }) => {
       } else {
         console.log('⚠️ proyectoId no está disponible, no se ejecutan las funciones');
       }
-    }, [proyectoId, fechaDesde, fechaHasta]);
+    }, [proyectoId, fechaDesde, fechaHasta, filtroDescripcion]);
 
     // Validar que data sea un array válido
     const datosValidos = Array.isArray(data) ? data : [];
@@ -4001,9 +4049,41 @@ const Reportabilidad = ({ proyectoId }) => {
               }}
             />
           </div>
+          {/* Filtro de descripción solo para predictividad */}
+          {seleccion === 'predictividad' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
+              <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Descripción</label>
+              <select
+                value={filtroDescripcion}
+                onChange={e => setFiltroDescripcion(e.target.value)}
+                style={{
+                  border: '2px solid rgb(22, 53, 93)',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: 10,
+                  color: '#222',
+                  fontWeight: 500,
+                  outline: 'none',
+                  minWidth: '150px',
+                  backgroundColor: '#fff',
+                }}
+              >
+                <option value="">Todas las descripciones</option>
+                {descripcionesDisponibles.map((descripcion, index) => (
+                  <option key={index} value={descripcion}>
+                    {descripcion}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
-            onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
-            title="Limpiar filtro de fecha"
+            onClick={() => { 
+              setFechaDesde(''); 
+              setFechaHasta(''); 
+              setFiltroDescripcion('');
+            }}
+            title="Limpiar todos los filtros"
             style={{
               background: 'none',
               border: 'none',

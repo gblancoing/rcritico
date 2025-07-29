@@ -16,6 +16,7 @@ try {
     $proyecto_id = $_GET['proyecto_id'] ?? $_POST['proyecto_id'] ?? null;
     $fecha_desde = $_GET['fecha_desde'] ?? $_POST['fecha_desde'] ?? null;
     $fecha_hasta = $_GET['fecha_hasta'] ?? $_POST['fecha_hasta'] ?? null;
+    $descripcion = $_GET['descripcion'] ?? $_POST['descripcion'] ?? null;
 
     if (!$proyecto_id) {
         echo json_encode([
@@ -38,6 +39,16 @@ try {
     
     if (($verificacion['total'] ?? 0) == 0) {
         error_log("❌ NO HAY DATOS PARA ESTE PROYECTO EN financiero_sap");
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'total_proyeccion' => 0,
+                'total_registros' => 0,
+                'periodo_minimo' => null,
+                'periodo_maximo' => null
+            ]
+        ]);
+        exit;
     }
 
     // Construir la consulta base para obtener datos de proyección financiera
@@ -65,8 +76,14 @@ try {
         error_log("🔍 FILTRO fecha_hasta aplicado: $fecha_hasta");
     }
     
-    if (!$fecha_desde && !$fecha_hasta) {
-        error_log("🔍 SIN FILTROS DE FECHA - mostrando todos los datos");
+    if ($descripcion) {
+        $sql .= " AND descripcion = ?";
+        $params[] = $descripcion;
+        error_log("🔍 FILTRO descripcion aplicado: $descripcion");
+    }
+    
+    if (!$fecha_desde && !$fecha_hasta && !$descripcion) {
+        error_log("🔍 SIN FILTROS - mostrando todos los datos");
     }
 
     // Ejecutar la consulta
@@ -77,64 +94,26 @@ try {
     // Log para debugging
     error_log("🔍 DEBUG PROYECCIÓN FINANCIERA:");
     error_log("  SQL ejecutado: " . $sql);
-    error_log("  Parámetros: " . print_r($params, true));
-    error_log("  Resultado: " . print_r($resultado, true));
-    error_log("  Total registros: " . ($resultado['total_registros'] ?? 0));
-    error_log("  Total proyección: " . ($resultado['total_proyeccion'] ?? 0));
+    error_log("  Parámetros: " . json_encode($params));
+    error_log("  Resultado: " . json_encode($resultado));
 
-    // Preparar la respuesta
+    // Obtener el valor total de la proyección financiera
     $total_proyeccion = $resultado['total_proyeccion'] ?? 0;
     
-    // Verificar qué categorías VP tienen valores en la tabla
-    $sqlCategorias = "SELECT 
-                        SUM(MO) as total_mo,
-                        SUM(IC) as total_ic,
-                        SUM(EM) as total_em,
-                        SUM(IE) as total_ie,
-                        SUM(SC) as total_sc,
-                        SUM(AD) as total_ad,
-                        SUM(CL) as total_cl,
-                        SUM(CT) as total_ct,
-                        COUNT(*) as total_registros
-                    FROM financiero_sap 
-                    WHERE proyecto_id = ?";
-    $stmtCategorias = $pdo->prepare($sqlCategorias);
-    $stmtCategorias->execute([$proyecto_id]);
-    $totalesCategorias = $stmtCategorias->fetch(PDO::FETCH_ASSOC);
-    
-    error_log("🔍 TOTALES POR CATEGORÍA VP:");
-    error_log("  - MO (CONSTRUCCIÓN): " . number_format($totalesCategorias['total_mo'] ?? 0, 2));
-    error_log("  - IC (INDIRECTOS): " . number_format($totalesCategorias['total_ic'] ?? 0, 2));
-    error_log("  - EM (EQUIPOS): " . number_format($totalesCategorias['total_em'] ?? 0, 2));
-    error_log("  - IE (INGENIERÍA): " . number_format($totalesCategorias['total_ie'] ?? 0, 2));
-    error_log("  - SC (SERVICIOS): " . number_format($totalesCategorias['total_sc'] ?? 0, 2));
-    error_log("  - AD (ADMINISTRACIÓN): " . number_format($totalesCategorias['total_ad'] ?? 0, 2));
-    error_log("  - CL (COSTOS ESPECIALES): " . number_format($totalesCategorias['total_cl'] ?? 0, 2));
-    error_log("  - CT (CONTINGENCIA): " . number_format($totalesCategorias['total_ct'] ?? 0, 2));
-    error_log("  - Total registros: " . ($totalesCategorias['total_registros'] ?? 0));
-    
-    // Formatear el resultado como moneda USD
-    $proyeccion_formateada = number_format($total_proyeccion, 0, ',', ',');
+    error_log("🔍 PROYECCIÓN FINANCIERA CALCULADA:");
+    error_log("  Valor total: " . $total_proyeccion);
+    error_log("  Registros procesados: " . ($resultado['total_registros'] ?? 0));
+    error_log("  Rango de períodos: " . ($resultado['periodo_minimo'] ?? 'N/A') . " a " . ($resultado['periodo_maximo'] ?? 'N/A'));
 
-    $respuesta = [
+    echo json_encode([
         'success' => true,
         'categoria' => 'Financiera',
         'total_proyeccion' => $total_proyeccion,
-        'total_formateado' => $proyeccion_formateada,
+        'total_formateado' => number_format($total_proyeccion, 0, ',', ','),
         'categorias_incluidas' => ['MO', 'IC', 'EM', 'IE', 'SC', 'AD', 'CL', 'CT'],
-        'totales_por_categoria' => [
-            'MO' => $totalesCategorias['total_mo'] ?? 0,
-            'IC' => $totalesCategorias['total_ic'] ?? 0,
-            'EM' => $totalesCategorias['total_em'] ?? 0,
-            'IE' => $totalesCategorias['total_ie'] ?? 0,
-            'SC' => $totalesCategorias['total_sc'] ?? 0,
-            'AD' => $totalesCategorias['total_ad'] ?? 0,
-            'CL' => $totalesCategorias['total_cl'] ?? 0,
-            'CT' => $totalesCategorias['total_ct'] ?? 0
-        ],
         'detalles' => [
             'proyecto_id' => $proyecto_id,
-            'total_registros' => intval($resultado['total_registros']),
+            'total_registros' => intval($verificacion['total'] ?? 0),
             'filtros_aplicados' => [
                 'fecha_desde' => $fecha_desde,
                 'fecha_hasta' => $fecha_hasta
@@ -142,26 +121,26 @@ try {
             'rango_datos' => [
                 'periodo_minimo' => $resultado['periodo_minimo'],
                 'periodo_maximo' => $resultado['periodo_maximo']
+            ],
+            'debug_info' => [
+                'registros_unicos' => $verificacion['total'] ?? 0,
+                'total_registros' => $verificacion['total'] ?? 0,
+                'valor_original' => $resultado['total_proyeccion'] ?? 0,
+                'valor_final' => $total_proyeccion,
+                'tipo_calculo' => 'SUMA DIRECTA - Sin correcciones',
+                'filtros_aplicados' => [
+                    'fecha_desde' => $fecha_desde,
+                    'fecha_hasta' => $fecha_hasta
+                ]
             ]
         ]
-    ];
-
-    // Si no hay datos, agregar información adicional
-    if ($resultado['total_registros'] == 0) {
-        $respuesta['message'] = 'No se encontraron datos de proyección financiera para los parámetros especificados';
-        $respuesta['total_proyeccion'] = 0;
-        $respuesta['total_formateado'] = '0';
-    }
-
-    echo json_encode($respuesta);
+    ]);
 
 } catch (Exception $e) {
+    error_log("❌ ERROR EN PROYECCIÓN FINANCIERA: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Error al consultar proyección financiera: ' . $e->getMessage(),
-        'categoria' => 'Financiera',
-        'total_proyeccion' => 0,
-        'total_formateado' => '0'
+        'error' => 'Error al obtener proyección financiera: ' . $e->getMessage()
     ]);
 }
 ?> 

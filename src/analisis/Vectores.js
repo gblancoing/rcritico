@@ -165,6 +165,7 @@ const Vectores = ({ proyectoId }) => {
   const [importMessage, setImportMessage] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroDescripcion, setFiltroDescripcion] = useState(''); // NUEVO: Filtro por descripción
   const CLAVE_IMPORTACION = 'codelco2025$'; // Clave actualizada
   const [showClaveModal, setShowClaveModal] = useState(false);
   const [claveInput, setClaveInput] = useState('');
@@ -220,6 +221,16 @@ const Vectores = ({ proyectoId }) => {
   };
 
   const normalizar = str => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+  // Función para obtener descripciones únicas de la tabla financiero_sap
+  const obtenerDescripcionesUnicas = () => {
+    if (!Array.isArray(tablaFinancieroSap) || tablaFinancieroSap.length === 0) {
+      return [];
+    }
+    
+    const descripciones = [...new Set(tablaFinancieroSap.map(row => row.descripcion).filter(desc => desc && desc.trim() !== ''))];
+    return descripciones.sort();
+  };
 
   // Función helper para cargar datos de una tabla específica
   const cargarDatosTabla = async (tabla, setter) => {
@@ -2600,7 +2611,7 @@ const Vectores = ({ proyectoId }) => {
           
           {/* Filtros y botón de importación */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
-            {/* Columna izquierda: Filtros de fecha */}
+            {/* Columna izquierda: Filtros de fecha y descripción */}
             <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
@@ -2636,9 +2647,38 @@ const Vectores = ({ proyectoId }) => {
                   }}
                 />
               </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Descripción</label>
+                <select
+                  value={filtroDescripcion}
+                  onChange={e => setFiltroDescripcion(e.target.value)}
+                  style={{
+                    border: '2px solid rgb(22, 53, 93)',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    fontSize: 10,
+                    color: '#222',
+                    fontWeight: 500,
+                    outline: 'none',
+                    minWidth: '150px',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  <option value="">Todas las descripciones</option>
+                  {obtenerDescripcionesUnicas().map((descripcion, index) => (
+                    <option key={index} value={descripcion}>
+                      {descripcion}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
-                onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
-                title="Limpiar filtro de fecha"
+                onClick={() => { 
+                  setFechaDesde(''); 
+                  setFechaHasta(''); 
+                  setFiltroDescripcion('');
+                }}
+                title="Limpiar todos los filtros"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -2696,13 +2736,16 @@ const Vectores = ({ proyectoId }) => {
                 // Debug: verificar el estado de tablaFinancieroSap
                 console.log('tablaFinancieroSap:', tablaFinancieroSap, 'tipo:', typeof tablaFinancieroSap, 'es array:', Array.isArray(tablaFinancieroSap));
                 
-                // Aplicar filtros de fecha
+                // Aplicar filtros de fecha y descripción
                 let data = Array.isArray(tablaFinancieroSap) ? tablaFinancieroSap : [];
                 if (fechaDesde) {
                   data = data.filter(row => row.periodo >= fechaDesde);
                 }
                 if (fechaHasta) {
                   data = data.filter(row => row.periodo <= fechaHasta);
+                }
+                if (filtroDescripcion) {
+                  data = data.filter(row => row.descripcion === filtroDescripcion);
                 }
                 
                 // Calcular total por categoría
@@ -2769,6 +2812,9 @@ const Vectores = ({ proyectoId }) => {
                     }
                     if (fechaHasta) {
                       data = data.filter(row => row.periodo <= fechaHasta);
+                    }
+                    if (filtroDescripcion) {
+                      data = data.filter(row => row.descripcion === filtroDescripcion);
                     }
                     
                     const total = Object.values(categoriasConCodigos).reduce((acc, codigo) => {
@@ -2857,6 +2903,9 @@ const Vectores = ({ proyectoId }) => {
                       }
                       if (fechaHasta) {
                         data = data.filter(row => row.periodo <= fechaHasta);
+                      }
+                      if (filtroDescripcion) {
+                        data = data.filter(row => row.descripcion === filtroDescripcion);
                       }
                       return data.map((row, index) => (
                         <tr key={index} style={{ borderBottom: '1px solid #eee' }}>

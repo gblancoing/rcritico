@@ -93,16 +93,24 @@ foreach ($rows as $index => $row) {
             // Si está vacío, establecer como 0
             $parcial_periodo = 0.0;
         } else {
-            if (strpos($parcial_limpio, '%') !== false) {
-                $parcial_limpio = str_replace('%', '', $parcial_limpio);
-            }
-            $parcial_limpio = str_replace(',', '.', $parcial_limpio);
-            
-            if (!is_numeric($parcial_limpio)) {
-                throw new Exception("Parcial período inválido en fila " . ($index + 1) . ". Formato esperado: 12,25% o 12.25");
-            }
+            // Si es un número pequeño (menor a 1), probablemente es un porcentaje en formato decimal
+            if (is_numeric($parcial_limpio) && $parcial_limpio < 1 && $parcial_limpio > 0) {
+                // Convertir de decimal a porcentaje (ej: 0.0023 -> 0.23)
+                $parcial_periodo = $parcial_limpio * 100;
+            } else {
+                // Procesar como string (remover % y convertir coma a punto)
+                if (strpos($parcial_limpio, '%') !== false) {
+                    $parcial_limpio = str_replace('%', '', $parcial_limpio);
+                }
+                $parcial_limpio = str_replace(',', '.', $parcial_limpio);
+                
+                if (!is_numeric($parcial_limpio)) {
+                    throw new Exception("Parcial período inválido en fila " . ($index + 1) . ". Formato esperado: 12,25% o 12.25");
+                }
 
-            $parcial_periodo = floatval($parcial_limpio);
+                $parcial_periodo = floatval($parcial_limpio);
+            }
+            
             if ($parcial_periodo < 0 || $parcial_periodo > 100) {
                 throw new Exception("Parcial período fuera de rango (0-100) en fila " . ($index + 1));
             }
@@ -110,18 +118,30 @@ foreach ($rows as $index => $row) {
 
         // Procesar porcentaje_periodo (remover símbolo % y convertir coma a punto)
         $porcentaje_limpio = $porcentaje_periodo;
-        if (strpos($porcentaje_limpio, '%') !== false) {
-            $porcentaje_limpio = str_replace('%', '', $porcentaje_limpio);
-        }
-        $porcentaje_limpio = str_replace(',', '.', $porcentaje_limpio);
-        
-        if (empty($porcentaje_limpio) || !is_numeric($porcentaje_limpio)) {
-            throw new Exception("Porcentaje período inválido en fila " . ($index + 1) . ". Formato esperado: 12,25% o 12.25");
-        }
+        if (empty($porcentaje_limpio)) {
+            $porcentaje_periodo = 0.0;
+        } else {
+            // Si es un número pequeño (menor a 1), probablemente es un porcentaje en formato decimal
+            if (is_numeric($porcentaje_limpio) && $porcentaje_limpio < 1 && $porcentaje_limpio > 0) {
+                // Convertir de decimal a porcentaje (ej: 0.0023 -> 0.23)
+                $porcentaje_periodo = $porcentaje_limpio * 100;
+            } else {
+                // Procesar como string (remover % y convertir coma a punto)
+                if (strpos($porcentaje_limpio, '%') !== false) {
+                    $porcentaje_limpio = str_replace('%', '', $porcentaje_limpio);
+                }
+                $porcentaje_limpio = str_replace(',', '.', $porcentaje_limpio);
+                
+                if (!is_numeric($porcentaje_limpio)) {
+                    throw new Exception("Porcentaje período inválido en fila " . ($index + 1) . ". Formato esperado: 12,25% o 12.25");
+                }
 
-        $porcentaje_periodo = floatval($porcentaje_limpio);
-        if ($porcentaje_periodo < 0 || $porcentaje_periodo > 100) {
-            throw new Exception("Porcentaje período fuera de rango (0-100) en fila " . ($index + 1));
+                $porcentaje_periodo = floatval($porcentaje_limpio);
+            }
+            
+            if ($porcentaje_periodo < 0 || $porcentaje_periodo > 100) {
+                throw new Exception("Porcentaje período fuera de rango (0-100) en fila " . ($index + 1));
+            }
         }
 
         // Insertar registro usando los datos del contexto

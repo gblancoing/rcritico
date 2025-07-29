@@ -3,7 +3,8 @@
 function getDbConfig() {
     // Detectar si estamos en desarrollo local o producción
     $isLocal = in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) || 
-               strpos($_SERVER['HTTP_HOST'], 'localhost') !== false;
+               strpos($_SERVER['HTTP_HOST'], 'localhost') !== false ||
+               strpos($_SERVER['HTTP_HOST'], 'xampp') !== false;
     
     if ($isLocal) {
         // Configuración para desarrollo local (XAMPP)
@@ -15,12 +16,11 @@ function getDbConfig() {
         ];
     } else {
         // Configuración para producción (cPanel)
-        // IMPORTANTE: Cambiar estos valores según tu configuración de cPanel
         return [
-            'host' => 'localhost', // Normalmente es localhost en cPanel
-            'user' => 'jejcatvn', // Cambiar por tu usuario de base de datos
-            'pass' => '+T2v9jtSZS', // Cambiar por tu contraseña de base de datos
-            'dbname' => 'jejcatvn_financiero' // Cambiar por el nombre de tu base de datos
+            'host' => 'localhost',
+            'user' => 'jejcatvn',
+            'pass' => '+T2v9jtSZS',
+            'dbname' => 'jejcatvn_financiero'
         ];
     }
 }

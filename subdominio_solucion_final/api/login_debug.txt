@@ -754,3 +754,93 @@ CENTROS OBTENIDOS: Array
 )
 
 ANTES DE LOGIN EXITOSO
+Conexión a DB OK
+INICIO LOGIN
+Array
+(
+    [email] => gblanco@jej.cl
+    [password] => admin123
+)
+DESPUÉS DE PASSWORD
+DESPUÉS DE APROBADO
+CENTROS OBTENIDOS: Array
+(
+    [0] => Array
+        (
+            [id] => 1
+            [nombre] => T21C404 8a-9a
+            [descripcion] => Centro de costos principal para pruebas
+            [proyecto_id] => 1
+        )
+
+    [1] => Array
+        (
+            [id] => 2
+            [nombre] => Contrato CC-858
+            [descripcion] => Centro de costo CC-858
+            [proyecto_id] => 2
+        )
+
+)
+
+ANTES DE LOGIN EXITOSO
+Conexión a DB OK
+INICIO LOGIN
+Array
+(
+    [email] => gblanco@jej.cl
+    [password] => admin123
+)
+DESPUÉS DE PASSWORD
+DESPUÉS DE APROBADO
+CENTROS OBTENIDOS: Array
+(
+    [0] => Array
+        (
+            [id] => 1
+            [nombre] => T21C404 8a-9a
+            [descripcion] => Centro de costos principal para pruebas
+            [proyecto_id] => 1
+        )
+
+    [1] => Array
+        (
+            [id] => 2
+            [nombre] => Contrato CC-858
+            [descripcion] => Centro de costo CC-858
+            [proyecto_id] => 2
+        )
+
+)
+
+ANTES DE LOGIN EXITOSO
+Conexión a DB OK
+INICIO LOGIN
+Array
+(
+    [email] => gblanco@jej.cl
+    [password] => admin123
+)
+DESPUÉS DE PASSWORD
+DESPUÉS DE APROBADO
+CENTROS OBTENIDOS: Array
+(
+    [0] => Array
+        (
+            [id] => 1
+            [nombre] => T21C404 8a-9a
+            [descripcion] => Centro de costos principal para pruebas
+            [proyecto_id] => 1
+        )
+
+    [1] => Array
+        (
+            [id] => 2
+            [nombre] => Contrato CC-858
+            [descripcion] => Centro de costo CC-858
+            [proyecto_id] => 2
+        )
+
+)
+
+ANTES DE LOGIN EXITOSO
