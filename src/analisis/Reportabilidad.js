@@ -230,6 +230,13 @@ const Reportabilidad = ({ proyectoId }) => {
     }
   }, [proyectoId]);
 
+  // Recargar datos cuando cambien los filtros de fecha
+  useEffect(() => {
+    if (proyectoId) {
+      cargarDatosReporte();
+    }
+  }, [proyectoId, fechaDesde, fechaHasta, filtroDescripcion]);
+
   // Función para obtener descripciones únicas de la tabla financiero_sap
   const obtenerDescripcionesDisponibles = async () => {
     try {
@@ -524,7 +531,7 @@ const Reportabilidad = ({ proyectoId }) => {
           filtroDescripcion={filtroDescripcion}
         />;
       case 'eficiencia_gasto':
-        return <ReporteEficienciaGasto data={datosReporte} />;
+        return <ReporteEficienciaGasto data={datosReporte} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} />;
       case 'cumplimiento_fisico':
         return <ReporteCumplimientoFisico data={datosReporte} autorizado={autorizado} setAutorizado={setAutorizado} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} datosCumplimientoFisico={datosCumplimientoFisico} filtroVector={filtroVector} setFiltroVector={setFiltroVector} />;
       default:
@@ -2496,54 +2503,589 @@ const Reportabilidad = ({ proyectoId }) => {
   };
 
   // Componente para el reporte de Eficiencia del Gasto
-  const ReporteEficienciaGasto = ({ data }) => (
-    <div style={{ width: '100%', padding: '20px' }}>
-      <h3 style={{ color: '#16355D', marginBottom: '20px' }}>Análisis de Eficiencia del Gasto</h3>
+  const ReporteEficienciaGasto = ({ data, proyectoId, fechaDesde, fechaHasta }) => {
+    const [datosEficiencia, setDatosEficiencia] = useState([]);
+    const [cargando, setCargando] = useState(true);
+    const [error, setError] = useState('');
+
+    // Función para obtener datos financieros (V0 y Real) - PARCIALES
+    const obtenerDatosFinancieros = async (periodo, fechaInicio = null, fechaFin = null) => {
+      try {
+        // Determinar el período a consultar
+        let periodoAConsultar;
+        let nombrePeriodo;
+        
+        if (periodo === 'mes') {
+          // Determinar el período a consultar para el mes
+          if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
+            // Caso 2: Filtros del mismo mes - usar el mes del filtro
+            const [año, mes] = fechaDesde.split('-');
+            const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
+            periodoAConsultar = fechaFiltro.toISOString().slice(0, 7) + '-01';
+            nombrePeriodo = fechaFiltro.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
+          } else {
+            // Caso 1: Sin filtros o filtros de rango - usar el mes actual
+            const mesActual = new Date().toISOString().slice(0, 7);
+            periodoAConsultar = mesActual + '-01';
+            nombrePeriodo = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
+          }
+        } else {
+          // Para acumulado y anual, usar las fechas de filtro si están disponibles
+          periodoAConsultar = null; // Se manejará con periodo_desde y periodo_hasta
+        }
+        
+        const urlV0 = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=v0_parcial${periodoAConsultar ? `&periodo=${periodoAConsultar}` : ''}`;
+        const urlReal = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=real_parcial${periodoAConsultar ? `&periodo=${periodoAConsultar}` : ''}`;
+        
+        console.log('🔍 Consultando datos financieros:', periodoAConsultar || 'sin filtro de período');
+        console.log('📅 Período a consultar:', periodoAConsultar);
+        console.log('📅 Nombre del período:', nombrePeriodo);
+        console.log('URL V0:', urlV0);
+        console.log('URL Real:', urlReal);
+
+        const [responseV0, responseReal] = await Promise.all([
+          fetch(urlV0),
+          fetch(urlReal)
+        ]);
+
+        const dataV0 = await responseV0.json();
+        const dataReal = await responseReal.json();
+
+        console.log('📊 Datos V0 Parcial:', dataV0);
+        console.log('📊 Datos Real Parcial:', dataReal);
+        console.log('📊 Cantidad de registros V0:', dataV0.success ? dataV0.datos.length : 0);
+        console.log('📊 Cantidad de registros Real:', dataReal.success ? dataReal.datos.length : 0);
+
+        // Obtener PLAN V. O. 2025 (KUSD) - SUMAR todos los montos de v0_parcial del mes presente
+        let planV0 = 0;
+        if (dataV0.success && dataV0.datos.length > 0) {
+          planV0 = dataV0.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+          console.log('💰 Plan V0 (suma de todos los montos):', planV0);
+        }
+
+        // Obtener GASTO REAL (KUSD) - SUMAR todos los montos de real_parcial del mes presente
+        let gastoReal = 0;
+        if (dataReal.success && dataReal.datos.length > 0) {
+          gastoReal = dataReal.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+          console.log('💰 Gasto Real (suma de todos los montos):', gastoReal);
+        }
+
+        // CUMPLI. (A)(%) = (GASTO REAL / PLAN V. O.) * 100
+        const cumplimientoA = planV0 > 0 ? (gastoReal / planV0) * 100 : 0;
+        console.log('📈 Cumplimiento A:', cumplimientoA);
+
+        return {
+          planV0: planV0,
+          gastoReal: gastoReal,
+          cumplimientoA: cumplimientoA
+        };
+      } catch (error) {
+        console.error('❌ Error obteniendo PLAN V. O. 2025 (KUSD):', error);
+        return { planV0: 0, gastoReal: 0, cumplimientoA: 0 };
+      }
+    };
+
+    // Función para obtener datos de cumplimiento físico - PARCIALES
+    const obtenerDatosCumplimientoFisico = async (periodo, fechaInicio = null, fechaFin = null) => {
+      try {
+        let url = `${API_BASE}/cumplimiento_fisico/cumplimiento_fisico.php?proyecto_id=${proyectoId}`;
+        
+        // Aplicar filtros de fecha según el período
+        if (periodo === 'filtrado' && fechaInicio && fechaFin) {
+          // Usar fechas filtradas específicas
+          url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
+        } else if (periodo === 'mes') {
+          // Determinar el período a consultar para el mes
+          if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
+            // Caso 2: Filtros del mismo mes - usar el mes del filtro
+            const [año, mes] = fechaDesde.split('-');
+            const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
+            const mesFiltro = fechaFiltro.toISOString().slice(0, 7);
+            url += `&periodo_desde=${mesFiltro}-01&periodo_hasta=${mesFiltro}-31`;
+          } else {
+            // Caso 1: Sin filtros o filtros de rango - usar el mes actual
+            const mesActual = new Date().toISOString().slice(0, 7);
+            url += `&periodo_desde=${mesActual}-01&periodo_hasta=${mesActual}-31`;
+          }
+        } else if (periodo === 'acumulado') {
+          const añoActual = new Date().getFullYear();
+          const mesActual = new Date().getMonth() + 1;
+          const fechaInicio = `${añoActual}-01-01`;
+          const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+          url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
+        } else if (periodo === 'anual') {
+          const añoActual = new Date().getFullYear();
+          const fechaInicio = `${añoActual}-01-01`;
+          const fechaFin = `${añoActual}-12-31`;
+          url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
+        }
+
+        console.log('🔍 Consultando datos de cumplimiento físico PARCIALES:');
+        console.log('URL:', url);
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        console.log('📊 Datos cumplimiento físico:', data);
+
+        if (data.success && data.data.length > 0) {
+          // Filtrar datos por vector V0 y REAL
+          const datosV0 = data.data.filter(item => item.vector === 'V0');
+          const datosReal = data.data.filter(item => item.vector === 'REAL');
+          
+          console.log('📊 Datos V0:', datosV0);
+          console.log('📊 Datos REAL:', datosReal);
+          
+          // Obtener valores de parcial_periodo
+          let proyeccionV0 = 0;
+          let avanceFisico = 0;
+          
+          if (datosV0.length > 0) {
+            // PROG. V. O. 2025 (%) = valor parcial_periodo del vector V0
+            proyeccionV0 = parseFloat(datosV0[0].parcial_periodo) || 0;
+            console.log('📈 Proyección V0 (parcial_periodo):', proyeccionV0);
+          }
+          
+          if (datosReal.length > 0) {
+            // AVANC. FÍSICO (%) = valor parcial_periodo del vector REAL
+            avanceFisico = parseFloat(datosReal[0].parcial_periodo) || 0;
+            console.log('📈 Avance Físico (parcial_periodo):', avanceFisico);
+          }
+          
+          // CUMPLI. (B)(%) = (AVANC. FÍSICO / PROG. V. O.) * 100
+          const cumplimientoB = proyeccionV0 > 0 ? (avanceFisico / proyeccionV0) * 100 : 0;
+          console.log('📈 Cumplimiento B:', cumplimientoB);
+
+          return {
+            proyeccionV0: proyeccionV0,
+            avanceFisico: avanceFisico,
+            cumplimientoB: cumplimientoB
+          };
+        }
+
+        return { proyeccionV0: 0, avanceFisico: 0, cumplimientoB: 0 };
+      } catch (error) {
+        console.error('❌ Error obteniendo datos de cumplimiento físico PARCIALES:', error);
+        return { proyeccionV0: 0, avanceFisico: 0, cumplimientoB: 0 };
+      }
+    };
+
+    // Función para calcular la eficiencia del gasto
+    const calcularEficienciaGasto = (cumplimientoB, cumplimientoA) => {
+      if (cumplimientoA <= 0) return 0;
+      // EFICIEN. GASTO (%) = (CUMPLI. (B)(%)) / (CUMPLI. (A)(%))
+      return (cumplimientoB / cumplimientoA) * 100;
+    };
+
+    // Función para calcular la nota según la política de la imagen
+    const calcularNota = (eficiencia) => {
+      // Política de notas según la imagen:
+      // < 80% = 1
+      // 90% = 2  
+      // 100% = 3
+      // 105% = 4
+      // > 110% = 5
+      if (eficiencia < 80) return 1.00;
+      if (eficiencia === 90) return 2.00;
+      if (eficiencia === 100) return 3.00;
+      if (eficiencia === 105) return 4.00;
+      if (eficiencia > 110) return 5.00;
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-        {data.map((item, index) => (
-          <div key={index} style={{
-            background: '#fff',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            border: '2px solid #16355D'
-          }}>
-            <h4 style={{ color: '#16355D', marginBottom: '10px' }}>{item.categoria}</h4>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1ecb4f', marginBottom: '5px' }}>
-              {item.eficiencia}%
+      // Para valores entre rangos, usar la nota más cercana
+      if (eficiencia >= 80 && eficiencia < 90) return 1.00;
+      if (eficiencia > 90 && eficiencia < 100) return 2.00;
+      if (eficiencia > 100 && eficiencia < 105) return 3.00;
+      if (eficiencia > 105 && eficiencia <= 110) return 4.00;
+      
+      return 1.00; // Valor por defecto
+    };
+
+    // Cargar datos cuando el componente se monta
+    useEffect(() => {
+      const cargarDatosEficiencia = async () => {
+        setCargando(true);
+        setError('');
+
+        try {
+          // Determinar los períodos basados en los filtros de fecha
+          let periodos = [];
+          
+          // Determinar el período del mes (siempre el primer período)
+          let nombrePeriodoMes;
+          let tipoPeriodoMes = 'mes';
+          
+          if (fechaDesde && fechaHasta) {
+            // Si hay filtros, verificar si es el mismo mes
+            if (fechaDesde === fechaHasta) {
+              // Caso 2: Filtros del mismo mes (ej: Mayo 2025, Mayo 2025)
+              const [año, mes] = fechaDesde.split('-');
+              const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
+              const mesNombre = fechaFiltro.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+              const añoNumero = fechaFiltro.getFullYear();
+              nombrePeriodoMes = `PERIODO ${mesNombre} ${añoNumero}`;
+              tipoPeriodoMes = 'mes';
+            } else {
+              // Caso 3: Filtros de rango - mantener mes actual para el primer período
+              const mesActual = new Date();
+              nombrePeriodoMes = mesActual.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
+              nombrePeriodoMes = `PERIODO ${nombrePeriodoMes}`;
+              tipoPeriodoMes = 'mes';
+            }
+          } else {
+            // Caso 1: Sin filtros - mes actual
+            const mesActual = new Date();
+            nombrePeriodoMes = mesActual.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
+            nombrePeriodoMes = `PERIODO ${nombrePeriodoMes}`;
+            tipoPeriodoMes = 'mes';
+          }
+          
+          // Construir los períodos
+          periodos = [
+            { nombre: nombrePeriodoMes, tipo: tipoPeriodoMes },
+            { nombre: 'PERIODO DESDE ENE. - JUL. 2025', tipo: 'acumulado' },
+            { nombre: 'PERIODO AÑO 2025', tipo: 'anual' }
+          ];
+
+          const datosCompletos = [];
+
+          for (const periodo of periodos) {
+            // Obtener datos financieros
+            const datosFinancieros = await obtenerDatosFinancieros(periodo.tipo, periodo.fechaInicio, periodo.fechaFin);
+            
+            // Obtener datos de cumplimiento físico
+            const datosFisicos = await obtenerDatosCumplimientoFisico(periodo.tipo, periodo.fechaInicio, periodo.fechaFin);
+            
+            // Calcular eficiencia del gasto
+            const eficienciaGasto = calcularEficienciaGasto(
+              datosFisicos.cumplimientoB, 
+              datosFinancieros.cumplimientoA
+            );
+
+            // Calcular nota
+            const nota = calcularNota(eficienciaGasto);
+
+            datosCompletos.push({
+              periodo: periodo.nombre,
+              planV0: datosFinancieros.planV0,
+              gastoReal: datosFinancieros.gastoReal,
+              cumplimientoA: datosFinancieros.cumplimientoA,
+              proyeccionV0: datosFisicos.proyeccionV0,
+              avanceFisico: datosFisicos.avanceFisico,
+              cumplimientoB: datosFisicos.cumplimientoB,
+              eficienciaGasto: eficienciaGasto,
+              nota: nota
+            });
+          }
+
+          setDatosEficiencia(datosCompletos);
+        } catch (error) {
+          console.error('Error cargando datos de eficiencia:', error);
+          setError('Error al cargar los datos de eficiencia del gasto');
+        } finally {
+          setCargando(false);
+        }
+      };
+
+      if (proyectoId) {
+        cargarDatosEficiencia();
+      }
+    }, [proyectoId, fechaDesde, fechaHasta]);
+
+    if (cargando) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          fontSize: '18px',
+          color: '#16355D'
+        }}>
+          Cargando datos de eficiencia del gasto...
             </div>
-            <div style={{ color: '#666', marginBottom: '10px' }}>
-              Presupuesto: ${(item.presupuesto/1000000).toFixed(1)}M
+      );
+    }
+
+    if (error) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          fontSize: '18px',
+          color: '#dc3545'
+        }}>
+          {error}
             </div>
-            <div style={{ color: '#666', marginBottom: '10px' }}>
-              Ejecutado: ${(item.ejecutado/1000000).toFixed(1)}M
-            </div>
+      );
+    }
+
+    if (datosEficiencia.length === 0) {
+      return (
             <div style={{
-              padding: '5px 10px',
-              borderRadius: '4px',
-              background: item.eficiencia >= 95 ? '#d4edda' : item.eficiencia >= 90 ? '#fff3cd' : '#f8d7da',
-              color: item.eficiencia >= 95 ? '#155724' : item.eficiencia >= 90 ? '#856404' : '#721c24',
-              fontWeight: 'bold',
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          fontSize: '18px',
+          color: '#16355D',
               textAlign: 'center'
             }}>
-              {item.eficiencia >= 95 ? 'Excelente' : item.eficiencia >= 90 ? 'Bueno' : 'Requiere Atención'}
+          <div style={{ marginBottom: '20px' }}>
+            📊 No hay datos disponibles para generar el reporte de eficiencia del gasto
             </div>
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            Asegúrate de que existan datos en las tablas de vectores y cumplimiento físico para el proyecto seleccionado.
           </div>
-        ))}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ width: '100%', padding: '20px' }}>
+        <h3 style={{ color: '#16355D', marginBottom: '20px', textAlign: 'center' }}>
+          EFICIENCIA DEL GASTO FÍSICO - FINANCIERO
+        </h3>
+        
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse', 
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}>
+            <thead>
+              <tr style={{ backgroundColor: '#16355D', color: 'white' }}>
+                <th style={{ padding: '15px', textAlign: 'center', border: '1px solid #ddd' }}>
+                  PERÍODOS
+                </th>
+                <th colSpan="3" style={{ padding: '15px', textAlign: 'center', border: '1px solid #ddd' }}>
+                  AVANCE FINANCIERO
+                </th>
+                <th colSpan="3" style={{ padding: '15px', textAlign: 'center', border: '1px solid #ddd' }}>
+                  AVANCE FÍSICO
+                </th>
+                <th colSpan="2" style={{ padding: '15px', textAlign: 'center', border: '1px solid #ddd' }}>
+                  EFICIENCIA
+                </th>
+              </tr>
+              <tr style={{ backgroundColor: '#f8f9fa' }}>
+                <th style={{ padding: '12px', textAlign: 'center', border: '1px solid #ddd', fontSize: '14px' }}>
+                  &nbsp;
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#16355D',
+                  color: 'white',
+                  borderRadius: '20px'
+                }}>
+                  PLAN V. O. 2025 (KUSD)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#ffc107',
+                  color: 'black'
+                }}>
+                  GASTO REAL (KUSD)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white'
+                }}>
+                  CUMPLI. (%)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#16355D',
+                  color: 'white'
+                }}>
+                  PROG. V. O. 2025 (%)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#ffc107',
+                  color: 'black'
+                }}>
+                  AVANC. FÍSICO (%)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white'
+                }}>
+                  CUMPLI. (%)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white'
+                }}>
+                  EFICIEN. GASTO (%)
+                </th>
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white'
+                }}>
+                  NOTA
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {datosEficiencia.map((fila, index) => (
+                <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#f8f9fa' : 'white' }}>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontWeight: 'bold',
+                    fontSize: '14px'
+                  }}>
+                    {fila.periodo}
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}>
+                    {fila.planV0.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}>
+                    {fila.gastoReal.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}>
+                    {fila.cumplimientoA.toFixed(2)}%
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}>
+                    {fila.proyeccionV0.toFixed(2)}%
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px'
+                  }}>
+                    {fila.avanceFisico.toFixed(2)}%
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}>
+                    {fila.cumplimientoB.toFixed(2)}%
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: fila.eficienciaGasto >= 150 ? '#28a745' : fila.eficienciaGasto >= 100 ? '#ffc107' : '#dc3545'
+                  }}>
+                    {fila.eficienciaGasto.toFixed(2)}%
+                  </td>
+                  <td style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    border: '1px solid #ddd',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: fila.nota >= 4 ? '#28a745' : fila.nota >= 3 ? '#ffc107' : '#dc3545'
+                  }}>
+                    {fila.nota.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
       </div>
 
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="categoria" />
-          <YAxis domain={[0, 100]} />
-          <Tooltip formatter={v => `${v}%`} />
-          <Bar dataKey="eficiencia" fill="#16355D" />
-        </BarChart>
-      </ResponsiveContainer>
+        {/* Información adicional */}
+        <div style={{ 
+          marginTop: '20px', 
+          padding: '15px', 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: '8px',
+          border: '1px solid #dee2e6'
+        }}>
+          <h4 style={{ color: '#16355D', marginBottom: '10px' }}>Información del Reporte</h4>
+          <ul style={{ margin: 0, paddingLeft: '20px', color: '#666' }}>
+            <li><strong>Plan V. O. 2025:</strong> Presupuesto planificado según versión 0</li>
+            <li><strong>Gasto Real:</strong> Ejecución financiera real del período</li>
+            <li><strong>Prog. V. O. 2025:</strong> Proyección física planificada</li>
+            <li><strong>Avanc. Físico:</strong> Avance físico real del período</li>
+            <li><strong>Eficien. Gasto:</strong> Relación entre avance físico y financiero</li>
+            <li><strong>Nota:</strong> Calificación basada en la eficiencia del gasto</li>
+          </ul>
+          
+          {/* Indicador de filtros aplicados */}
+          {(fechaDesde || fechaHasta) && (
+            <div style={{ 
+              marginTop: '15px', 
+              padding: '10px', 
+              backgroundColor: '#e3f2fd', 
+              borderRadius: '6px',
+              border: '1px solid #2196f3',
+              fontSize: '14px',
+              color: '#1976d2'
+            }}>
+              <strong>🔍 Filtros aplicados:</strong> 
+              {fechaDesde && ` Desde: ${fechaDesde}`}
+              {fechaHasta && ` Hasta: ${fechaHasta}`}
+            </div>
+          )}
+        </div>
     </div>
   );
+  };
 
   // Componente para el reporte de Cumplimiento Físico
   const ReporteCumplimientoFisico = ({ data, autorizado, setAutorizado, proyectoId, fechaDesde, fechaHasta, datosCumplimientoFisico, filtroVector, setFiltroVector }) => {

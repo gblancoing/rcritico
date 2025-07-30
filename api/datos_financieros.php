@@ -23,6 +23,7 @@ require 'db.php';
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $proyecto_id = $_GET['proyecto_id'] ?? null;
     $tabla = $_GET['tabla'] ?? null;
+    $periodo = $_GET['periodo'] ?? null;
     
     if (!$proyecto_id) {
         http_response_code(400);
@@ -52,8 +53,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     FROM $tabla rp 
                     INNER JOIN proyectos p ON rp.proyecto_id = p.proyecto_id 
                     WHERE rp.proyecto_id = ?";
+            
+            $params = [$proyecto_id];
+            
+            // Si se proporciona un período, agregar el filtro
+            if ($periodo) {
+                $sql .= " AND rp.periodo = ?";
+                $params[] = $periodo;
+            }
+            
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$proyecto_id]);
+            $stmt->execute($params);
             $datos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } else {
             // Obtener datos de todas las tablas con JOIN para obtener el nombre del proyecto
@@ -62,8 +72,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         FROM $tabla_nombre rp 
                         INNER JOIN proyectos p ON rp.proyecto_id = p.proyecto_id 
                         WHERE rp.proyecto_id = ?";
+                
+                $params = [$proyecto_id];
+                
+                // Si se proporciona un período, agregar el filtro
+                if ($periodo) {
+                    $sql .= " AND rp.periodo = ?";
+                    $params[] = $periodo;
+                }
+                
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$proyecto_id]);
+                $stmt->execute($params);
                 $datos[$tabla_nombre] = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         }
@@ -71,6 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode([
             'success' => true,
             'proyecto_id' => $proyecto_id,
+            'tabla' => $tabla,
+            'periodo' => $periodo,
             'datos' => $datos
         ]);
         
