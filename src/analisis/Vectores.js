@@ -6,6 +6,7 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { buildAppUrl } from '../config';
 
 const tablas = [
 
@@ -237,8 +238,9 @@ const Vectores = ({ proyectoId }) => {
     setCargandoTabla(true);
     try {
       if (proyectoId) {
-        // Usar la nueva API que filtra por proyecto
-        const response = await fetch(`http://localhost/financiero/api/datos_financieros.php?proyecto_id=${proyectoId}&tabla=${tabla}`);
+        // Usar la nueva API que filtra por proyecto con URL dinámica
+        const apiUrl = buildAppUrl('api/datos_financieros.php');
+        const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&tabla=${tabla}`);
         const data = await response.json();
         if (data.success) {
           // La API datos_financieros.php devuelve los datos en data.datos
@@ -852,8 +854,9 @@ const Vectores = ({ proyectoId }) => {
       if (arr.length === 0) {
         try {
           if (proyectoId) {
-            // Usar la nueva API que filtra por proyecto
-            const res = await fetch(`http://localhost/financiero/api/datos_financieros.php?proyecto_id=${proyectoId}&tabla=${tabla}`);
+            // Usar la nueva API que filtra por proyecto con URL dinámica
+            const apiUrl = buildAppUrl('api/datos_financieros.php');
+            const res = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&tabla=${tabla}`);
             const data = await res.json();
             setter(data.success ? data.datos : []);
           } else {

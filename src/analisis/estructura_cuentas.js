@@ -11,7 +11,7 @@ import { AllCommunityModule } from 'ag-grid-community';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-import { API_BASE } from '../config';
+import { API_BASE, buildAppUrl } from '../config';
 
 export default function EstructuraCuentas() {
   // Estado para la tabla 1
@@ -35,7 +35,8 @@ export default function EstructuraCuentas() {
 
   // Fetch de datos para la tabla 1
   useEffect(() => {
-    fetch('http://localhost/financiero/api/analisis/campo1_area.php')
+    const apiUrl = buildAppUrl('api/analisis/campo1_area.php');
+    fetch(apiUrl)
       .then(res => {
         if (!res.ok) throw new Error('Error en la respuesta del servidor');
         return res.json();

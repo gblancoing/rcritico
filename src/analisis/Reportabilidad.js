@@ -560,6 +560,11 @@ const Reportabilidad = ({ proyectoId }) => {
     const [realFinanciera, setRealFinanciera] = useState(0);
     const [realFisica, setRealFisica] = useState(0);
     const [cargandoDatos, setCargandoDatos] = useState(false);
+    
+    // Estados para el historial de predictividad
+    const [historialFinanciero, setHistorialFinanciero] = useState([]);
+    const [historialFisico, setHistorialFisico] = useState([]);
+    const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
     // Función para obtener descripciones únicas de la tabla financiero_sap
     const obtenerDescripcionesDisponibles = async () => {
@@ -750,9 +755,6 @@ const Reportabilidad = ({ proyectoId }) => {
     // Función para obtener proyección física desde la tabla predictividad
     const obtenerProyeccionFisica = async () => {
       try {
-        console.log('🚀 INICIANDO obtenerProyeccionFisica');
-        console.log('📋 Parámetros:', { proyectoId, fechaDesde, fechaHasta });
-        
         // Construir URL con filtros
         let url = `${API_BASE}/predictividad/proyeccion_fisica.php`;
         const params = new URLSearchParams();
@@ -760,12 +762,10 @@ const Reportabilidad = ({ proyectoId }) => {
         if (proyectoId) {
           params.append('proyecto_id', proyectoId);
         }
-        
         if (fechaDesde) {
           // Enviar solo el año y mes para que el backend pueda extraer correctamente
           params.append('fecha_desde', fechaDesde);
         }
-        
         if (fechaHasta) {
           // Enviar solo el año y mes para que el backend pueda extraer correctamente
           params.append('fecha_hasta', fechaHasta);
@@ -775,32 +775,107 @@ const Reportabilidad = ({ proyectoId }) => {
           url += '?' + params.toString();
         }
         
-        console.log('🔍 Consultando proyección física desde predictividad:', url);
+        console.log('🔍 Consultando proyección física:', url);
         
         const response = await fetch(url);
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response ok:', response.ok);
-        
         const data = await response.json();
+        
         console.log('📊 Respuesta proyección física:', data);
         
         if (data.success) {
           const valorProyeccion = parseFloat(data.total_proyeccion_fisica) || 0;
-          console.log('🔢 Valor proyección parseado:', valorProyeccion);
-          
           setProyeccionFisica(valorProyeccion);
           
           console.log('✅ Proyección física actualizada:', valorProyeccion);
-          console.log('📋 Total registros encontrados:', data.detalles?.total_registros);
-          console.log('📊 Formato:', data.total_formateado);
         } else {
-          console.log('⚠️ No se encontraron datos de proyección física en predictividad');
-          console.log('❌ Error:', data.error);
+          console.error('❌ Error al obtener proyección física:', data.error);
           setProyeccionFisica(0);
         }
       } catch (error) {
         console.error('❌ Error de conexión proyección física:', error);
         setProyeccionFisica(0);
+      }
+    };
+
+    // Función para obtener historial de predictividad financiera
+    const obtenerHistorialFinanciero = async () => {
+      try {
+        setCargandoHistorial(true);
+        
+        // Obtener datos desde enero-2025 hasta el presente
+        const fechaInicio = '2025-01-01';
+        const fechaActual = new Date().toISOString().split('T')[0];
+        
+        let url = `${API_BASE}/predictividad/proyeccion_financiera.php`;
+        const params = new URLSearchParams();
+        
+        if (proyectoId) {
+          params.append('proyecto_id', proyectoId);
+        }
+        params.append('fecha_desde', fechaInicio);
+        params.append('fecha_hasta', fechaActual);
+        params.append('historial', 'true'); // Flag para indicar que queremos historial
+        
+        if (filtroDescripcion) {
+          params.append('descripcion', filtroDescripcion);
+        }
+        
+        url += '?' + params.toString();
+        
+        console.log('🔍 Consultando historial financiero:', url);
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success && data.historial) {
+          setHistorialFinanciero(data.historial);
+          console.log('✅ Historial financiero cargado:', data.historial);
+        } else {
+          console.error('❌ Error al obtener historial financiero:', data.error);
+          setHistorialFinanciero([]);
+        }
+      } catch (error) {
+        console.error('❌ Error de conexión historial financiero:', error);
+        setHistorialFinanciero([]);
+      } finally {
+        setCargandoHistorial(false);
+      }
+    };
+
+    // Función para obtener historial de predictividad física
+    const obtenerHistorialFisico = async () => {
+      try {
+        // Obtener datos desde enero-2025 hasta el presente
+        const fechaInicio = '2025-01-01';
+        const fechaActual = new Date().toISOString().split('T')[0];
+        
+        let url = `${API_BASE}/predictividad/proyeccion_fisica.php`;
+        const params = new URLSearchParams();
+        
+        if (proyectoId) {
+          params.append('proyecto_id', proyectoId);
+        }
+        params.append('fecha_desde', fechaInicio);
+        params.append('fecha_hasta', fechaActual);
+        params.append('historial', 'true'); // Flag para indicar que queremos historial
+        
+        url += '?' + params.toString();
+        
+        console.log('🔍 Consultando historial físico:', url);
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success && data.historial) {
+          setHistorialFisico(data.historial);
+          console.log('✅ Historial físico cargado:', data.historial);
+        } else {
+          console.error('❌ Error al obtener historial físico:', data.error);
+          setHistorialFisico([]);
+        }
+      } catch (error) {
+        console.error('❌ Error de conexión historial físico:', error);
+        setHistorialFisico([]);
       }
     };
 
@@ -1353,6 +1428,10 @@ const Reportabilidad = ({ proyectoId }) => {
         obtenerRealFinanciera();
         obtenerRealFisica();
         obtenerProyeccionFisica();
+        
+        // Cargar historial
+        obtenerHistorialFinanciero();
+        obtenerHistorialFisico();
       } else {
         console.log('⚠️ proyectoId no está disponible, no se ejecutan las funciones');
       }
@@ -1394,26 +1473,113 @@ const Reportabilidad = ({ proyectoId }) => {
     
     const periodoActual = obtenerPeriodoActual();
 
-    // Función para calcular la nota basada en la desviación
+    // Función para calcular la nota basada en la desviación según la métrica de predictividad
     const calcularNota = (desviacion) => {
-      if (!desviacion || isNaN(desviacion)) {
-        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
-      }
+      // Para desviaciones negativas (mayor eficiencia): siempre Nota 5
+      // Para desviaciones positivas (menor eficiencia): evaluar según rango
       
-      // Tomar el valor absoluto de la desviación
-      const desviacionAbsoluta = Math.abs(desviacion);
-      
-      // Aplicar la métrica de notas
-      if (desviacionAbsoluta > 15) {
-        return { numero: '1', descripcion: 'Requiere atención crítica', color: '#dc3545' };
-      } else if (desviacionAbsoluta > 10) {
-        return { numero: '3', descripcion: 'Requiere mejora', color: '#ffc107' };
-      } else if (desviacionAbsoluta >= 0) {
-        return { numero: '5', descripcion: 'Excelente cumplimiento', color: '#28a745' };
+      if (desviacion < 0) {
+        // Desviación negativa = mayor eficiencia (gasto real < proyectado)
+        // Si gastó menos de lo proyectado, es excelente = Nota 5
+        return {
+          numero: '5',
+          color: '#28a745',
+          descripcion: 'Excelente cumplimiento'
+        };
       } else {
-        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
+        // Desviación positiva = menor eficiencia (gasto real > proyectado)
+        if (desviacion <= 10) {
+          return {
+            numero: '5',
+            color: '#28a745',
+            descripcion: 'Excelente cumplimiento'
+          };
+        } else if (desviacion <= 15) {
+          return {
+            numero: '3',
+            color: '#ffc107',
+            descripcion: 'Cumplimiento 100%'
+          };
+        } else {
+          return {
+            numero: '1',
+            color: '#dc3545',
+            descripcion: 'Cumplimiento crítico'
+          };
+        }
       }
     };
+
+    // Componente de Tooltip - COMENTADO PARA EVITAR ERRORES
+    /*
+    const Tooltip = ({ children, content, position = 'top' }) => {
+      const [showTooltip, setShowTooltip] = useState(false);
+      
+      const tooltipStyle = {
+        position: 'absolute',
+        backgroundColor: '#333',
+        color: 'white',
+        padding: '8px 12px',
+        borderRadius: '6px',
+        fontSize: '12px',
+        maxWidth: '300px',
+        zIndex: 1000,
+        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+        whiteSpace: 'pre-line',
+        lineHeight: '1.4',
+        ...(position === 'top' && {
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginBottom: '8px'
+        }),
+        ...(position === 'bottom' && {
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginTop: '8px'
+        })
+      };
+      
+      const arrowStyle = {
+        position: 'absolute',
+        width: '0',
+        height: '0',
+        ...(position === 'top' && {
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          borderLeft: '6px solid transparent',
+          borderRight: '6px solid transparent',
+          borderTop: '6px solid #333'
+        }),
+        ...(position === 'bottom' && {
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          borderLeft: '6px solid transparent',
+          borderRight: '6px solid transparent',
+          borderBottom: '6px solid #333'
+        })
+      };
+      
+      return (
+        <div 
+          style={{ position: 'relative', display: 'inline-block' }}
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          {children}
+          {showTooltip && (
+            <div style={tooltipStyle}>
+              {content}
+              <div style={arrowStyle}></div>
+            </div>
+          )}
+        </div>
+      );
+    };
+    */
 
     return (
     <div style={{ width: '100%', padding: '20px' }}>
@@ -1932,12 +2098,31 @@ const Reportabilidad = ({ proyectoId }) => {
                       <span style={{ fontSize: '12px' }}>Cargando...</span>
                       </div>
                     ) : proyeccionFinanciera > 0 ? (
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>
-                          USD {proyeccionFinanciera.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </div>
-                        <div style={{ fontSize: '10px', color: '#28a745', marginTop: '2px' }}>
-                          ✅ Datos SAP
+                      <div
+                        style={{ cursor: 'help' }}
+                        title={`📊 PROYECCIÓN FINANCIERA
+
+🔍 Fuente de datos: Tabla financiero_sap
+📋 Cálculo: Suma de categorías VP
+   • MO (Mano de Obra)
+   • IC (Instalaciones y Construcción)
+   • EM (Equipos y Maquinaria)
+   • IE (Instalaciones Especiales)
+   • SC (Servicios de Construcción)
+   • AD (Administración)
+   • CL (Contingencia Local)
+   • CT (Contingencia Total)
+
+💰 Representa: Presupuesto proyectado para el período seleccionado
+📅 Filtros aplicados: ${fechaDesde ? `Desde: ${fechaDesde}` : 'Sin filtro'} ${fechaHasta ? `Hasta: ${fechaHasta}` : ''} ${filtroDescripcion ? `Descripción: ${filtroDescripcion}` : ''}`}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'bold' }}>
+                            USD {proyeccionFinanciera.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#28a745', marginTop: '2px' }}>
+                            ✅ Datos SAP
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1963,12 +2148,31 @@ const Reportabilidad = ({ proyectoId }) => {
                       <span style={{ fontSize: '12px' }}>Cargando...</span>
                       </div>
                     ) : realFinanciera > 0 ? (
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>
-                          USD {realFinanciera.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </div>
-                        <div style={{ fontSize: '10px', color: '#007bff', marginTop: '2px' }}>
-                          📋 Datos Reales
+                      <div
+                        style={{ cursor: 'help' }}
+                        title={`💰 REAL FINANCIERO
+
+🔍 Fuente de datos: Tabla real_parcial
+📋 Cálculo: Suma de categorías VP ejecutadas
+   • MO (Mano de Obra)
+   • IC (Instalaciones y Construcción)
+   • EM (Equipos y Maquinaria)
+   • IE (Instalaciones Especiales)
+   • SC (Servicios de Construcción)
+   • AD (Administración)
+   • CL (Contingencia Local)
+   • CT (Contingencia Total)
+
+💡 Representa: Gasto real ejecutado en el período seleccionado
+📅 Filtros aplicados: ${fechaDesde ? `Desde: ${fechaDesde}` : 'Sin filtro'} ${fechaHasta ? `Hasta: ${fechaHasta}` : ''}`}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'bold' }}>
+                            USD {realFinanciera.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#007bff', marginTop: '2px' }}>
+                            📋 Datos Reales
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -2098,12 +2302,27 @@ const Reportabilidad = ({ proyectoId }) => {
                         <span style={{ fontSize: '12px' }}>Cargando...</span>
                       </div>
                     ) : proyeccionFisica > 0 ? (
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>
-                          {proyeccionFisica.toFixed(2)}%
-                        </div>
-                        <div style={{ fontSize: '10px', color: '#28a745', marginTop: '2px' }}>
-                          ✅ Datos Predictividad
+                      <div
+                        style={{ cursor: 'help' }}
+                        title={`📊 PROYECCIÓN FÍSICA
+
+🔍 Fuente de datos: Tabla predictividad
+📋 Campo: porcentaje_predicido
+📅 Filtro por: period_cierre_real
+
+💡 Representa: Porcentaje de avance físico proyectado para el período seleccionado
+📈 Cálculo: Suma de porcentajes predichos en el período
+📅 Filtros aplicados: ${fechaDesde ? `Desde: ${fechaDesde}` : 'Sin filtro'} ${fechaHasta ? `Hasta: ${fechaHasta}` : ''}
+
+🔧 Nota: Los datos se obtienen de predicciones basadas en el avance histórico del proyecto`}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'bold' }}>
+                            {proyeccionFisica.toFixed(2)}%
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#28a745', marginTop: '2px' }}>
+                            ✅ Datos Predictividad
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -2222,6 +2441,8 @@ const Reportabilidad = ({ proyectoId }) => {
           </tbody>
         </table>
           </div>
+
+
       </div>
     </div>
   );
@@ -2916,24 +3137,30 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
-    // Función para calcular la nota basada en la desviación
+    // Función para calcular la nota basada en la desviación según la métrica
     const calcularNota = (desviacion) => {
-      if (!desviacion || isNaN(desviacion)) {
-        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
-      }
+      // Usar valor absoluto para manejar desviaciones positivas y negativas
+      const desviacionAbs = Math.abs(desviacion);
       
-      // Tomar el valor absoluto de la desviación
-      const desviacionAbsoluta = Math.abs(desviacion);
-      
-      // Aplicar la métrica de notas
-      if (desviacionAbsoluta > 15) {
-        return { numero: '1', descripcion: 'Requiere atención crítica', color: '#dc3545' };
-      } else if (desviacionAbsoluta > 10) {
-        return { numero: '3', descripcion: 'Requiere mejora', color: '#ffc107' };
-      } else if (desviacionAbsoluta >= 0) {
-        return { numero: '5', descripcion: 'Excelente cumplimiento', color: '#28a745' };
+      // Según la métrica: |X| > 15% = Nota 1, 15% >= |X| > 10% = Nota 3, 10% >= |X| >= 0% = Nota 5
+      if (desviacionAbs > 15) {
+        return {
+          numero: '1',
+          color: '#dc3545',
+          descripcion: 'Cumplimiento crítico'
+        };
+      } else if (desviacionAbs > 10) {
+        return {
+          numero: '3',
+          color: '#ffc107',
+          descripcion: 'Cumplimiento 100%'
+        };
       } else {
-        return { numero: '-', descripcion: 'Sin datos', color: '#6c757d' };
+        return {
+          numero: '5',
+          color: '#28a745',
+          descripcion: 'Excelente cumplimiento'
+        };
       }
     };
 
@@ -2987,7 +3214,7 @@ const Reportabilidad = ({ proyectoId }) => {
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '14px',
-                fontWeight: 'bold'
+                fontWeight: '500'
               }}
               title="Ver formato requerido del archivo Excel"
             >
@@ -3004,7 +3231,7 @@ const Reportabilidad = ({ proyectoId }) => {
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '14px',
-                fontWeight: 'bold'
+                fontWeight: '500'
               }}
               title="Descargar plantilla Excel"
             >
@@ -3029,7 +3256,7 @@ const Reportabilidad = ({ proyectoId }) => {
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '14px',
-                fontWeight: 'bold'
+                fontWeight: '500'
               }}
               title="Seleccionar archivo Excel"
             >
@@ -3048,7 +3275,7 @@ const Reportabilidad = ({ proyectoId }) => {
                 borderRadius: '4px',
                 cursor: archivoSeleccionado && !importando ? 'pointer' : 'not-allowed',
                 fontSize: '14px',
-                fontWeight: 'bold',
+                fontWeight: '500',
                 position: 'relative'
               }}
               title={autorizado ? "Importar datos a la base de datos" : "Requiere autorización"}
@@ -3126,12 +3353,16 @@ const Reportabilidad = ({ proyectoId }) => {
             marginBottom: '15px',
             flexWrap: 'wrap'
           }}>
-            <label style={{ 
-              color: '#16355D', 
-              fontWeight: 'bold', 
-              fontSize: '14px',
-              marginRight: '5px'
-            }}>
+            <label 
+              style={{ 
+                color: '#16355D', 
+                fontWeight: 'bold', 
+                fontSize: '14px',
+                marginRight: '5px',
+                cursor: 'help'
+              }}
+              title="Filtra los datos mostrados en la tabla principal y afecta la columna 'Sumatoria Parciales' de la tabla de resumen. La columna 'Período Actual' y 'Proyección' NO se ven afectadas por este filtro."
+            >
               Filtrar por Vector:
             </label>
             <select
@@ -3169,7 +3400,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   fontSize: '12px',
                   fontWeight: 'bold'
                 }}
-                title="Limpiar filtro de vector"
+                title="Limpiar el filtro de vector y mostrar todos los vectores nuevamente"
               >
                 ✕ Limpiar
               </button>
@@ -3184,6 +3415,25 @@ const Reportabilidad = ({ proyectoId }) => {
               borderRadius: '8px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
+              <div 
+                style={{ 
+                  background: '#f8f9fa', 
+                  padding: '8px 12px', 
+                  borderBottom: '1px solid #ddd',
+                  fontSize: '12px',
+                  color: '#666',
+                  fontWeight: '500',
+                  cursor: 'help'
+                }}
+                title="Esta tabla muestra los datos detallados de cumplimiento físico. Los filtros de fecha y vector afectan directamente los datos mostrados aquí. Los datos de esta tabla se utilizan para calcular la columna 'Sumatoria Parciales' en la tabla de resumen."
+              >
+                📋 Datos Detallados de Cumplimiento Físico
+                {fechaDesde || fechaHasta || filtroVector ? (
+                  <span style={{ marginLeft: '10px', color: '#16355D' }}>
+                    (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'} {filtroVector ? `| Vector: ${filtroVector}` : ''})
+                  </span>
+                ) : null}
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead style={{ position: 'sticky', top: 0, background: '#16355D', color: '#fff' }}>
                   <tr>
@@ -3276,12 +3526,17 @@ const Reportabilidad = ({ proyectoId }) => {
         {getDatosFiltrados().length > 0 && (
           <div style={{ marginTop: '30px', marginBottom: '30px' }}>
             <h3 style={{ color: '#16355D', marginBottom: '20px' }}>
-              📊 Resumen de Parciales por Vector
-              {fechaDesde || fechaHasta ? (
-                <span style={{ fontSize: '14px', color: '#666', fontWeight: 'normal', marginLeft: '10px' }}>
-                  (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'})
-                </span>
-              ) : null}
+              <span 
+                style={{ cursor: 'help' }}
+                title="Esta tabla muestra un resumen consolidado de los valores parciales por vector. Las columnas tienen diferentes comportamientos respecto a los filtros: Período Actual y Proyección NO se ven afectadas por filtros, mientras que Sumatoria Parciales SÍ responde a los filtros de fecha aplicados."
+              >
+                📊 Resumen de Parciales por Vector
+                {fechaDesde || fechaHasta ? (
+                  <span style={{ fontSize: '14px', color: '#666', fontWeight: 'normal', marginLeft: '10px' }}>
+                    (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'})
+                  </span>
+                ) : null}
+              </span>
             </h3>
             
             <div style={{ 
@@ -3301,67 +3556,87 @@ const Reportabilidad = ({ proyectoId }) => {
                       background: '#FF8C00',
                       color: '#fff'
                     }}>
-                      Vector
+                      <span 
+                        style={{ cursor: 'help' }}
+                        title="Tipos de vectores de cumplimiento físico disponibles en el sistema. Los vectores se muestran siempre en el orden: REAL, V0, NPC, API."
+                      >
+                        Vector
+                      </span>
                     </th>
                     <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
-                      {(() => {
-                        // SIEMPRE mostrar mes vencido (independiente del filtro)
-                        const mesVencido = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
-                        const añoMesVencido = mesVencido === 12 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-                        const nombreMes = new Date(añoMesVencido, mesVencido - 1).toLocaleDateString('es-ES', { month: 'long' });
-                        return (
-                          <>
-                            <div>Período Actual (%)</div>
-                            <div>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
-                          </>
-                        );
-                      })()}
-                    </th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
-                      {(() => {
-                        if (!fechaDesde && !fechaHasta) {
-                          // Sin filtro: desde enero hasta mes vencido
+                      <span 
+                        style={{ cursor: 'help' }}
+                        title="Muestra el valor del mes vencido (mes anterior al actual) para cada vector. Esta columna NO se ve afectada por los filtros de fecha aplicados - siempre muestra el mes vencido."
+                      >
+                        {(() => {
+                          // SIEMPRE mostrar mes vencido (independiente del filtro)
                           const mesVencido = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
                           const añoMesVencido = mesVencido === 12 ? new Date().getFullYear() - 1 : new Date().getFullYear();
                           const nombreMes = new Date(añoMesVencido, mesVencido - 1).toLocaleDateString('es-ES', { month: 'long' });
                           return (
                             <>
-                              <div>Sumatoria Parciales (%)</div>
-                              <div>Enero - {nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
-                            </>
-                          );
-                        } else if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
-                          // Filtro de un mes específico
-                          const [año, mes] = fechaDesde.split('-');
-                          const nombreMes = new Date(año, parseInt(mes) - 1).toLocaleDateString('es-ES', { month: 'long' });
-                          return (
-                            <>
-                              <div>Sumatoria Parciales (%)</div>
+                              <div>Período Actual (%)</div>
                               <div>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
                             </>
                           );
-                        } else {
-                          // Filtro de rango
-                          const [añoDesde, mesDesde] = fechaDesde ? fechaDesde.split('-') : ['', ''];
-                          const [añoHasta, mesHasta] = fechaHasta ? fechaHasta.split('-') : ['', ''];
-                          const nombreMesDesde = fechaDesde ? new Date(añoDesde, parseInt(mesDesde) - 1).toLocaleDateString('es-ES', { month: 'long' }) : '';
-                          const nombreMesHasta = fechaHasta ? new Date(añoHasta, parseInt(mesHasta) - 1).toLocaleDateString('es-ES', { month: 'long' }) : '';
-                          return (
-                            <>
-                              <div>Sumatoria Parciales (%)</div>
-                              <div>{nombreMesDesde.charAt(0).toUpperCase() + nombreMesDesde.slice(1)} - {nombreMesHasta.charAt(0).toUpperCase() + nombreMesHasta.slice(1)}</div>
-                            </>
-                          );
-                        }
-                      })()}
+                        })()}
+                      </span>
                     </th>
                     <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
-                      {(() => {
-                        const añoProyeccion = fechaDesde ? fechaDesde.split('-')[0] : 
-                                             fechaHasta ? fechaHasta.split('-')[0] : 
-                                             new Date().getFullYear();
-                        return `Proyección ${añoProyeccion} (%)`;
-                      })()}
+                      <span 
+                        style={{ cursor: 'help' }}
+                        title="Suma de los valores parciales según el filtro aplicado. Sin filtro: desde enero hasta el mes vencido. Con filtro: solo los meses seleccionados en el filtro de fechas."
+                      >
+                        {(() => {
+                          if (!fechaDesde && !fechaHasta) {
+                            // Sin filtro: desde enero hasta mes vencido
+                            const mesVencido = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
+                            const añoMesVencido = mesVencido === 12 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+                            const nombreMes = new Date(añoMesVencido, mesVencido - 1).toLocaleDateString('es-ES', { month: 'long' });
+                            return (
+                              <>
+                                <div>Sumatoria Parciales (%)</div>
+                                <div>Enero - {nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
+                              </>
+                            );
+                          } else if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
+                            // Filtro de un mes específico
+                            const [año, mes] = fechaDesde.split('-');
+                            const nombreMes = new Date(año, parseInt(mes) - 1).toLocaleDateString('es-ES', { month: 'long' });
+                            return (
+                              <>
+                                <div>Sumatoria Parciales (%)</div>
+                                <div>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
+                              </>
+                            );
+                          } else {
+                            // Filtro de rango
+                            const [añoDesde, mesDesde] = fechaDesde ? fechaDesde.split('-') : ['', ''];
+                            const [añoHasta, mesHasta] = fechaHasta ? fechaHasta.split('-') : ['', ''];
+                            const nombreMesDesde = fechaDesde ? new Date(añoDesde, parseInt(mesDesde) - 1).toLocaleDateString('es-ES', { month: 'long' }) : '';
+                            const nombreMesHasta = fechaHasta ? new Date(añoHasta, parseInt(mesHasta) - 1).toLocaleDateString('es-ES', { month: 'long' }) : '';
+                            return (
+                              <>
+                                <div>Sumatoria Parciales (%)</div>
+                                <div>{nombreMesDesde.charAt(0).toUpperCase() + nombreMesDesde.slice(1)} - {nombreMesHasta.charAt(0).toUpperCase() + nombreMesHasta.slice(1)}</div>
+                              </>
+                            );
+                          }
+                        })()}
+                      </span>
+                    </th>
+                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
+                      <span 
+                        style={{ cursor: 'help' }}
+                        title="Proyección anual completa para el año seleccionado. Esta columna NO se ve afectada por los filtros de fecha - siempre muestra la suma de todos los meses del año."
+                      >
+                        {(() => {
+                          const añoProyeccion = fechaDesde ? fechaDesde.split('-')[0] : 
+                                               fechaHasta ? fechaHasta.split('-')[0] : 
+                                               new Date().getFullYear();
+                          return `Proyección ${añoProyeccion} (%)`;
+                        })()}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -3380,7 +3655,12 @@ const Reportabilidad = ({ proyectoId }) => {
                                resumen.vector === 'V0' ? '#00BFFF' : 
                                resumen.vector === 'NPC' ? '#0066CC' : '#32CD32'
                       }}>
-                        {resumen.vector}
+                        <span 
+                          style={{ cursor: 'help' }}
+                          title={`Vector ${resumen.vector}: ${resumen.vector === 'REAL' ? 'Datos reales de ejecución física' : resumen.vector === 'V0' ? 'Versión 0 del presupuesto' : resumen.vector === 'NPC' ? 'Nuevo Presupuesto de Contrato' : 'Aprobación Presupuestaria Inicial'}`}
+                        >
+                          {resumen.vector}
+                        </span>
                       </td>
                       <td style={{ 
                         padding: '12px 8px', 
@@ -3389,7 +3669,12 @@ const Reportabilidad = ({ proyectoId }) => {
                         fontWeight: 'bold',
                         color: '#16355D'
                       }}>
-                        {resumen.parcialPeriodo.toFixed(2)}%
+                        <span 
+                          style={{ cursor: 'help' }}
+                          title={`Valor del mes vencido para ${resumen.vector}. Este valor NO cambia al aplicar filtros de fecha.`}
+                        >
+                          {resumen.parcialPeriodo.toFixed(2)}%
+                        </span>
                       </td>
                       <td style={{ 
                         padding: '12px 8px', 
@@ -3398,7 +3683,12 @@ const Reportabilidad = ({ proyectoId }) => {
                         fontWeight: 'bold',
                         color: '#16355D'
                       }}>
-                        {resumen.sumatoriaParciales.toFixed(2)}%
+                        <span 
+                          style={{ cursor: 'help' }}
+                          title={`Suma acumulada de valores parciales para ${resumen.vector} ${!fechaDesde && !fechaHasta ? 'desde enero hasta el mes vencido' : 'en el período filtrado'}.`}
+                        >
+                          {resumen.sumatoriaParciales.toFixed(2)}%
+                        </span>
                       </td>
                       <td style={{ 
                         padding: '12px 8px', 
@@ -3407,7 +3697,12 @@ const Reportabilidad = ({ proyectoId }) => {
                         fontWeight: 'bold',
                         color: '#16355D'
                       }}>
-                        {resumen.proyeccionAno.toFixed(2)}%
+                        <span 
+                          style={{ cursor: 'help' }}
+                          title={`Proyección anual completa para ${resumen.vector}. Este valor NO cambia al aplicar filtros de fecha - siempre muestra la suma de todos los meses del año.`}
+                        >
+                          {resumen.proyeccionAno.toFixed(2)}%
+                        </span>
                       </td>
                     </tr>
                   ))}
