@@ -1510,6 +1510,53 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
+    // Función específica para calcular nota de predictividad física
+    const calcularNotaFisica = (desviacion) => {
+      // Para avance físico, la lógica es diferente:
+      // - Desviación positiva = mayor avance del proyectado = bueno (pero proyección imprecisa)
+      // - Desviación negativa = menor avance del proyectado = malo
+      // La nota se basa en la precisión de la proyección, no en el avance en sí
+      
+      const desviacionAbsoluta = Math.abs(desviacion);
+      
+      if (desviacionAbsoluta <= 5) {
+        // Proyección muy precisa (desviación ≤ 5%)
+        return {
+          numero: '5',
+          color: '#28a745',
+          descripcion: 'Proyección precisa'
+        };
+      } else if (desviacionAbsoluta <= 10) {
+        // Proyección aceptable (desviación ≤ 10%)
+        return {
+          numero: '4',
+          color: '#17a2b8',
+          descripcion: 'Proyección aceptable'
+        };
+      } else if (desviacionAbsoluta <= 20) {
+        // Proyección con desviación moderada (desviación ≤ 20%)
+        return {
+          numero: '3',
+          color: '#ffc107',
+          descripcion: 'Proyección moderada'
+        };
+      } else if (desviacionAbsoluta <= 50) {
+        // Proyección con desviación alta (desviación ≤ 50%)
+        return {
+          numero: '2',
+          color: '#fd7e14',
+          descripcion: 'Proyección imprecisa'
+        };
+      } else {
+        // Proyección muy imprecisa (desviación > 50%)
+        return {
+          numero: '1',
+          color: '#dc3545',
+          descripcion: 'Proyección crítica'
+        };
+      }
+    };
+
     // Componente de Tooltip - COMENTADO PARA EVITAR ERRORES
     /*
     const Tooltip = ({ children, content, position = 'top' }) => {
@@ -2409,8 +2456,8 @@ const Reportabilidad = ({ proyectoId }) => {
                             color: desviacion.esPositiva ? '#dc3545' : 
                                    desviacion.esNegativa ? '#28a745' : '#6c757d'
                           }}>
-                            {desviacion.esPositiva ? '📈 Más Gasto' : 
-                             desviacion.esNegativa ? '📉 Menos Gasto' : '📊 Sin desviación'}
+                            {desviacion.esPositiva ? '📈 Mayor Avance' : 
+                             desviacion.esNegativa ? '📉 Menor Avance' : '📊 Sin desviación'}
                           </div>
                         </div>
                       );
@@ -2424,7 +2471,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   }}>
                     {(() => {
                       const desviacion = calcularDesviacionFisica();
-                      const nota = calcularNota(desviacion.porcentaje);
+                      const nota = calcularNotaFisica(desviacion.porcentaje);
                       return (
                         <div>
                           <div style={{ fontWeight: 'bold', fontSize: '16px', color: nota.color }}>
