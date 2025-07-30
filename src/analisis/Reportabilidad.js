@@ -2496,6 +2496,244 @@ const Reportabilidad = ({ proyectoId }) => {
         </table>
           </div>
 
+          {/* Análisis Dinámico - Predictividad */}
+          {proyeccionFinanciera > 0 && realFinanciera > 0 && proyeccionFisica > 0 && realFisica > 0 && (
+            <div style={{ 
+              backgroundColor: '#fff3cd', 
+              padding: '20px', 
+              borderRadius: '8px', 
+              border: '2px solid #ffc107',
+              marginTop: '20px'
+            }}>
+              <h5 style={{ 
+                color: '#856404', 
+                marginBottom: '15px', 
+                fontSize: '16px', 
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                📊 ANÁLISIS EJECUTIVO - PREDICTIVIDAD DEL PROYECTO
+              </h5>
+              
+              {(() => {
+                // Obtener datos de desviación
+                const desviacionFinanciera = calcularDesviacionFinanciera();
+                const desviacionFisica = calcularDesviacionFisica();
+                
+                // Calcular precisión de predicciones
+                const precisionFinanciera = Math.abs(100 - Math.abs(desviacionFinanciera.porcentaje));
+                const precisionFisica = Math.abs(100 - Math.abs(desviacionFisica.porcentaje));
+                
+                // Determinar estado general de predictividad
+                const getEstadoPredictividad = () => {
+                  const precisionPromedio = (precisionFinanciera + precisionFisica) / 2;
+                  
+                  if (precisionPromedio >= 95) {
+                    return { texto: 'EXCELENTE', color: '#28a745', icono: '🟢' };
+                  } else if (precisionPromedio >= 85) {
+                    return { texto: 'BUENA', color: '#17a2b8', icono: '🔵' };
+                  } else if (precisionPromedio >= 75) {
+                    return { texto: 'REGULAR', color: '#ffc107', icono: '🟡' };
+                  } else if (precisionPromedio >= 60) {
+                    return { texto: 'REQUIERE MEJORA', color: '#fd7e14', icono: '🟠' };
+                  } else {
+                    return { texto: 'CRÍTICA', color: '#dc3545', icono: '🔴' };
+                  }
+                };
+                
+                const estadoPredictividad = getEstadoPredictividad();
+                
+                return (
+                  <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                    {/* Estado General de Predictividad */}
+                    <div style={{ 
+                      marginBottom: '15px', 
+                      padding: '10px', 
+                      backgroundColor: estadoPredictividad.color + '20',
+                      borderRadius: '6px',
+                      border: `1px solid ${estadoPredictividad.color}`
+                    }}>
+                      <strong style={{ color: estadoPredictividad.color }}>
+                        {estadoPredictividad.icono} PRECISIÓN DE PREDICCIONES: {estadoPredictividad.texto}
+                      </strong>
+                    </div>
+                    
+                    {/* Análisis por dimensiones */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px' }}>
+                      <div>
+                        <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                          💰 PREDICCIÓN FINANCIERA
+                        </h6>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          <div><strong>Proyectado:</strong> USD {proyeccionFinanciera.toLocaleString()}</div>
+                          <div><strong>Ejecutado:</strong> USD {realFinanciera.toLocaleString()}</div>
+                          <div><strong>Desviación:</strong> 
+                            <span style={{ 
+                              color: desviacionFinanciera.esPositiva ? '#dc3545' : desviacionFinanciera.esNegativa ? '#28a745' : '#666',
+                              fontWeight: 'bold'
+                            }}>
+                              {desviacionFinanciera.esPositiva ? '+' : ''}{desviacionFinanciera.porcentaje}%
+                            </span>
+                          </div>
+                          <div><strong>Precisión:</strong> 
+                            <span style={{ 
+                              color: precisionFinanciera >= 95 ? '#28a745' : precisionFinanciera >= 85 ? '#17a2b8' : precisionFinanciera >= 75 ? '#ffc107' : '#dc3545',
+                              fontWeight: 'bold'
+                            }}>
+                              {precisionFinanciera.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                          📈 PREDICCIÓN FÍSICA
+                        </h6>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          <div><strong>Proyectado:</strong> {proyeccionFisica.toFixed(2)}%</div>
+                          <div><strong>Ejecutado:</strong> {realFisica.toFixed(2)}%</div>
+                          <div><strong>Desviación:</strong> 
+                            <span style={{ 
+                              color: desviacionFisica.esPositiva ? '#dc3545' : desviacionFisica.esNegativa ? '#28a745' : '#666',
+                              fontWeight: 'bold'
+                            }}>
+                              {desviacionFisica.esPositiva ? '+' : ''}{desviacionFisica.porcentaje}%
+                            </span>
+                          </div>
+                          <div><strong>Precisión:</strong> 
+                            <span style={{ 
+                              color: precisionFisica >= 95 ? '#28a745' : precisionFisica >= 85 ? '#17a2b8' : precisionFisica >= 75 ? '#ffc107' : '#dc3545',
+                              fontWeight: 'bold'
+                            }}>
+                              {precisionFisica.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Indicadores clave */}
+                    <div style={{ 
+                      backgroundColor: '#f8f9fa', 
+                      padding: '12px', 
+                      borderRadius: '6px',
+                      border: '1px solid #dee2e6',
+                      marginBottom: '15px'
+                    }}>
+                      <h6 style={{ color: '#856404', marginBottom: '10px', fontSize: '13px', fontWeight: 'bold' }}>
+                        🎯 INDICADORES CLAVE DE PREDICTIVIDAD
+                      </h6>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', fontSize: '12px' }}>
+                        <div>
+                          <strong>
+                            Precisión Promedio:
+                            <span 
+                              title={`🧮 CÁLCULO DE PRECISIÓN PROMEDIO:
+
+📊 FÓRMULA:
+Precisión Promedio = (Precisión Financiera + Precisión Física) / 2
+
+📈 CÁLCULO DE CADA PRECISIÓN:
+• Precisión = 100% - |Desviación|
+
+📋 EJEMPLO CON TUS DATOS:
+• Desviación Financiera: ${typeof desviacionFinanciera.porcentaje === 'number' ? desviacionFinanciera.porcentaje.toFixed(2) : desviacionFinanciera.porcentaje}%
+• Precisión Financiera: 100% - |${typeof desviacionFinanciera.porcentaje === 'number' ? desviacionFinanciera.porcentaje.toFixed(2) : desviacionFinanciera.porcentaje}%| = ${typeof precisionFinanciera === 'number' ? precisionFinanciera.toFixed(2) : precisionFinanciera}%
+
+• Desviación Física: ${typeof desviacionFisica.porcentaje === 'number' ? desviacionFisica.porcentaje.toFixed(2) : desviacionFisica.porcentaje}%
+• Precisión Física: 100% - |${typeof desviacionFisica.porcentaje === 'number' ? desviacionFisica.porcentaje.toFixed(2) : desviacionFisica.porcentaje}%| = ${typeof precisionFisica === 'number' ? precisionFisica.toFixed(2) : precisionFisica}%
+
+🎯 RESULTADO:
+Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFinanciera.toFixed(2) : precisionFinanciera}% + ${typeof precisionFisica === 'number' ? precisionFisica.toFixed(2) : precisionFisica}%) / 2 = ${((precisionFinanciera + precisionFisica) / 2).toFixed(1)}%
+
+💡 INTERPRETACIÓN:
+• 95-100%: Excelente precisión
+• 85-94%: Buena precisión
+• 75-84%: Precisión regular
+• 60-74%: Requiere mejora
+• <60%: Precisión crítica`}
+                              style={{ 
+                                cursor: 'help', 
+                                color: '#007bff', 
+                                marginLeft: '5px',
+                                fontSize: '11px'
+                              }}
+                            >
+                              ℹ️
+                            </span>
+                          </strong> 
+                          <span style={{ 
+                            color: (precisionFinanciera + precisionFisica) / 2 >= 95 ? '#28a745' : (precisionFinanciera + precisionFisica) / 2 >= 85 ? '#17a2b8' : (precisionFinanciera + precisionFisica) / 2 >= 75 ? '#ffc107' : '#dc3545',
+                            fontWeight: 'bold'
+                          }}>
+                            {((precisionFinanciera + precisionFisica) / 2).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Calificación Financiera:</strong> 
+                          <span style={{ 
+                            color: calcularNota(desviacionFinanciera.porcentaje).color,
+                            fontWeight: 'bold'
+                          }}>
+                            {calcularNota(desviacionFinanciera.porcentaje).numero}/5
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Calificación Física:</strong> 
+                          <span style={{ 
+                            color: calcularNotaFisica(desviacionFisica.porcentaje).color,
+                            fontWeight: 'bold'
+                          }}>
+                            {calcularNotaFisica(desviacionFisica.porcentaje).numero}/5
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Confianza del Modelo:</strong> 
+                          <span style={{ 
+                            color: (precisionFinanciera + precisionFisica) / 2 >= 90 ? '#28a745' : (precisionFinanciera + precisionFisica) / 2 >= 80 ? '#17a2b8' : '#ffc107',
+                            fontWeight: 'bold'
+                          }}>
+                            {(precisionFinanciera + precisionFisica) / 2 >= 90 ? 'ALTA' : (precisionFinanciera + precisionFisica) / 2 >= 80 ? 'MEDIA' : 'BAJA'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Recomendaciones */}
+                    <div style={{ 
+                      marginTop: '12px', 
+                      padding: '10px', 
+                      backgroundColor: '#d1ecf1', 
+                      borderRadius: '6px',
+                      border: '1px solid #bee5eb',
+                      fontSize: '12px',
+                      color: '#0c5460'
+                    }}>
+                      <strong>💡 INSIGHTS DE PREDICTIVIDAD:</strong>
+                      {(() => {
+                        const precisionPromedio = (precisionFinanciera + precisionFisica) / 2;
+                        
+                        if (precisionPromedio >= 95) {
+                          return ' El modelo de predicción muestra excelente precisión. Las proyecciones son altamente confiables para la planificación futura.';
+                        } else if (precisionPromedio >= 85) {
+                          return ' El modelo de predicción tiene buena precisión. Se recomienda monitorear tendencias para mejorar la exactitud.';
+                        } else if (precisionPromedio >= 75) {
+                          return ' La precisión del modelo es regular. Se sugiere revisar los parámetros de predicción y ajustar el modelo.';
+                        } else if (precisionPromedio >= 60) {
+                          return ' La precisión requiere mejora significativa. Se necesita recalibrar el modelo de predicción con datos más recientes.';
+                        } else {
+                          return ' La precisión es crítica. Se requiere una revisión completa del modelo de predicción y sus algoritmos.';
+                        }
+                      })()}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
       </div>
     </div>
@@ -3100,7 +3338,7 @@ const Reportabilidad = ({ proyectoId }) => {
     }
 
     return (
-      <div style={{ width: '100%', padding: '20px' }}>
+    <div style={{ width: '100%', padding: '20px' }}>
         <h3 style={{ color: '#16355D', marginBottom: '20px', textAlign: 'center' }}>
           EFICIENCIA DEL GASTO FÍSICO - FINANCIERO
         </h3>
@@ -3117,7 +3355,7 @@ const Reportabilidad = ({ proyectoId }) => {
             <thead>
               <tr style={{ backgroundColor: '#16355D', color: 'white' }}>
                 <th style={{ padding: '15px', textAlign: 'center', border: '1px solid #ddd' }}>
-                  PERÍODOS
+                  AVANCES
                 </th>
                 <th colSpan="3" style={{ padding: '15px', textAlign: 'center', border: '1px solid #ddd' }}>
                   AVANCE FINANCIERO
@@ -3130,8 +3368,16 @@ const Reportabilidad = ({ proyectoId }) => {
                 </th>
               </tr>
               <tr style={{ backgroundColor: '#f8f9fa' }}>
-                <th style={{ padding: '12px', textAlign: 'center', border: '1px solid #ddd', fontSize: '14px' }}>
-                  &nbsp;
+                <th style={{ 
+                  padding: '12px', 
+                  textAlign: 'center', 
+                  border: '1px solid #ddd', 
+                  fontSize: '14px',
+                  backgroundColor: '#16355D',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}>
+                  PERÍODOS
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -3301,7 +3547,7 @@ const Reportabilidad = ({ proyectoId }) => {
               ))}
             </tbody>
           </table>
-      </div>
+            </div>
 
         {/* Información adicional */}
         <div style={{ 
@@ -3311,15 +3557,321 @@ const Reportabilidad = ({ proyectoId }) => {
           borderRadius: '8px',
           border: '1px solid #dee2e6'
         }}>
-          <h4 style={{ color: '#16355D', marginBottom: '10px' }}>Información del Reporte</h4>
-          <ul style={{ margin: 0, paddingLeft: '20px', color: '#666' }}>
-            <li><strong>Plan V. O. 2025:</strong> Presupuesto planificado según versión 0</li>
-            <li><strong>Gasto Real:</strong> Ejecución financiera real del período</li>
-            <li><strong>Prog. V. O. 2025:</strong> Proyección física planificada</li>
-            <li><strong>Avanc. Físico:</strong> Avance físico real del período</li>
-            <li><strong>Eficien. Gasto:</strong> Relación entre avance físico y financiero</li>
-            <li><strong>Nota:</strong> Calificación basada en la eficiencia del gasto</li>
-          </ul>
+          <h4 style={{ color: '#16355D', marginBottom: '15px', fontSize: '16px', fontWeight: 'bold' }}>
+            📊 GLOSARIO TÉCNICO - EFICIENCIA DEL GASTO
+          </h4>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px' }}>
+            <div>
+              <h5 style={{ color: '#16355D', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                💰 AVANCE FINANCIERO
+              </h5>
+              <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
+                <li><strong>Plan V0:</strong> Presupuesto planificado según Versión 0 (USD). Representa la proyección financiera base del proyecto.</li>
+                <li><strong>Gasto Real:</strong> Ejecución financiera real ejecutada en el período analizado (USD). Refleja el desembolso efectivo.</li>
+                <li><strong>Cumpli (%):</strong> Porcentaje de cumplimiento financiero = (Gasto Real / Plan V0) × 100. Indica la eficiencia presupuestaria.</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h5 style={{ color: '#16355D', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                📈 AVANCE FÍSICO
+              </h5>
+              <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
+                <li><strong>Prog. V0:</strong> Proyección física planificada según Versión 0 (%). Meta de avance físico esperado.</li>
+                <li><strong>Avance Fisico:</strong> Avance físico real alcanzado en el período (%). Progreso efectivo de las actividades.</li>
+                <li><strong>Cumpli (%):</strong> Porcentaje de cumplimiento físico = (Avance Físico / Prog. V0) × 100. Eficiencia operacional.</li>
+              </ul>
+            </div>
+          </div>
+          
+            <div style={{
+            backgroundColor: '#f8f9fa', 
+            padding: '12px', 
+            borderRadius: '6px', 
+            border: '1px solid #dee2e6',
+            marginBottom: '15px'
+          }}>
+            <h5 style={{ color: '#16355D', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+              🎯 MÉTRICAS DE EFICIENCIA
+            </h5>
+            <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
+                              <li><strong>Eficien. Gasto (%):</strong> Índice de eficiencia del gasto = (Cumpli. Físico / Cumpli. Financiero) × 100. Valores {'>'}100% indican mayor eficiencia física vs financiera.</li>
+              <li><strong>Nota:</strong> Calificación basada en la eficiencia del gasto: 5.0 (Excelente), 4.0 (Bueno), 3.0 (Regular), 2.0 (Deficiente), 1.0 (Crítico).</li>
+            </ul>
+          </div>
+          
+          <div style={{ 
+            backgroundColor: '#e8f5e8', 
+            padding: '10px', 
+            borderRadius: '6px', 
+            border: '1px solid #28a745',
+            fontSize: '12px',
+            color: '#155724'
+          }}>
+            <strong>📋 PERÍODOS DE ANÁLISIS:</strong>
+            <ul style={{ margin: '5px 0 0 15px', padding: 0, fontSize: '12px' }}>
+              <li><strong>Período del Mes:</strong> Análisis mensual específico (actual o filtrado)</li>
+              <li><strong>Período Acumulado:</strong> Sumatoria desde enero hasta el mes de análisis</li>
+              <li><strong>Período Anual:</strong> Análisis completo del año (actual o filtrado)</li>
+            </ul>
+          </div>
+          
+          {/* Análisis Dinámico */}
+          {datosEficiencia.length > 0 && (
+            <div style={{ 
+              backgroundColor: '#fff3cd', 
+              padding: '15px', 
+              borderRadius: '8px', 
+              border: '2px solid #ffc107',
+              marginTop: '15px'
+            }}>
+              <h5 style={{ 
+                color: '#856404', 
+                marginBottom: '12px', 
+                fontSize: '14px', 
+              fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                📊 ANÁLISIS EJECUTIVO - ESTADO ACTUAL DEL PROYECTO
+              </h5>
+              
+              {(() => {
+                // Obtener datos del período actual (primera fila)
+                const periodoActual = datosEficiencia[0];
+                const periodoAcumulado = datosEficiencia[1];
+                
+                // Análisis financiero
+                const eficienciaFinanciera = periodoActual.cumplimientoA;
+                const eficienciaFisica = periodoActual.cumplimientoB;
+                const eficienciaGasto = periodoActual.eficienciaGasto;
+                
+                // Análisis de tendencias (comparar mes actual vs mes anterior)
+                // Para simplificar, usamos la diferencia entre el mes actual y el acumulado como indicador de tendencia
+                const tendenciaFinanciera = periodoActual.cumplimientoA - 100; // Diferencia vs 100% (meta)
+                const tendenciaFisica = periodoActual.cumplimientoB - 100; // Diferencia vs 100% (meta)
+                
+                // Determinar estado general
+                const getEstadoGeneral = () => {
+                  if (eficienciaGasto >= 150 && eficienciaFinanciera >= 100 && eficienciaFisica >= 100) {
+                    return { texto: 'EXCELENTE', color: '#28a745', icono: '🟢' };
+                  } else if (eficienciaGasto >= 100 && eficienciaFinanciera >= 90 && eficienciaFisica >= 90) {
+                    return { texto: 'BUENO', color: '#17a2b8', icono: '🔵' };
+                  } else if (eficienciaGasto >= 80 && eficienciaFinanciera >= 80 && eficienciaFisica >= 80) {
+                    return { texto: 'REGULAR', color: '#ffc107', icono: '🟡' };
+                  } else if (eficienciaGasto >= 60) {
+                    return { texto: 'REQUIERE ATENCIÓN', color: '#fd7e14', icono: '🟠' };
+                  } else {
+                    return { texto: 'CRÍTICO', color: '#dc3545', icono: '🔴' };
+                  }
+                };
+                
+                const estadoGeneral = getEstadoGeneral();
+                
+                return (
+                  <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                    {/* Estado General */}
+                    <div style={{ 
+                      marginBottom: '12px', 
+                      padding: '8px', 
+                      backgroundColor: estadoGeneral.color + '20',
+                      borderRadius: '6px',
+                      border: `1px solid ${estadoGeneral.color}`
+                    }}>
+                      <strong style={{ color: estadoGeneral.color }}>
+                        {estadoGeneral.icono} ESTADO GENERAL: {estadoGeneral.texto}
+                      </strong>
+            </div>
+                    
+                    {/* Análisis por dimensiones */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '12px' }}>
+                      <div>
+                        <h6 style={{ color: '#856404', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                          💰 EFICIENCIA FINANCIERA
+                        </h6>
+                        <div style={{ fontSize: '11px', color: '#666' }}>
+                          <div><strong>Planificado:</strong> {periodoActual.planV0.toLocaleString()} USD</div>
+                          <div><strong>Ejecutado:</strong> {periodoActual.gastoReal.toLocaleString()} USD</div>
+                          <div><strong>Cumplimiento:</strong> 
+                            <span style={{ 
+                              color: eficienciaFinanciera >= 100 ? '#28a745' : eficienciaFinanciera >= 90 ? '#ffc107' : '#dc3545',
+                              fontWeight: 'bold'
+                            }}>
+                              {eficienciaFinanciera.toFixed(1)}%
+                            </span>
+          </div>
+                        </div>
+      </div>
+
+                      <div>
+                        <h6 style={{ color: '#856404', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                          📈 EFICIENCIA FÍSICA
+                        </h6>
+                        <div style={{ fontSize: '11px', color: '#666' }}>
+                          <div><strong>Planificado:</strong> {periodoActual.proyeccionV0.toFixed(2)}%</div>
+                          <div><strong>Ejecutado:</strong> {periodoActual.avanceFisico.toFixed(2)}%</div>
+                          <div><strong>Cumplimiento:</strong> 
+                            <span style={{ 
+                              color: eficienciaFisica >= 100 ? '#28a745' : eficienciaFisica >= 90 ? '#ffc107' : '#dc3545',
+                              fontWeight: 'bold'
+                            }}>
+                              {eficienciaFisica.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Indicadores clave */}
+                    <div style={{ 
+                      backgroundColor: '#f8f9fa', 
+                      padding: '10px', 
+                      borderRadius: '6px',
+                      border: '1px solid #dee2e6'
+                    }}>
+                      <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold' }}>
+                        🎯 INDICADORES CLAVE
+                      </h6>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '11px' }}>
+                        <div>
+                          <strong>Eficiencia del Gasto:</strong> 
+                          <span style={{ 
+                            color: eficienciaGasto >= 150 ? '#28a745' : eficienciaGasto >= 100 ? '#17a2b8' : '#dc3545',
+                            fontWeight: 'bold'
+                          }}>
+                            {eficienciaGasto.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Calificación:</strong> 
+                          <span style={{ 
+                            color: periodoActual.nota >= 4 ? '#28a745' : periodoActual.nota >= 3 ? '#ffc107' : '#dc3545',
+                            fontWeight: 'bold'
+                          }}>
+                            {periodoActual.nota.toFixed(1)}/5.0
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Desv. vs Meta Financiera:</strong> 
+                          <span style={{ 
+                            color: tendenciaFinanciera > 0 ? '#28a745' : tendenciaFinanciera < 0 ? '#dc3545' : '#666',
+                            fontWeight: 'bold'
+                          }}>
+                            {tendenciaFinanciera > 0 ? '+' : ''}{tendenciaFinanciera.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Desv. vs Meta Física:</strong> 
+                          <span style={{ 
+                            color: tendenciaFisica > 0 ? '#28a745' : tendenciaFisica < 0 ? '#dc3545' : '#666',
+                            fontWeight: 'bold'
+                          }}>
+                            {tendenciaFisica > 0 ? '+' : ''}{tendenciaFisica.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Recomendaciones */}
+                    <div style={{ 
+                      marginTop: '10px', 
+                      padding: '8px', 
+                      backgroundColor: '#d1ecf1', 
+                      borderRadius: '6px',
+                      border: '1px solid #bee5eb',
+                      fontSize: '11px',
+                      color: '#0c5460'
+                    }}>
+                      <strong>💡 INSIGHTS:</strong>
+                      {eficienciaGasto >= 150 ? 
+                        ' El proyecto muestra excelente eficiencia operacional con avance físico superior al financiero.' :
+                        eficienciaGasto >= 100 ? 
+                        ' El proyecto mantiene un balance adecuado entre avance físico y financiero.' :
+                        eficienciaGasto >= 80 ? 
+                        ' Se recomienda revisar la ejecución física para mejorar la eficiencia del gasto.' :
+                        ' Se requiere intervención inmediata para optimizar la ejecución física y financiera.'
+                      }
+                                         </div>
+                   </div>
+                 );
+               })()}
+             </div>
+           )}
+           
+           {/* Resumen de Períodos */}
+           {datosEficiencia.length > 0 && (
+             <div style={{ 
+               backgroundColor: '#f8f9fa', 
+               padding: '15px', 
+               borderRadius: '8px', 
+               border: '1px solid #dee2e6',
+               marginTop: '15px'
+             }}>
+               <h5 style={{ 
+                 color: '#495057', 
+                 marginBottom: '12px', 
+                 fontSize: '14px', 
+                 fontWeight: 'bold',
+                 display: 'flex',
+                 alignItems: 'center',
+                 gap: '8px'
+               }}>
+                 📅 RESUMEN DE PERÍODOS
+               </h5>
+               
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', fontSize: '12px' }}>
+                 {datosEficiencia.map((periodo, index) => (
+                   <div key={index} style={{ 
+                     padding: '10px', 
+                     backgroundColor: 'white', 
+                     borderRadius: '6px',
+                     border: '1px solid #ced4da'
+                   }}>
+                     <h6 style={{ 
+                       color: '#16355D', 
+                       marginBottom: '8px', 
+                       fontSize: '11px', 
+                       fontWeight: 'bold',
+                       textAlign: 'center'
+                     }}>
+                       {periodo.periodo}
+                     </h6>
+                     
+                     <div style={{ fontSize: '10px', color: '#666', lineHeight: '1.3' }}>
+                       <div style={{ marginBottom: '4px' }}>
+                         <strong>Eficiencia:</strong> 
+                         <span style={{ 
+                           color: periodo.eficienciaGasto >= 150 ? '#28a745' : periodo.eficienciaGasto >= 100 ? '#17a2b8' : '#dc3545',
+                           fontWeight: 'bold'
+                         }}>
+                           {periodo.eficienciaGasto.toFixed(1)}%
+                         </span>
+                       </div>
+                       <div style={{ marginBottom: '4px' }}>
+                         <strong>Financiero:</strong> {periodo.cumplimientoA.toFixed(1)}%
+                       </div>
+                       <div style={{ marginBottom: '4px' }}>
+                         <strong>Físico:</strong> {periodo.cumplimientoB.toFixed(1)}%
+                       </div>
+                       <div>
+                         <strong>Nota:</strong> 
+                         <span style={{ 
+                           color: periodo.nota >= 4 ? '#28a745' : periodo.nota >= 3 ? '#ffc107' : '#dc3545',
+                           fontWeight: 'bold'
+                         }}>
+                           {periodo.nota.toFixed(1)}
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+               
+               
+             </div>
+           )}
           
           {/* Indicador de filtros aplicados */}
           {(fechaDesde || fechaHasta) && (
