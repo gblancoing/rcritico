@@ -2529,13 +2529,33 @@ const Reportabilidad = ({ proyectoId }) => {
             periodoAConsultar = mesActual + '-01';
             nombrePeriodo = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
           }
+        } else if (periodo === 'acumulado') {
+          // Acumulado estándar: desde enero hasta el mes actual
+          periodoAConsultar = null; // Se manejará con periodo_desde y periodo_hasta
+        } else if (periodo === 'filtrado') {
+          // Acumulado con filtros: desde enero hasta el mes final del filtro
+          periodoAConsultar = null; // Se manejará con periodo_desde y periodo_hasta
         } else {
-          // Para acumulado y anual, usar las fechas de filtro si están disponibles
+          // Para anual, usar las fechas de filtro si están disponibles
           periodoAConsultar = null; // Se manejará con periodo_desde y periodo_hasta
         }
         
-        const urlV0 = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=v0_parcial${periodoAConsultar ? `&periodo=${periodoAConsultar}` : ''}`;
-        const urlReal = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=real_parcial${periodoAConsultar ? `&periodo=${periodoAConsultar}` : ''}`;
+        let urlV0 = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=v0_parcial`;
+        let urlReal = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=real_parcial`;
+        
+        if (periodoAConsultar) {
+          urlV0 += `&periodo=${periodoAConsultar}`;
+          urlReal += `&periodo=${periodoAConsultar}`;
+        } else if (periodo === 'acumulado') {
+          // Para acumulado, traer todos los datos y filtrar en el frontend
+          console.log('🔍 Acumulado: trayendo todos los datos para filtrar en frontend');
+        } else if (periodo === 'filtrado' && fechaInicio && fechaFin) {
+          // Para acumulado filtrado, traer todos los datos y filtrar en el frontend
+          console.log('🔍 Filtrado: trayendo todos los datos para filtrar en frontend');
+        } else if (periodo === 'anual') {
+          // Para anual, traer todos los datos y filtrar por año completo
+          console.log('🔍 Anual: trayendo todos los datos para filtrar por año completo');
+        }
         
         console.log('🔍 Consultando datos financieros:', periodoAConsultar || 'sin filtro de período');
         console.log('📅 Período a consultar:', periodoAConsultar);
@@ -2556,18 +2576,144 @@ const Reportabilidad = ({ proyectoId }) => {
         console.log('📊 Cantidad de registros V0:', dataV0.success ? dataV0.datos.length : 0);
         console.log('📊 Cantidad de registros Real:', dataReal.success ? dataReal.datos.length : 0);
 
-        // Obtener PLAN V. O. 2025 (KUSD) - SUMAR todos los montos de v0_parcial del mes presente
+        // Obtener PLAN V. O. 2025 (KUSD) y GASTO REAL (KUSD)
         let planV0 = 0;
+        let gastoReal = 0;
+        
         if (dataV0.success && dataV0.datos.length > 0) {
-          planV0 = dataV0.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-          console.log('💰 Plan V0 (suma de todos los montos):', planV0);
+          if (periodo === 'acumulado') {
+            // Filtrar datos desde enero hasta el mes actual
+            const añoActual = new Date().getFullYear();
+            const mesActual = new Date().getMonth() + 1;
+            const fechaInicio = `${añoActual}-01-01`;
+            const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+            
+            const datosFiltrados = dataV0.datos.filter(item => {
+              const itemFecha = new Date(item.periodo);
+              const inicio = new Date(fechaInicio);
+              const fin = new Date(fechaFin);
+              return itemFecha >= inicio && itemFecha <= fin;
+            });
+            
+            planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Plan V0 (acumulado desde enero hasta mes actual):', planV0);
+          } else if (periodo === 'filtrado' && fechaInicio && fechaFin) {
+            // Filtrar datos desde enero hasta el mes final del filtro
+            const [añoFin, mesFin] = fechaFin.split('-');
+            const fechaInicioAcumulado = `${añoFin}-01-01`;
+            const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
+            
+            const datosFiltrados = dataV0.datos.filter(item => {
+              const itemFecha = new Date(item.periodo);
+              const inicio = new Date(fechaInicioAcumulado);
+              const fin = new Date(fechaFinAcumulado);
+              return itemFecha >= inicio && itemFecha <= fin;
+            });
+            
+            planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Plan V0 (acumulado filtrado):', planV0);
+          } else if (periodo === 'anual') {
+            // Filtrar datos del año completo
+            let añoAConsultar;
+            if (fechaDesde && fechaHasta) {
+              // Si hay filtros, usar el año del filtro
+              if (fechaDesde === fechaHasta) {
+                const [año] = fechaDesde.split('-');
+                añoAConsultar = parseInt(año);
+              } else {
+                const [añoFin] = fechaHasta.split('-');
+                añoAConsultar = parseInt(añoFin);
+              }
+            } else {
+              // Sin filtros, usar el año actual
+              añoAConsultar = new Date().getFullYear();
+            }
+            
+            const fechaInicioAnual = `${añoAConsultar}-01-01`;
+            const fechaFinAnual = `${añoAConsultar}-12-31`;
+            
+            const datosFiltrados = dataV0.datos.filter(item => {
+              const itemFecha = new Date(item.periodo);
+              const inicio = new Date(fechaInicioAnual);
+              const fin = new Date(fechaFinAnual);
+              return itemFecha >= inicio && itemFecha <= fin;
+            });
+            
+            planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Plan V0 (anual):', planV0, 'para año', añoAConsultar);
+          } else {
+            // Mes específico - sumar todos los montos
+            planV0 = dataV0.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Plan V0 (mes específico):', planV0);
+          }
         }
 
-        // Obtener GASTO REAL (KUSD) - SUMAR todos los montos de real_parcial del mes presente
-        let gastoReal = 0;
         if (dataReal.success && dataReal.datos.length > 0) {
-          gastoReal = dataReal.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-          console.log('💰 Gasto Real (suma de todos los montos):', gastoReal);
+          if (periodo === 'acumulado') {
+            // Filtrar datos desde enero hasta el mes actual
+            const añoActual = new Date().getFullYear();
+            const mesActual = new Date().getMonth() + 1;
+            const fechaInicio = `${añoActual}-01-01`;
+            const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+            
+            const datosFiltrados = dataReal.datos.filter(item => {
+              const itemFecha = new Date(item.periodo);
+              const inicio = new Date(fechaInicio);
+              const fin = new Date(fechaFin);
+              return itemFecha >= inicio && itemFecha <= fin;
+            });
+            
+            gastoReal = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Gasto Real (acumulado desde enero hasta mes actual):', gastoReal);
+          } else if (periodo === 'filtrado' && fechaInicio && fechaFin) {
+            // Filtrar datos desde enero hasta el mes final del filtro
+            const [añoFin, mesFin] = fechaFin.split('-');
+            const fechaInicioAcumulado = `${añoFin}-01-01`;
+            const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
+            
+            const datosFiltrados = dataReal.datos.filter(item => {
+              const itemFecha = new Date(item.periodo);
+              const inicio = new Date(fechaInicioAcumulado);
+              const fin = new Date(fechaFinAcumulado);
+              return itemFecha >= inicio && itemFecha <= fin;
+            });
+            
+            gastoReal = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Gasto Real (acumulado filtrado):', gastoReal);
+          } else if (periodo === 'anual') {
+            // Filtrar datos del año completo
+            let añoAConsultar;
+            if (fechaDesde && fechaHasta) {
+              // Si hay filtros, usar el año del filtro
+              if (fechaDesde === fechaHasta) {
+                const [año] = fechaDesde.split('-');
+                añoAConsultar = parseInt(año);
+              } else {
+                const [añoFin] = fechaHasta.split('-');
+                añoAConsultar = parseInt(añoFin);
+              }
+            } else {
+              // Sin filtros, usar el año actual
+              añoAConsultar = new Date().getFullYear();
+            }
+            
+            const fechaInicioAnual = `${añoAConsultar}-01-01`;
+            const fechaFinAnual = `${añoAConsultar}-12-31`;
+            
+            const datosFiltrados = dataReal.datos.filter(item => {
+              const itemFecha = new Date(item.periodo);
+              const inicio = new Date(fechaInicioAnual);
+              const fin = new Date(fechaFinAnual);
+              return itemFecha >= inicio && itemFecha <= fin;
+            });
+            
+            gastoReal = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Gasto Real (anual):', gastoReal, 'para año', añoAConsultar);
+          } else {
+            // Mes específico - sumar todos los montos
+            gastoReal = dataReal.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+            console.log('💰 Gasto Real (mes específico):', gastoReal);
+          }
         }
 
         // CUMPLI. (A)(%) = (GASTO REAL / PLAN V. O.) * 100
@@ -2588,13 +2734,12 @@ const Reportabilidad = ({ proyectoId }) => {
     // Función para obtener datos de cumplimiento físico - PARCIALES
     const obtenerDatosCumplimientoFisico = async (periodo, fechaInicio = null, fechaFin = null) => {
       try {
+        console.log('🔍 Debug - obtenerDatosCumplimientoFisico:', { periodo, fechaInicio, fechaFin });
+        
         let url = `${API_BASE}/cumplimiento_fisico/cumplimiento_fisico.php?proyecto_id=${proyectoId}`;
         
         // Aplicar filtros de fecha según el período
-        if (periodo === 'filtrado' && fechaInicio && fechaFin) {
-          // Usar fechas filtradas específicas
-          url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
-        } else if (periodo === 'mes') {
+        if (periodo === 'mes') {
           // Determinar el período a consultar para el mes
           if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
             // Caso 2: Filtros del mismo mes - usar el mes del filtro
@@ -2608,16 +2753,43 @@ const Reportabilidad = ({ proyectoId }) => {
             url += `&periodo_desde=${mesActual}-01&periodo_hasta=${mesActual}-31`;
           }
         } else if (periodo === 'acumulado') {
+          // Acumulado estándar: desde enero hasta el mes actual
           const añoActual = new Date().getFullYear();
           const mesActual = new Date().getMonth() + 1;
           const fechaInicio = `${añoActual}-01-01`;
           const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
           url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
+          console.log('🔍 Acumulado físico: desde', fechaInicio, 'hasta', fechaFin);
+        } else if (periodo === 'filtrado') {
+          // Acumulado con filtros: desde enero hasta el mes final del filtro
+          if (fechaInicio && fechaFin) {
+            const [añoFin, mesFin] = fechaFin.split('-');
+            const fechaInicioAcumulado = `${añoFin}-01-01`;
+            const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
+            url += `&periodo_desde=${fechaInicioAcumulado}&periodo_hasta=${fechaFinAcumulado}`;
+            console.log('🔍 Filtrado físico: desde', fechaInicioAcumulado, 'hasta', fechaFinAcumulado);
+          }
         } else if (periodo === 'anual') {
-          const añoActual = new Date().getFullYear();
-          const fechaInicio = `${añoActual}-01-01`;
-          const fechaFin = `${añoActual}-12-31`;
+          // Determinar el año a consultar
+          let añoAConsultar;
+          if (fechaDesde && fechaHasta) {
+            // Si hay filtros, usar el año del filtro
+            if (fechaDesde === fechaHasta) {
+              const [año] = fechaDesde.split('-');
+              añoAConsultar = parseInt(año);
+            } else {
+              const [añoFin] = fechaHasta.split('-');
+              añoAConsultar = parseInt(añoFin);
+            }
+          } else {
+            // Sin filtros, usar el año actual
+            añoAConsultar = new Date().getFullYear();
+          }
+          
+          const fechaInicio = `${añoAConsultar}-01-01`;
+          const fechaFin = `${añoAConsultar}-12-31`;
           url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
+          console.log('🔍 Anual físico: desde', fechaInicio, 'hasta', fechaFin, 'para año', añoAConsultar);
         }
 
         console.log('🔍 Consultando datos de cumplimiento físico PARCIALES:');
@@ -2641,15 +2813,15 @@ const Reportabilidad = ({ proyectoId }) => {
           let avanceFisico = 0;
           
           if (datosV0.length > 0) {
-            // PROG. V. O. 2025 (%) = valor parcial_periodo del vector V0
-            proyeccionV0 = parseFloat(datosV0[0].parcial_periodo) || 0;
-            console.log('📈 Proyección V0 (parcial_periodo):', proyeccionV0);
+            // PROG. V. O. 2025 (%) = sumar todos los valores parcial_periodo del vector V0
+            proyeccionV0 = datosV0.reduce((sum, item) => sum + (parseFloat(item.parcial_periodo) || 0), 0);
+            console.log('📈 Proyección V0 (suma de parcial_periodo):', proyeccionV0);
           }
           
           if (datosReal.length > 0) {
-            // AVANC. FÍSICO (%) = valor parcial_periodo del vector REAL
-            avanceFisico = parseFloat(datosReal[0].parcial_periodo) || 0;
-            console.log('📈 Avance Físico (parcial_periodo):', avanceFisico);
+            // AVANC. FÍSICO (%) = sumar todos los valores parcial_periodo del vector REAL
+            avanceFisico = datosReal.reduce((sum, item) => sum + (parseFloat(item.parcial_periodo) || 0), 0);
+            console.log('📈 Avance Físico (suma de parcial_periodo):', avanceFisico);
           }
           
           // CUMPLI. (B)(%) = (AVANC. FÍSICO / PROG. V. O.) * 100
@@ -2722,38 +2894,122 @@ const Reportabilidad = ({ proyectoId }) => {
               const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
               const mesNombre = fechaFiltro.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
               const añoNumero = fechaFiltro.getFullYear();
-              nombrePeriodoMes = `PERIODO ${mesNombre} ${añoNumero}`;
+              nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
               tipoPeriodoMes = 'mes';
             } else {
               // Caso 3: Filtros de rango - mantener mes actual para el primer período
               const mesActual = new Date();
-              nombrePeriodoMes = mesActual.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
-              nombrePeriodoMes = `PERIODO ${nombrePeriodoMes}`;
+              const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+              const añoNumero = mesActual.getFullYear();
+              nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
               tipoPeriodoMes = 'mes';
             }
           } else {
             // Caso 1: Sin filtros - mes actual
             const mesActual = new Date();
-            nombrePeriodoMes = mesActual.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
-            nombrePeriodoMes = `PERIODO ${nombrePeriodoMes}`;
+            const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+            const añoNumero = mesActual.getFullYear();
+            nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
             tipoPeriodoMes = 'mes';
+          }
+          
+          // Determinar el período acumulado (segundo período)
+          let nombrePeriodoAcumulado;
+          let tipoPeriodoAcumulado = 'acumulado';
+          
+          console.log('🔍 Debug - Fechas para acumulado:', { fechaDesde, fechaHasta });
+          
+          if (fechaDesde && fechaHasta) {
+            console.log('🔍 Debug - Detectando tipo de filtro:', { fechaDesde, fechaHasta, esMismoMes: fechaDesde === fechaHasta });
+            
+            // Si hay filtros, verificar si es el mismo mes o rango
+            if (fechaDesde === fechaHasta) {
+              // Mismo mes - no afecta al acumulado, mantener mes actual
+              const mesActual = new Date();
+              const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+              const añoNumero = mesActual.getFullYear();
+              nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesNombre}. ${añoNumero}`;
+              console.log('🔍 Debug - Mismo mes detectado, usando mes actual:', nombrePeriodoAcumulado);
+            } else {
+              // Rango de fechas - usar el mes inicial y final del rango para el acumulado
+              const [añoInicio, mesInicio] = fechaDesde.split('-');
+              const [añoFin, mesFin] = fechaHasta.split('-');
+              
+              const fechaInicio = new Date(parseInt(añoInicio), parseInt(mesInicio) - 1, 1);
+              const fechaFin = new Date(parseInt(añoFin), parseInt(mesFin) - 1, 1);
+              
+              const mesInicioNombre = fechaInicio.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+              const mesFinNombre = fechaFin.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+              const añoNumero = fechaFin.getFullYear();
+              
+              nombrePeriodoAcumulado = `PERIODO DESDE ${mesInicioNombre}. - ${mesFinNombre}. ${añoNumero}`;
+              tipoPeriodoAcumulado = 'filtrado'; // Marcar como filtrado para usar fechas específicas
+              console.log('🔍 Debug - Rango de fechas detectado:', { 
+                nombrePeriodoAcumulado, 
+                tipoPeriodoAcumulado,
+                añoInicio,
+                mesInicio,
+                mesInicioNombre,
+                añoFin,
+                mesFin,
+                mesFinNombre
+              });
+            }
+          } else {
+            // Sin filtros - usar el mes actual
+            const mesActual = new Date();
+            const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+            const añoNumero = mesActual.getFullYear();
+            nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesNombre}. ${añoNumero}`;
+          }
+          
+          // Determinar el período anual (tercer período)
+          let nombrePeriodoAnual = 'PERIODO AÑO 2025';
+          
+          if (fechaDesde && fechaHasta) {
+            // Si hay filtros, usar el año del filtro
+            if (fechaDesde === fechaHasta) {
+              // Mismo mes - usar el año del filtro
+              const [año] = fechaDesde.split('-');
+              nombrePeriodoAnual = `PERIODO AÑO ${año}`;
+            } else {
+              // Rango de fechas - usar el año del filtro final
+              const [añoFin] = fechaHasta.split('-');
+              nombrePeriodoAnual = `PERIODO AÑO ${añoFin}`;
+            }
+          } else {
+            // Sin filtros - usar el año actual
+            const añoActual = new Date().getFullYear();
+            nombrePeriodoAnual = `PERIODO AÑO ${añoActual}`;
           }
           
           // Construir los períodos
           periodos = [
             { nombre: nombrePeriodoMes, tipo: tipoPeriodoMes },
-            { nombre: 'PERIODO DESDE ENE. - JUL. 2025', tipo: 'acumulado' },
-            { nombre: 'PERIODO AÑO 2025', tipo: 'anual' }
+            { nombre: nombrePeriodoAcumulado, tipo: tipoPeriodoAcumulado, fechaInicio: fechaDesde, fechaFin: fechaHasta },
+            { nombre: nombrePeriodoAnual, tipo: 'anual' }
           ];
 
           const datosCompletos = [];
 
           for (const periodo of periodos) {
+            console.log('🔍 Debug - Procesando período:', { 
+              nombre: periodo.nombre, 
+              tipo: periodo.tipo, 
+              fechaInicio: periodo.fechaInicio, 
+              fechaFin: periodo.fechaFin 
+            });
+            
             // Obtener datos financieros
             const datosFinancieros = await obtenerDatosFinancieros(periodo.tipo, periodo.fechaInicio, periodo.fechaFin);
             
             // Obtener datos de cumplimiento físico
             const datosFisicos = await obtenerDatosCumplimientoFisico(periodo.tipo, periodo.fechaInicio, periodo.fechaFin);
+            
+            console.log('🔍 Debug - Resultados para', periodo.nombre, ':', {
+              financieros: datosFinancieros,
+              fisicos: datosFisicos
+            });
             
             // Calcular eficiencia del gasto
             const eficienciaGasto = calcularEficienciaGasto(
@@ -2883,10 +3139,9 @@ const Reportabilidad = ({ proyectoId }) => {
                   border: '1px solid #ddd', 
                   fontSize: '14px',
                   backgroundColor: '#16355D',
-                  color: 'white',
-                  borderRadius: '20px'
+                  color: 'white'
                 }}>
-                  PLAN V. O. 2025 (KUSD)
+                  Plan V0
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -2896,7 +3151,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   backgroundColor: '#ffc107',
                   color: 'black'
                 }}>
-                  GASTO REAL (KUSD)
+                  Gasto Real
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -2906,7 +3161,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
-                  CUMPLI. (%)
+                  Cumpli (%)
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -2916,7 +3171,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   backgroundColor: '#16355D',
                   color: 'white'
                 }}>
-                  PROG. V. O. 2025 (%)
+                  Prog. V0
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -2926,7 +3181,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   backgroundColor: '#ffc107',
                   color: 'black'
                 }}>
-                  AVANC. FÍSICO (%)
+                  Avance Fisico
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -2936,7 +3191,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
-                  CUMPLI. (%)
+                  Cumpli (%)
                 </th>
                 <th style={{ 
                   padding: '12px', 
