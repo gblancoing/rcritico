@@ -23,8 +23,7 @@ const tablas = [
 
 const reportes = [
   { value: 'reporte9', label: 'Flujo Financiero SAP' },
-  { value: 'reporte6', label: 'Curva S - Acumulados' },
-  { value: 'reporte1', label: 'Curva S - Parciales' },
+  { value: 'reporte1', label: 'Curva S - Parc/Acum.' },
   // Agrega más reportes si los necesitas
 ];
 
@@ -204,6 +203,8 @@ const Vectores = ({ proyectoId }) => {
   const [mostrarAnalisisEVM, setMostrarAnalisisEVM] = useState(false);
   const [modoGrafico, setModoGrafico] = useState('normal'); // 'normal' o 'evm'
   const [mostrarPopupAnalisis, setMostrarPopupAnalisis] = useState(false);
+  const [popupVariacionesVisible, setPopupVariacionesVisible] = useState(false);
+  const [tablaCumplimientoFisico, setTablaCumplimientoFisico] = useState([]);
 
   const categorias = [
     'CONSTRUCCION',
@@ -264,6 +265,19 @@ const Vectores = ({ proyectoId }) => {
         if (data.success) {
           // La API datos_financieros.php devuelve los datos en data.datos
           console.log(`Datos cargados para ${tabla}:`, data.datos);
+          console.log(`Tipo de datos para ${tabla}:`, typeof data.datos);
+          console.log(`Es array para ${tabla}:`, Array.isArray(data.datos));
+          
+          // Log especial para cumplimiento_fisico
+          if (tabla === 'cumplimiento_fisico') {
+            console.log('📊 DATOS DE CUMPLIMIENTO FÍSICO CARGADOS:');
+            console.log('Registros totales:', data.datos?.length || 0);
+            if (Array.isArray(data.datos) && data.datos.length > 0) {
+              console.log('Primeros 3 registros:', data.datos.slice(0, 3));
+              console.log('Estructura del primer registro:', Object.keys(data.datos[0] || {}));
+            }
+          }
+          
           setter(data.datos || []);
         } else {
           console.log(`Error cargando ${tabla}:`, data.error);
@@ -275,6 +289,9 @@ const Vectores = ({ proyectoId }) => {
         const data = await response.json();
         if (data.success) {
           // La API individual devuelve los datos en data.data
+          console.log(`Datos cargados (fallback) para ${tabla}:`, data.data);
+          console.log(`Tipo de datos (fallback) para ${tabla}:`, typeof data.data);
+          console.log(`Es array (fallback) para ${tabla}:`, Array.isArray(data.data));
           setter(data.data || []);
         } else {
           setter([]);
@@ -330,6 +347,21 @@ const Vectores = ({ proyectoId }) => {
       if (tablaApiParcial.length === 0) {
         cargarDatosTabla('api_parcial', setTablaApiParcial);
       }
+      // Cumplimiento Físico
+      if (tablaCumplimientoFisico.length === 0) {
+        console.log('🔄 Cargando tabla de cumplimiento físico...');
+        cargarDatosTabla('cumplimiento_fisico', setTablaCumplimientoFisico);
+      } else {
+        console.log('✅ Tabla de cumplimiento físico ya cargada:', tablaCumplimientoFisico.length, 'registros');
+      }
+      
+      // Log adicional para verificar el estado de la tabla
+      console.log('📊 Estado actual de tablaCumplimientoFisico:', {
+        tipo: typeof tablaCumplimientoFisico,
+        esArray: Array.isArray(tablaCumplimientoFisico),
+        longitud: tablaCumplimientoFisico?.length || 'N/A',
+        claves: !Array.isArray(tablaCumplimientoFisico) ? Object.keys(tablaCumplimientoFisico || {}) : 'N/A'
+      });
     }
   }, [seleccion, proyectoId]);
 
@@ -1438,36 +1470,216 @@ const Vectores = ({ proyectoId }) => {
     };
   };
 
+  // --- NUEVA FUNCIÓN: Calcular Indicadores EVM con datos filtrados ---
+  const calcularIndicadoresEVMFiltrados = (fechaSeguimiento) => {
+    if (!fechaSeguimiento) {
+      return null;
+    }
+
+    // Obtener datos filtrados por fecha (igual que en getKpiData)
+    let datosReal = tablaRealParcial;
+    let datosV0 = tablaV0Parcial;
+    let datosNpc = tablaNpcParcial;
+    let datosApi = tablaApiParcial;
+
+    // Aplicar filtros de fecha si están definidos
+    if (fechaDesde) {
+      datosReal = datosReal.filter(row => row.periodo >= fechaDesde);
+      datosV0 = datosV0.filter(row => row.periodo >= fechaDesde);
+      datosNpc = datosNpc.filter(row => row.periodo >= fechaDesde);
+      datosApi = datosApi.filter(row => row.periodo >= fechaDesde);
+    }
+    if (fechaHasta) {
+      datosReal = datosReal.filter(row => row.periodo <= fechaHasta);
+      datosV0 = datosV0.filter(row => row.periodo <= fechaHasta);
+      datosNpc = datosNpc.filter(row => row.periodo <= fechaHasta);
+      datosApi = datosApi.filter(row => row.periodo <= fechaHasta);
+    }
+
+    // Calcular totales acumulados hasta la fecha de seguimiento
+    const calcularTotalAcumulado = (datos, fechaLimite) => {
+      return datos
+        .filter(row => row.periodo <= fechaLimite)
+        .reduce((total, row) => total + (Number(row.monto) || 0), 0);
+    };
+
+    // Calcular totales para el presupuesto completo (sin filtro de fecha)
+    const calcularTotalCompleto = (datos) => {
+      return datos.reduce((total, row) => total + (Number(row.monto) || 0), 0);
+    };
+
+    // Obtener valores en la fecha de seguimiento
+    const AC = calcularTotalAcumulado(datosReal, fechaSeguimiento); // Actual Cost (Costo Real acumulado)
+    const PV = calcularTotalAcumulado(datosApi, fechaSeguimiento);  // Planned Value (Costo Planeado API acumulado)
+    
+    // Para EV (Earned Value), necesitamos el valor del trabajo REALMENTE COMPLETADO
+    // En EVM, EV representa el valor del trabajo completado según el plan original
+    // Como no tenemos datos de progreso físico, usamos una aproximación basada en el costo real
+    // pero con una lógica más conservadora y realista
+    
+    // BAC debe ser el presupuesto total COMPLETO del proyecto (sin filtros de fecha)
+    const BAC = calcularTotalCompleto(tablaApiParcial); // Budget at Completion (Presupuesto total API completo)
+    
+    // EV = Valor del trabajo realmente completado
+    // En EVM, EV = BAC × % de completitud del proyecto
+    // Como no tenemos datos de progreso físico directo, usamos una aproximación basada en el tiempo
+    // EV = BAC × (tiempo transcurrido / tiempo total del proyecto)
+    
+    // Calcular progreso basado en tiempo transcurrido vs tiempo total del proyecto
+    const fechas = tablaApiParcial.map(row => new Date(row.periodo)).sort((a, b) => a - b);
+    const fechaInicio = fechas[0];
+    const fechaFin = fechas[fechas.length - 1];
+    const fechaSeguimientoDate = new Date(fechaSeguimiento);
+    
+    const tiempoTotal = fechaFin - fechaInicio;
+    const tiempoTranscurrido = fechaSeguimientoDate - fechaInicio;
+    const porcentajeCompletitud = tiempoTotal > 0 ? Math.min(tiempoTranscurrido / tiempoTotal, 1) : 0;
+    
+    // EV = BAC × % de completitud (cálculo correcto según EVM)
+    const EV = BAC * porcentajeCompletitud;
+    
+    // También calculamos valores para comparación con V0 (mantenemos los cálculos originales)
+    const PV_V0 = calcularTotalAcumulado(datosV0, fechaSeguimiento); // Planned Value V0
+    const BAC_V0 = calcularTotalCompleto(tablaV0Parcial); // Budget at Completion V0 (completo)
+    const EV_V0 = BAC_V0 * porcentajeCompletitud; // Earned Value correcto para V0
+    
+    // NOTA: Para el análisis EVM ahora consideramos API Parcial vs Real Parcial
+    // Los otros escenarios (V0, NPC) se mantienen pero no se usan en el análisis principal
+
+    // Logs para debug
+    console.log('=== DEBUG EVM SIMPLIFICADO ===');
+    console.log('Fecha Seguimiento:', fechaSeguimiento);
+    console.log('Filtros - Desde:', fechaDesde, 'Hasta:', fechaHasta);
+    console.log('--- ANÁLISIS PRINCIPAL (API vs Real) ---');
+    console.log('AC (Real Parcial):', AC);
+    console.log('PV (API Parcial):', PV);
+    console.log('EV (BAC × % completitud):', EV);
+    console.log('BAC (API Total):', BAC);
+    console.log('Porcentaje completitud:', porcentajeCompletitud);
+    console.log('Fecha inicio proyecto:', fechaInicio);
+    console.log('Fecha fin proyecto:', fechaFin);
+    console.log('Fecha seguimiento:', fechaSeguimientoDate);
+    console.log('--- OTROS ESCENARIOS (solo para referencia) ---');
+    console.log('PV_V0 (V0 Parcial):', PV_V0);
+    console.log('EV_V0 (V0):', EV_V0);
+    console.log('BAC_V0 (V0 Total):', BAC_V0);
+    console.log('Registros Real:', datosReal.length);
+    console.log('Registros V0:', datosV0.length);
+    console.log('Registros API:', datosApi.length);
+    console.log('========================');
+
+    // Calcular variaciones
+    const CV = EV - AC;  // Cost Variance
+    const SV = EV - PV;  // Schedule Variance
+    
+    // Calcular índices de rendimiento
+    const CPI = AC !== 0 ? EV / AC : 0;  // Cost Performance Index
+    const SPI = PV !== 0 ? EV / PV : 0;  // Schedule Performance Index
+    
+    // Calcular estimaciones
+    const EAC = CPI !== 0 ? BAC / CPI : BAC;  // Estimate at Completion
+    const ETC = EAC - AC;  // Estimate to Complete
+    const VAC = BAC - EAC; // Variance at Completion
+    
+    // Calcular porcentajes
+    const porcentajeCompletado = BAC !== 0 ? (EV / BAC) * 100 : 0;
+    const porcentajePlaneado = BAC !== 0 ? (PV / BAC) * 100 : 0;
+    const porcentajeReal = BAC !== 0 ? (AC / BAC) * 100 : 0;
+
+    return {
+      fechaSeguimiento,
+      AC: AC || 0,
+      PV: PV || 0,
+      EV: EV || 0,
+      BAC: BAC || 0,
+      CV: CV || 0,
+      SV: SV || 0,
+      CPI: CPI || 0,
+      SPI: SPI || 0,
+      EAC: EAC || 0,
+      ETC: ETC || 0,
+      VAC: VAC || 0,
+      porcentajeCompletado: porcentajeCompletado || 0,
+      porcentajePlaneado: porcentajePlaneado || 0,
+      porcentajeReal: porcentajeReal || 0,
+      estadoCosto: CV >= 0 ? 'Bajo Presupuesto' : 'Sobre Presupuesto',
+      estadoCronograma: SV >= 0 ? 'Adelantado' : 'Atrasado',
+      estadoRendimiento: CPI >= 1 && SPI >= 1 ? 'Excelente' : 
+                        CPI >= 1 && SPI < 1 ? 'Costo OK, Atrasado' :
+                        CPI < 1 && SPI >= 1 ? 'Sobre Costo, Adelantado' : 'Crítico'
+    };
+  };
+
+
+  // --- FUNCIÓN PARA CALCULAR VALORES V0 (mantenemos para referencia) ---
+  const calcularValoresV0 = (indicadoresEVM) => {
+    if (!indicadoresEVM) return indicadoresEVM;
+    
+    const { AC, PV_V0, EV_V0, BAC_V0 } = indicadoresEVM;
+    
+    // Calcular variaciones para V0 (solo para referencia, no para análisis principal)
+    const CV_V0 = (EV_V0 || 0) - (AC || 0);
+    const SV_V0 = (EV_V0 || 0) - (PV_V0 || 0);
+    const CPI_V0 = (AC || 0) !== 0 ? (EV_V0 || 0) / (AC || 0) : 0;
+    const SPI_V0 = (PV_V0 || 0) !== 0 ? (EV_V0 || 0) / (PV_V0 || 0) : 0;
+    
+    return {
+      ...indicadoresEVM,
+      CV_V0,
+      SV_V0,
+      CPI_V0,
+      SPI_V0
+    };
+  };
+
+
+
   const actualizarAnalisisEVM = () => {
     if (!fechaSeguimiento) {
       setIndicadoresEVM(null);
       return;
     }
 
-    const datosCurvaS = prepararDatosCurvaS(tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial);
-    const indicadores = calcularIndicadoresEVM(datosCurvaS, fechaSeguimiento);
-    setIndicadoresEVM(indicadores);
+    // Usar la función con datos filtrados
+    const indicadores = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+    
+    // Calcular valores de V0 (solo para referencia, no para análisis principal)
+    const indicadoresCompletos = calcularValoresV0(indicadores);
+    
+    setIndicadoresEVM(indicadoresCompletos);
   };
 
   // --- useEffect para actualizar análisis EVM ---
   useEffect(() => {
     actualizarAnalisisEVM();
-  }, [fechaSeguimiento, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial]);
+  }, [fechaSeguimiento, fechaDesde, fechaHasta, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial, tablaCumplimientoFisico]);
 
   // --- useEffect para inicializar fecha de seguimiento ---
   useEffect(() => {
     if (seleccion === 'reporte1' && tablaRealParcial.length > 0 && !fechaSeguimiento) {
-      // Obtener la fecha más reciente de los datos disponibles
+      // Obtener el mes presente como fecha de seguimiento por defecto
+      const fechaActual = new Date();
+      const año = fechaActual.getFullYear();
+      const mes = String(fechaActual.getMonth() + 1).padStart(2, '0');
+      const fechaPresente = `${año}-${mes}-01`;
+      
+      // Verificar si la fecha presente está disponible en los datos
       const datosCurvaS = prepararDatosCurvaS(tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial);
-      if (datosCurvaS.length > 0) {
-        // Usar la fecha del medio de los datos como fecha de seguimiento por defecto
-        const fechaMedia = datosCurvaS[Math.floor(datosCurvaS.length / 2)]?.periodo;
-        if (fechaMedia) {
-          setFechaSeguimiento(fechaMedia);
+      const fechaDisponible = datosCurvaS.find(item => item.periodo === fechaPresente);
+      
+      if (fechaDisponible) {
+        // Si el mes presente está disponible, usarlo
+        setFechaSeguimiento(fechaPresente);
+      } else {
+        // Si no está disponible, usar la fecha más reciente disponible
+        const fechasDisponibles = datosCurvaS.map(item => item.periodo).sort();
+        const fechaMasReciente = fechasDisponibles[fechasDisponibles.length - 1];
+        if (fechaMasReciente) {
+          setFechaSeguimiento(fechaMasReciente);
         }
       }
     }
-  }, [seleccion, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial, fechaSeguimiento]);
+  }, [seleccion, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial, tablaCumplimientoFisico, fechaSeguimiento]);
 
   // --- useEffect para cambiar automáticamente al modo EVM cuando se selecciona fecha ---
   useEffect(() => {
@@ -1476,32 +1688,297 @@ const Vectores = ({ proyectoId }) => {
     }
   }, [fechaSeguimiento]);
 
-  // --- COMPONENTE DE GRÁFICO EVM ---
+  // --- Función para normalizar formato de fecha ---
+  const normalizarFecha = (fecha) => {
+    if (!fecha) return null;
+    
+    // Si la fecha ya está en formato YYYY-MM-DD, la devolvemos tal como está
+    if (typeof fecha === 'string' && fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return fecha;
+    }
+    
+    // Si es un objeto Date, lo convertimos a YYYY-MM-DD
+    if (fecha instanceof Date) {
+      return fecha.toISOString().split('T')[0];
+    }
+    
+    // Si es otro formato, intentamos parsearlo
+    try {
+      const date = new Date(fecha);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    } catch (error) {
+      console.error('Error normalizando fecha:', error);
+    }
+    
+    return fecha;
+  };
+
+    // --- Función para obtener porcentaje de avance físico ACUMULADO desde API ---
+  const obtenerPorcentajeAvanceFisico = async (fecha, vector) => {
+    console.log(`🔍 Buscando avance físico ACUMULADO para fecha: ${fecha}, vector: ${vector}`);
+    
+    try {
+      const response = await fetch(`/api/obtener_avance_fisico.php?fecha=${fecha}`);
+      const data = await response.json();
+      
+      if (data.success && data.avance_fisico) {
+        const porcentaje = data.avance_fisico[vector];
+        if (porcentaje !== null && porcentaje !== undefined) {
+          console.log(`🎯 Porcentaje encontrado para ${vector}: ${porcentaje}%`);
+          return porcentaje;
+        }
+      }
+      
+      console.log(`❌ No se encontró porcentaje para ${vector} en fecha ${fecha}`);
+      return null;
+    } catch (error) {
+      console.error(`❌ Error al obtener avance físico para ${vector}:`, error);
+      return null;
+    }
+  };
+
+  // --- Componente personalizado para el tooltip del gráfico EVM ---
+  const TooltipEVM = ({ active, payload, label }) => {
+    const [avanceFisico, setAvanceFisico] = useState({ REAL: null, API: null });
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      if (active && label) {
+        setLoading(true);
+        const cargarAvanceFisico = async () => {
+          try {
+                    console.log('🎯 Tooltip activado para fecha:', label);
+        const porcentajeReal = await obtenerPorcentajeAvanceFisico(label, 'REAL');
+        const porcentajeAPI = await obtenerPorcentajeAvanceFisico(label, 'API');
+        
+        setAvanceFisico({
+          REAL: porcentajeReal,
+          API: porcentajeAPI
+        });
+        
+        console.log('📊 Porcentajes ACUMULADOS obtenidos - REAL:', porcentajeReal, 'API:', porcentajeAPI);
+          } catch (error) {
+            console.error('Error al cargar avance físico:', error);
+          } finally {
+            setLoading(false);
+          }
+        };
+        
+        cargarAvanceFisico();
+      }
+    }, [active, label]);
+
+    if (!active || !payload || !payload.length) {
+      return null;
+    }
+
+    return (
+      <div style={{
+        backgroundColor: 'white',
+        border: '1px solid #ccc',
+        borderRadius: '8px',
+        padding: '12px',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+        fontSize: '12px',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <div style={{ 
+          fontWeight: 'bold', 
+          marginBottom: '8px',
+          color: '#2c3e50',
+          borderBottom: '1px solid #eee',
+          paddingBottom: '4px'
+        }}>
+          Período: {label}
+        </div>
+        
+        {payload.map((entry, index) => (
+          <div key={index} style={{ 
+            marginBottom: '4px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ 
+              color: entry.color,
+              fontWeight: 'bold',
+              marginRight: '8px'
+            }}>
+              {entry.name}:
+            </span>
+            <span style={{ fontWeight: 'bold' }}>
+              ${(entry.value / 1000000).toFixed(2)}M
+            </span>
+          </div>
+        ))}
+        
+        {/* Mostrar porcentajes de avance físico */}
+        <div style={{
+          marginTop: '8px',
+          paddingTop: '8px',
+          borderTop: '1px solid #eee'
+        }}>
+          <div style={{ 
+            fontWeight: 'bold', 
+            marginBottom: '4px',
+            color: '#27ae60'
+          }}>
+            📊 Avance Físico (Acumulado):
+          </div>
+          
+          {/* Primer rectángulo rojo - Avance Físico REAL */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            marginBottom: '4px',
+            padding: '4px 8px',
+            backgroundColor: '#fff5f5',
+            border: '1px solid #fed7d7',
+            borderRadius: '4px'
+          }}>
+            <span style={{ color: '#ff6600', fontWeight: 'bold' }}>REAL:</span>
+            <span style={{ fontWeight: 'bold', color: '#e53e3e' }}>
+              {loading ? 'Cargando...' : (avanceFisico.REAL !== null ? `${avanceFisico.REAL.toFixed(2)}%` : 'N/A')}
+            </span>
+          </div>
+          
+          {/* Segundo rectángulo rojo - Avance Físico API */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            marginBottom: '4px',
+            padding: '4px 8px',
+            backgroundColor: '#fff5f5',
+            border: '1px solid #fed7d7',
+            borderRadius: '4px'
+          }}>
+            <span style={{ color: '#006400', fontWeight: 'bold' }}>API:</span>
+            <span style={{ fontWeight: 'bold', color: '#e53e3e' }}>
+              {loading ? 'Cargando...' : (avanceFisico.API !== null ? `${avanceFisico.API.toFixed(2)}%` : 'N/A')}
+            </span>
+          </div>
+          
+          {/* Tercer rectángulo amarillo - Desviación (REAL - API) */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            marginBottom: '4px',
+            padding: '4px 8px',
+            backgroundColor: '#fffbf0',
+            border: '1px solid #f6e05e',
+            borderRadius: '4px'
+          }}>
+            <span style={{ color: '#d69e2e', fontWeight: 'bold' }}>DESVIACIÓN:</span>
+            <span style={{ fontWeight: 'bold', color: '#b7791f' }}>
+              {loading ? 'Cargando...' : 
+                (avanceFisico.REAL !== null && avanceFisico.API !== null ? 
+                  `${(avanceFisico.REAL - avanceFisico.API).toFixed(2)}%` : 'N/A')}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
+
+  // --- COMPONENTE DE GRÁFICO EVM SIMPLIFICADO ---
   const GraficoEVM = ({ data, fechaSeguimiento, indicadores }) => {
-    if (!data || data.length === 0) return null;
+    console.log('GraficoEVM - Datos recibidos:', data);
+    console.log('GraficoEVM - Fecha seguimiento:', fechaSeguimiento);
+    console.log('GraficoEVM - Indicadores:', indicadores);
+    console.log('GraficoEVM - tablaCumplimientoFisico:', tablaCumplimientoFisico);
+    console.log('GraficoEVM - Tipo tablaCumplimientoFisico:', typeof tablaCumplimientoFisico);
+    console.log('GraficoEVM - Es array tablaCumplimientoFisico:', Array.isArray(tablaCumplimientoFisico));
+    
+    if (!data || data.length === 0) {
+      console.log('GraficoEVM - No hay datos disponibles');
+      return null;
+    }
 
     const fechaIndex = data.findIndex(item => item.periodo === fechaSeguimiento);
-    if (fechaIndex === -1) return null;
+    if (fechaIndex === -1) {
+      console.log('GraficoEVM - Fecha de seguimiento no encontrada en los datos');
+      return null;
+    }
 
     // Crear datos para el gráfico EVM
     const datosEVM = data.map((item, index) => ({
       ...item,
-      esFechaSeguimiento: index === fechaIndex,
       EAC: index >= fechaIndex ? indicadores?.EAC : null
     }));
+    
+    console.log('GraficoEVM - Datos procesados:', datosEVM);
+    console.log('GraficoEVM - Primeros 3 registros:', datosEVM.slice(0, 3));
+    console.log('GraficoEVM - Valores Real Parcial:', datosEVM.map(d => d['Real Parcial']).filter(v => v !== undefined));
+    console.log('GraficoEVM - Valores API Parcial:', datosEVM.map(d => d['API Parcial']).filter(v => v !== undefined));
+    console.log('GraficoEVM - Valores NPC Parcial:', datosEVM.map(d => d['NPC Parcial']).filter(v => v !== undefined));
 
     return (
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        padding: '2rem',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+        border: '1px solid #e1e8ed',
+        marginBottom: '2rem'
+      }}>
+        {/* Header del gráfico */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '2rem',
+          paddingBottom: '1rem',
+          borderBottom: '2px solid #f8f9fa'
+        }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '1.5rem',
+            fontWeight: 'bold'
+          }}>
+            📊
+          </div>
+          <div>
+            <h3 style={{ 
+              margin: '0', 
+              color: '#2c3e50', 
+              fontSize: '1.5rem', 
+              fontWeight: '700'
+            }}>
+              Gráfico EVM - Curva S
+            </h3>
+            <p style={{ 
+              margin: '0.5rem 0 0 0', 
+              color: '#7f8c8d', 
+              fontSize: '1rem'
+            }}>
+              Fecha de Seguimiento: <strong>{fechaSeguimiento}</strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Gráfico principal */}
       <ResponsiveContainer width="100%" height={500}>
         <LineChart
           data={datosEVM}
-          margin={{ top: 40, right: 40, left: 10, bottom: 20 }}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
             dataKey="periodo"
             angle={-45}
             textAnchor="end"
-            height={60}
+              height={80}
             interval="preserveStartEnd"
           />
           <YAxis 
@@ -1509,59 +1986,62 @@ const Vectores = ({ proyectoId }) => {
             tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`}
           />
           <Tooltip 
-            formatter={(value, name) => [`$${(value / 1000000).toFixed(2)}M`, name]}
-            labelFormatter={(label) => `Período: ${label}`}
+            content={<TooltipEVM />}
           />
           <Legend />
           
-          {/* Curvas principales */}
+                        {/* Curvas principales - AC, EV, PV */}
           <Line 
             type="monotone" 
             dataKey="Real Parcial" 
-            stroke="#ff0000" 
-            strokeWidth={3}
-            name="Costo Real (AC)"
-            dot={{ fill: '#ff0000', strokeWidth: 2, r: 4 }}
+              stroke="#ff6600" 
+              strokeWidth={1.5}
+              name="Costo Real (AC) - (Real)"
+              dot={{ fill: '#ff6600', strokeWidth: 1, r: 3 }}
+              activeDot={{ r: 5, stroke: '#ff6600', strokeWidth: 1, fill: '#fff' }}
           />
           <Line 
             type="monotone" 
-            dataKey="V0 Parcial" 
-            stroke="#0066cc" 
-            strokeWidth={3}
-            name="Costo Planeado (PV)"
-            dot={{ fill: '#0066cc', strokeWidth: 2, r: 4 }}
+              dataKey="API Parcial" 
+              stroke="#006400" 
+              strokeWidth={1.5}
+              name="Costo Planeado (PV) - API"
+              dot={{ fill: '#006400', strokeWidth: 1, r: 3 }}
+              activeDot={{ r: 5, stroke: '#006400', strokeWidth: 1, fill: '#fff' }}
           />
           <Line 
             type="monotone" 
             dataKey="NPC Parcial" 
-            stroke="#00cc00" 
-            strokeWidth={3}
-            name="Valor Ganado (EV)"
-            dot={{ fill: '#00cc00', strokeWidth: 2, r: 4 }}
+              stroke="#0066cc" 
+              strokeWidth={1.5}
+              name="Escenario NPC"
+              dot={{ fill: '#0066cc', strokeWidth: 1, r: 3 }}
+              activeDot={{ r: 5, stroke: '#0066cc', strokeWidth: 1, fill: '#fff' }}
           />
           <Line 
             type="monotone" 
-            dataKey="API Parcial" 
-            stroke="#666666" 
-            strokeWidth={2}
-            name="Escenario 3"
-            dot={{ fill: '#666666', strokeWidth: 1, r: 3 }}
+              dataKey="V0 Parcial" 
+              stroke="#800080" 
+              strokeWidth={1.5}
+              name="Escenario V0"
+              dot={{ fill: '#800080', strokeWidth: 1, r: 3 }}
+              activeDot={{ r: 5, stroke: '#800080', strokeWidth: 1, fill: '#fff' }}
           />
 
           {/* Línea de fecha de seguimiento */}
           <ReferenceLine 
             x={fechaSeguimiento} 
-            stroke="#ff6600" 
-            strokeDasharray="5 5"
-            strokeWidth={2}
+              stroke="#f39c12" 
+              strokeDasharray="8 4"
+              strokeWidth={3}
             label={{ value: "Fecha Seguimiento", position: "top" }}
           />
 
           {/* Línea BAC */}
           <ReferenceLine 
             y={indicadores?.BAC} 
-            stroke="#000000" 
-            strokeDasharray="3 3"
+              stroke="#34495e" 
+              strokeDasharray="5 5"
             strokeWidth={2}
             label={{ value: `BAC: $${(indicadores?.BAC / 1000000).toFixed(0)}M`, position: "right" }}
           />
@@ -1571,42 +2051,116 @@ const Vectores = ({ proyectoId }) => {
             <Line 
               type="monotone" 
               dataKey="EAC" 
-              stroke="#ff6600" 
-              strokeDasharray="5 5"
-              strokeWidth={2}
+                stroke="#f39c12" 
+                strokeDasharray="8 4"
+                strokeWidth={3}
               name="EAC Proyectado"
               connectNulls={false}
             />
           )}
 
-          {/* Puntos de seguimiento */}
+                        {/* Líneas horizontales de corte en fecha de seguimiento */}
           {indicadores && (
             <>
+                {/* Línea horizontal AC */}
               <ReferenceLine 
                 x={fechaSeguimiento} 
                 y={indicadores.AC}
-                stroke="#ff0000"
-                strokeWidth={3}
-                label={{ value: `AC: $${(indicadores.AC / 1000000).toFixed(1)}M`, position: "insideTopRight" }}
-              />
+                  stroke="#ff6600"
+                  strokeDasharray="5 5"
+                  strokeWidth={1.5}
+                  label={{ 
+                    value: `AC: $${(indicadores.AC / 1000000).toFixed(1)}M`, 
+                    position: "insideTopRight",
+                    fill: '#ff6600',
+                    fontSize: 11,
+                    fontWeight: 'bold'
+                  }}
+                />
+                {/* Línea horizontal PV */}
               <ReferenceLine 
                 x={fechaSeguimiento} 
                 y={indicadores.PV}
-                stroke="#0066cc"
-                strokeWidth={3}
-                label={{ value: `PV: $${(indicadores.PV / 1000000).toFixed(1)}M`, position: "insideTopLeft" }}
-              />
+                  stroke="#006400"
+                  strokeDasharray="5 5"
+                  strokeWidth={1.5}
+                  label={{ 
+                    value: `PV: $${(indicadores.PV / 1000000).toFixed(1)}M`, 
+                    position: "insideTopLeft",
+                    fill: '#006400',
+                    fontSize: 11,
+                    fontWeight: 'bold'
+                  }}
+                />
+                {/* Línea horizontal EV */}
               <ReferenceLine 
                 x={fechaSeguimiento} 
                 y={indicadores.EV}
-                stroke="#00cc00"
-                strokeWidth={3}
-                label={{ value: `EV: $${(indicadores.EV / 1000000).toFixed(1)}M`, position: "insideBottomRight" }}
+                  stroke="#0066cc"
+                  strokeDasharray="5 5"
+                  strokeWidth={1.5}
+                  label={{ 
+                    value: `EV: $${(indicadores.EV / 1000000).toFixed(1)}M`, 
+                    position: "insideBottomRight",
+                    fill: '#0066cc',
+                    fontSize: 11,
+                    fontWeight: 'bold'
+                  }}
               />
             </>
           )}
         </LineChart>
       </ResponsiveContainer>
+
+        {/* Leyenda explicativa */}
+        <div style={{
+          marginTop: '2rem',
+          padding: '1.5rem',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '12px',
+          border: '1px solid #e9ecef'
+        }}>
+          <h4 style={{ 
+            margin: '0 0 1rem 0', 
+            color: '#2c3e50', 
+            fontSize: '1.1rem', 
+            fontWeight: '600'
+          }}>
+            📋 Leyenda del Gráfico EVM
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+            gap: '0.75rem',
+            fontSize: '0.9rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#ff6600', borderRadius: '2px' }}></div>
+              <span style={{ color: '#666' }}><strong>AC:</strong> Costo Real (lo que se ha gastado)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#006400', borderRadius: '2px' }}></div>
+              <span style={{ color: '#666' }}><strong>PV:</strong> Costo Planeado (lo que se debería haber gastado)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#0066cc', borderRadius: '2px' }}></div>
+              <span style={{ color: '#666' }}><strong>NPC:</strong> Escenario NPC (datos de referencia)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#800080', borderRadius: '2px' }}></div>
+              <span style={{ color: '#666' }}><strong>V0:</strong> Escenario de Referencia (datos históricos)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#f39c12', borderTop: '3px dashed #f39c12' }}></div>
+              <span style={{ color: '#666' }}><strong>EAC:</strong> Costo Estimado al Completar (proyección)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#34495e', borderTop: '3px dashed #34495e' }}></div>
+              <span style={{ color: '#666' }}><strong>BAC:</strong> Presupuesto Total del Proyecto</span>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -1620,140 +2174,1081 @@ const Vectores = ({ proyectoId }) => {
 
     const getColorEstado = (estado) => {
       switch (estado) {
-        case 'Excelente': return '#00cc00';
-        case 'Bajo Presupuesto': return '#00cc00';
-        case 'Adelantado': return '#00cc00';
-        case 'Costo OK, Atrasado': return '#ffaa00';
-        case 'Sobre Costo, Adelantado': return '#ffaa00';
-        case 'Sobre Presupuesto': return '#ff0000';
-        case 'Atrasado': return '#ff0000';
-        case 'Crítico': return '#ff0000';
-        default: return '#666666';
+        case 'Excelente': return '#27ae60';
+        case 'Bajo Presupuesto': return '#27ae60';
+        case 'Adelantado': return '#27ae60';
+        case 'Costo OK, Atrasado': return '#f39c12';
+        case 'Sobre Costo, Adelantado': return '#f39c12';
+        case 'Sobre Presupuesto': return '#e74c3c';
+        case 'Atrasado': return '#e74c3c';
+        case 'Crítico': return '#e74c3c';
+        default: return '#7f8c8d';
+      }
+    };
+
+    const getIconoEstado = (estado) => {
+      switch (estado) {
+        case 'Excelente': return '✓';
+        case 'Bajo Presupuesto': return '✓';
+        case 'Adelantado': return '✓';
+        case 'Costo OK, Atrasado': return '⚠';
+        case 'Sobre Costo, Adelantado': return '⚠';
+        case 'Sobre Presupuesto': return '✗';
+        case 'Atrasado': return '✗';
+        case 'Crítico': return '✗';
+        default: return '•';
+      }
+    };
+
+    const getGradientColor = (tipo) => {
+      switch (tipo) {
+        case 'valores': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        case 'variaciones': return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+        case 'indices': return 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+        case 'estimaciones': return 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)';
+        case 'estados': return 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+        case 'porcentajes': return 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
+        default: return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
       }
     };
 
     return (
       <div style={{ 
-        backgroundColor: '#f8f9fa', 
-        padding: '20px', 
-        borderRadius: '8px', 
-        marginTop: '20px',
-        border: '1px solid #dee2e6'
+        backgroundColor: '#f8fafc', 
+        padding: '2rem', 
+        borderRadius: '16px', 
+        marginTop: '2rem',
+        border: '1px solid #e1e8ed',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)'
       }}>
-        <h3 style={{ marginBottom: '20px', color: '#333' }}>Análisis EVM - {indicadores.fechaSeguimiento}</h3>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '2rem',
+          paddingBottom: '1rem',
+          borderBottom: '2px solid #e1e8ed'
+        }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0a6ebd 0%, #005a8c 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '1.5rem',
+            fontWeight: 'bold'
+          }}>
+            EVM
+          </div>
+          <div>
+            <h3 style={{ 
+              margin: '0', 
+              color: '#2c3e50', 
+              fontSize: '1.8rem',
+              fontWeight: '700',
+              letterSpacing: '0.5px'
+            }}>
+              Análisis EVM (Earned Value Management).
+            </h3>
+            <p style={{ 
+              margin: '0.25rem 0 0 0', 
+              color: '#7f8c8d', 
+              fontSize: '1rem',
+              fontWeight: '500'
+            }}>
+              Fecha de Seguimiento: {indicadores.fechaSeguimiento}
+            </p>
+            <p style={{ 
+              margin: '0.25rem 0 0 0', 
+              color: '#e74c3c', 
+              fontSize: '0.85rem',
+              fontWeight: '500'
+            }}>
+              {fechaDesde && fechaHasta ? `Filtro: ${fechaDesde} a ${fechaHasta}` : 
+               fechaDesde ? `Filtro: Desde ${fechaDesde}` :
+               fechaHasta ? `Filtro: Hasta ${fechaHasta}` : 'Sin filtros de fecha'}
+            </p>
+          </div>
+        </div>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
+          gap: '1rem' 
+        }}>
           
           {/* Valores Básicos */}
-          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Valores Básicos</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div><strong>AC (Costo Real):</strong></div>
-              <div style={{ color: '#ff0000' }}>{formatearMoneda(indicadores.AC)}</div>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'help'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          title="💰 VALORES BÁSICOS EVM
+
+📊 ¿Cómo se calculan?
+• AC: Suma de costos reales acumulados hasta la fecha de seguimiento
+• PV: Suma de costos planeados acumulados hasta la fecha de seguimiento  
+• EV: Valor del trabajo realmente completado (basado en progreso físico)
+• BAC: Presupuesto total aprobado del proyecto
+
+🎯 ¿Por qué son importantes?
+Estos son los tres pilares fundamentales del EVM. Permiten comparar lo planeado vs lo real y determinar el valor generado.
+
+📈 ¿De dónde vienen los datos?
+• AC: Tabla 'Real Parcial' (datos importados)
+• PV: Tabla 'API Parcial' (datos importados)
+• EV: Calculado basado en progreso físico del proyecto
+• BAC: Presupuesto total del proyecto">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: getGradientColor('valores')
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: getGradientColor('valores'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                $
+            </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Valores Básicos
+              </h4>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>AC (Costo Real):</div>
+              <div style={{ color: '#e74c3c', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>{formatearMoneda(indicadores.AC)}</div>
               
-              <div><strong>PV (Costo Planeado):</strong></div>
-              <div style={{ color: '#0066cc' }}>{formatearMoneda(indicadores.PV)}</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>PV (Costo Planeado):</div>
+              <div style={{ color: '#3498db', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>{formatearMoneda(indicadores.PV)}</div>
               
-              <div><strong>EV (Valor Ganado):</strong></div>
-              <div style={{ color: '#00cc00' }}>{formatearMoneda(indicadores.EV)}</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>EV (Valor Ganado):</div>
+              <div style={{ color: '#27ae60', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>{formatearMoneda(indicadores.EV)}</div>
               
-              <div><strong>BAC (Presupuesto Total):</strong></div>
-              <div style={{ color: '#000000' }}>{formatearMoneda(indicadores.BAC)}</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>BAC (Presupuesto Total):</div>
+              <div style={{ color: '#2c3e50', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>{formatearMoneda(indicadores.BAC)}</div>
             </div>
           </div>
 
           {/* Variaciones */}
-          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Variaciones</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div><strong>CV (Variación Costo):</strong></div>
-              <div style={{ color: indicadores.CV >= 0 ? '#00cc00' : '#ff0000' }}>
-                {formatearMoneda(indicadores.CV)} ({formatearPorcentaje((indicadores.CV / indicadores.AC) * 100)})
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'help'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          title="📊 VARIACIONES EVM
+
+📊 ¿Cómo se calculan?
+• CV = EV - AC (Variación de Costo)
+• SV = EV - PV (Variación de Cronograma)
+• VAC = BAC - EAC (Variación Final Prevista)
+
+🎯 ¿Por qué son importantes?
+• CV > 0: Proyecto bajo presupuesto ✓
+• CV < 0: Proyecto sobre presupuesto ✗
+• SV > 0: Proyecto adelantado ✓
+• SV < 0: Proyecto atrasado ✗
+• VAC > 0: Se espera ahorro ✓
+• VAC < 0: Se espera sobrecosto ✗
+
+📈 ¿De dónde vienen los datos?
+Calculadas automáticamente a partir de los valores básicos EVM (AC, PV, EV, BAC, EAC)">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: getGradientColor('variaciones')
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: getGradientColor('variaciones'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                Δ
+              </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Variaciones
+              </h4>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>CV (Variación Costo):</div>
+              <div style={{ 
+                color: indicadores.CV >= 0 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.15rem',
+                lineHeight: '1.2'
+              }}>
+                <span>{formatearMoneda(indicadores.CV)}</span>
+                <span style={{ fontSize: '0.75rem', opacity: '0.8' }}>
+                  ({formatearPorcentaje((indicadores.CV / indicadores.AC) * 100)})
+                </span>
               </div>
               
-              <div><strong>SV (Variación Cronograma):</strong></div>
-              <div style={{ color: indicadores.SV >= 0 ? '#00cc00' : '#ff0000' }}>
-                {formatearMoneda(indicadores.SV)} ({formatearPorcentaje((indicadores.SV / indicadores.PV) * 100)})
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>SV (Variación Cronograma):</div>
+              <div style={{ 
+                color: indicadores.SV >= 0 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.15rem',
+                lineHeight: '1.2'
+              }}>
+                <span>{formatearMoneda(indicadores.SV)}</span>
+                <span style={{ fontSize: '0.75rem', opacity: '0.8' }}>
+                  ({formatearPorcentaje((indicadores.SV / indicadores.PV) * 100)})
+                </span>
               </div>
               
-              <div><strong>VAC (Variación Final):</strong></div>
-              <div style={{ color: indicadores.VAC >= 0 ? '#00cc00' : '#ff0000' }}>
-                {formatearMoneda(indicadores.VAC)} ({formatearPorcentaje((indicadores.VAC / indicadores.BAC) * 100)})
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>VAC (Variación Final):</div>
+              <div style={{ 
+                color: indicadores.VAC >= 0 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.15rem',
+                lineHeight: '1.2'
+              }}>
+                <span>{formatearMoneda(indicadores.VAC)}</span>
+                <span style={{ fontSize: '0.75rem', opacity: '0.8' }}>
+                  ({formatearPorcentaje((indicadores.VAC / indicadores.BAC) * 100)})
+                </span>
               </div>
             </div>
           </div>
 
           {/* Índices de Rendimiento */}
-          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Índices de Rendimiento</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div><strong>CPI (Índice Costo):</strong></div>
-              <div style={{ color: indicadores.CPI >= 1 ? '#00cc00' : '#ff0000' }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'help'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          title="📈 ÍNDICES DE RENDIMIENTO EVM
+
+📊 ¿Cómo se calculan?
+• CPI = EV / AC (Índice de Rendimiento de Costo)
+• SPI = EV / PV (Índice de Rendimiento de Cronograma)
+
+🎯 ¿Por qué son importantes?
+• CPI > 1: Eficiente en costos ✓
+• CPI < 1: Ineficiente en costos ✗
+• SPI > 1: Adelantado en cronograma ✓
+• SPI < 1: Atrasado en cronograma ✗
+• CPI = 1: En presupuesto
+• SPI = 1: En cronograma
+
+📈 ¿De dónde vienen los datos?
+Calculados automáticamente a partir de AC, PV y EV. Son métricas de eficiencia que indican qué tan bien está funcionando el proyecto">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: getGradientColor('indices')
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: getGradientColor('indices'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                %
+              </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Índices de Rendimiento
+              </h4>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>CPI (Índice Costo):</div>
+              <div style={{ 
+                color: indicadores.CPI >= 1 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '1.1rem',
+                lineHeight: '1.2'
+              }}>
                 {formatearIndice(indicadores.CPI)}
               </div>
               
-              <div><strong>SPI (Índice Cronograma):</strong></div>
-              <div style={{ color: indicadores.SPI >= 1 ? '#00cc00' : '#ff0000' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>SPI (Índice Cronograma):</div>
+              <div style={{ 
+                color: indicadores.SPI >= 1 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '1.1rem',
+                lineHeight: '1.2'
+              }}>
                 {formatearIndice(indicadores.SPI)}
               </div>
             </div>
           </div>
 
           {/* Estimaciones */}
-          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Estimaciones</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div><strong>EAC (Costo Estimado Total):</strong></div>
-              <div style={{ color: '#ff6600' }}>{formatearMoneda(indicadores.EAC)}</div>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'help'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          title="⚡ ESTIMACIONES EVM
+
+📊 ¿Cómo se calculan?
+• EAC = AC + ETC (Costo Estimado al Completar)
+• ETC = (BAC - EV) / CPI (Costo Estimado para Completar)
+
+🎯 ¿Por qué son importantes?
+• EAC: Predice el costo total final del proyecto
+• ETC: Indica cuánto dinero adicional se necesita
+• Permiten planificar recursos y presupuestos futuros
+• Ayudan a tomar decisiones de gestión tempranas
+
+📈 ¿De dónde vienen los datos?
+Calculadas automáticamente usando BAC, AC, EV y CPI. Son proyecciones basadas en el rendimiento actual del proyecto">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: getGradientColor('estimaciones')
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: getGradientColor('estimaciones'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                ⚡
+            </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Estimaciones
+              </h4>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>EAC (Costo Estimado Total):</div>
+              <div style={{ color: '#f39c12', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>{formatearMoneda(indicadores.EAC)}</div>
               
-              <div><strong>ETC (Costo para Completar):</strong></div>
-              <div style={{ color: '#ff6600' }}>{formatearMoneda(indicadores.ETC)}</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>ETC (Costo para Completar):</div>
+              <div style={{ color: '#f39c12', fontWeight: '700', fontSize: '0.9rem', lineHeight: '1.2' }}>{formatearMoneda(indicadores.ETC)}</div>
             </div>
           </div>
 
           {/* Estados */}
-          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Estados del Proyecto</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div><strong>Estado Costo:</strong></div>
-              <div style={{ color: getColorEstado(indicadores.estadoCosto) }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '1rem', 
+            borderRadius: '12px', 
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'help'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          title="📊 ESTADOS DEL PROYECTO EVM
+
+📊 ¿Cómo se determinan?
+• Estado Costo: Basado en CV (Variación de Costo)
+• Estado Cronograma: Basado en SV (Variación de Cronograma)
+• Estado General: Combinación de CPI y SPI
+
+🎯 ¿Por qué son importantes?
+• Proporcionan una evaluación rápida del proyecto
+• Ayudan a identificar problemas tempranamente
+• Permiten tomar decisiones de gestión informadas
+• Facilitan la comunicación con stakeholders
+
+📈 ¿De dónde vienen los datos?
+Calculados automáticamente a partir de las variaciones e índices EVM. Son indicadores de estado que resumen el rendimiento del proyecto">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: getGradientColor('estados')
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: getGradientColor('estados'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                📊
+              </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Estados del Proyecto
+              </h4>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Estado Costo:</div>
+              <div style={{ 
+                color: getColorEstado(indicadores.estadoCosto), 
+                fontWeight: '700', 
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                lineHeight: '1.2'
+              }}>
+                <span>{getIconoEstado(indicadores.estadoCosto)}</span>
                 {indicadores.estadoCosto}
               </div>
               
-              <div><strong>Estado Cronograma:</strong></div>
-              <div style={{ color: getColorEstado(indicadores.estadoCronograma) }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Estado Cronograma:</div>
+              <div style={{ 
+                color: getColorEstado(indicadores.estadoCronograma), 
+                fontWeight: '700', 
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                lineHeight: '1.2'
+              }}>
+                <span>{getIconoEstado(indicadores.estadoCronograma)}</span>
                 {indicadores.estadoCronograma}
               </div>
               
-              <div><strong>Estado General:</strong></div>
-              <div style={{ color: getColorEstado(indicadores.estadoRendimiento) }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Estado General:</div>
+              <div style={{ 
+                color: getColorEstado(indicadores.estadoRendimiento), 
+                fontWeight: '700', 
+                fontSize: '0.9rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                lineHeight: '1.2'
+              }}>
+                <span>{getIconoEstado(indicadores.estadoRendimiento)}</span>
                 {indicadores.estadoRendimiento}
               </div>
             </div>
           </div>
 
           {/* Porcentajes de Avance */}
-          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
-            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Porcentajes de Avance</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div><strong>% Completado (EV):</strong></div>
-              <div style={{ color: '#00cc00' }}>{formatearPorcentaje(indicadores.porcentajeCompletado)}</div>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '1rem', 
+            borderRadius: '12px', 
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'help'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          title="📈 PORCENTAJES DE AVANCE EVM
+
+📊 ¿Cómo se calculan?
+• % Completado = (EV / BAC) × 100
+• % Planeado = (PV / BAC) × 100
+• % Real = (AC / BAC) × 100
+
+🎯 ¿Por qué son importantes?
+• Muestran el progreso del proyecto en porcentajes
+• Permiten comparar lo completado vs lo planeado
+• Ayudan a visualizar el avance del proyecto
+• Facilitan la comunicación con stakeholders
+
+📈 ¿De dónde vienen los datos?
+Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progreso del proyecto en términos porcentuales">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: getGradientColor('porcentajes')
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: getGradientColor('porcentajes'),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                📈
+            </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Porcentajes de Avance
+              </h4>
+          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>% Completado (EV):</div>
+              <div style={{ color: '#27ae60', fontWeight: '700', fontSize: '1.1rem', lineHeight: '1.2' }}>{formatearPorcentaje(indicadores.porcentajeCompletado)}</div>
               
-              <div><strong>% Planeado (PV):</strong></div>
-              <div style={{ color: '#0066cc' }}>{formatearPorcentaje(indicadores.porcentajePlaneado)}</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>% Planeado (PV):</div>
+              <div style={{ color: '#3498db', fontWeight: '700', fontSize: '1.1rem', lineHeight: '1.2' }}>{formatearPorcentaje(indicadores.porcentajePlaneado)}</div>
               
-              <div><strong>% Real (AC):</strong></div>
-              <div style={{ color: '#ff0000' }}>{formatearPorcentaje(indicadores.porcentajeReal)}</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>% Real (AC):</div>
+              <div style={{ color: '#e74c3c', fontWeight: '700', fontSize: '1.1rem', lineHeight: '1.2' }}>{formatearPorcentaje(indicadores.porcentajeReal)}</div>
             </div>
           </div>
+
+
+
+          {/* Variaciones de Valor Ganado */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '1rem', 
+            borderRadius: '12px', 
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            gridColumn: '1 / -1',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          onClick={() => setPopupVariacionesVisible(true)}
+          title="📊 VARIACIONES DE VALOR GANADO
+
+📊 ¿Qué contiene?
+• CV: Variación de Costo (EV - AC)
+• SV: Variación de Cronograma (EV - PV)
+• VAC: Variación Final Prevista (BAC - EAC)
+• ETC: Costo Estimado para Completar
+
+🎯 ¿Por qué son importantes?
+• Proporcionan análisis detallado de las variaciones
+• Ayudan a identificar problemas específicos
+• Permiten tomar decisiones informadas
+• Facilitan la gestión del proyecto
+
+📈 ¿De dónde vienen los datos?
+Calculadas automáticamente a partir de los valores básicos EVM. Click para ver análisis detallado con explicaciones y recomendaciones">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)'
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                📊
+              </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Variaciones de Valor Ganado
+              </h4>
+              <div style={{
+                marginLeft: 'auto',
+                fontSize: '0.8rem',
+                color: '#7f8c8d',
+                fontStyle: 'italic'
+              }}>
+                Click para más info
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Variación de Costo (CV):</div>
+              <div style={{ 
+                color: indicadores.CV >= 0 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {formatearMoneda(indicadores.CV)} {indicadores.CV >= 0 ? '✓' : '✗'}
+              </div>
+              
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Variación de Cronograma (SV):</div>
+              <div style={{ 
+                color: indicadores.SV >= 0 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {formatearMoneda(indicadores.SV)} {indicadores.SV >= 0 ? '✓' : '✗'}
+              </div>
+              
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Variación Final Prevista (VAC):</div>
+              <div style={{ 
+                color: indicadores.VAC >= 0 ? '#27ae60' : '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {formatearMoneda(indicadores.VAC)} {indicadores.VAC >= 0 ? '✓' : '✗'}
+              </div>
+              
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Costo Estimado para Completar (ETC):</div>
+              <div style={{ 
+                color: '#3498db', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {formatearMoneda(indicadores.ETC)}
+              </div>
+            </div>
+          </div>
+
+
         </div>
       </div>
     );
   };
 
+  // --- COMPONENTE POPUP VARIACIONES DE VALOR GANADO ---
+  const PopupVariacionesValorGanado = ({ indicadores, fechaSeguimiento, onClose }) => {
+    const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
+    
+    const generarExplicacionVariaciones = () => {
+      const { CV, SV, VAC, ETC, AC, PV, EV, BAC, EAC } = indicadores;
+      
+      return {
+        cv: {
+          titulo: "Variación de Costo (CV)",
+          formula: "CV = EV - AC",
+          valor: CV,
+          explicacion: CV >= 0 
+            ? `✅ El proyecto está BAJO PRESUPUESTO. El valor del trabajo completado (${formatearMoneda(EV)}) es mayor que el costo real (${formatearMoneda(AC)}), lo que significa que estamos generando más valor del que estamos gastando.`
+            : `❌ El proyecto está SOBRE PRESUPUESTO. El costo real (${formatearMoneda(AC)}) es mayor que el valor del trabajo completado (${formatearMoneda(EV)}), indicando que estamos gastando más de lo que deberíamos.`,
+          recomendacion: CV >= 0 
+            ? "Mantener el control de costos actual. El proyecto está siendo eficiente en términos de gasto."
+            : "Revisar y optimizar los costos. Considerar medidas de control de gastos y eficiencia operacional."
+        },
+        sv: {
+          titulo: "Variación de Cronograma (SV)",
+          formula: "SV = EV - PV",
+          valor: SV,
+          explicacion: SV >= 0 
+            ? `✅ El proyecto está ADELANTADO. El valor del trabajo completado (${formatearMoneda(EV)}) es mayor que lo planeado (${formatearMoneda(PV)}), lo que significa que estamos progresando más rápido de lo esperado.`
+            : `❌ El proyecto está ATRASADO. El valor del trabajo completado (${formatearMoneda(EV)}) es menor que lo planeado (${formatearMoneda(PV)}), indicando que el progreso es más lento de lo esperado.`,
+          recomendacion: SV >= 0 
+            ? "Mantener el ritmo de trabajo actual. El proyecto está cumpliendo o superando las expectativas de tiempo."
+            : "Acelerar el progreso del proyecto. Considerar asignar más recursos o optimizar procesos para cumplir con el cronograma."
+        },
+        vac: {
+          titulo: "Variación Final Prevista (VAC)",
+          formula: "VAC = BAC - EAC",
+          valor: VAC,
+          explicacion: VAC >= 0 
+            ? `✅ El proyecto se espera que termine BAJO PRESUPUESTO. El presupuesto original (${formatearMoneda(BAC)}) es mayor que el costo estimado al final (${formatearMoneda(EAC)}), indicando que se espera un ahorro.`
+            : `❌ El proyecto se espera que termine SOBRE PRESUPUESTO. El costo estimado al final (${formatearMoneda(EAC)}) es mayor que el presupuesto original (${formatearMoneda(BAC)}), indicando que se espera un sobrecosto.`,
+          recomendacion: VAC >= 0 
+            ? "Mantener el control financiero actual. El proyecto está en camino de terminar dentro del presupuesto."
+            : "Implementar medidas de control de costos inmediatas. El proyecto necesita ajustes para evitar sobrecostos significativos."
+        },
+        etc: {
+          titulo: "Costo Estimado para Completar (ETC)",
+          formula: "ETC = EAC - AC",
+          valor: ETC,
+          explicacion: `Este valor (${formatearMoneda(ETC)}) representa cuánto dinero adicional se necesita para terminar el proyecto, considerando el rendimiento actual. Es la diferencia entre el costo total estimado (${formatearMoneda(EAC)}) y lo que ya se ha gastado (${formatearMoneda(AC)}).`,
+          recomendacion: "Este valor debe ser monitoreado regularmente. Si aumenta significativamente, indica que el proyecto está siendo más costoso de lo esperado y requiere atención inmediata."
+        }
+      };
+    };
+
+    const explicaciones = generarExplicacionVariaciones();
+
+    return createPortal(
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 99999,
+        padding: '20px',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '20px',
+          width: '85%',
+          maxWidth: '500px',
+          maxHeight: '75vh',
+          overflow: 'auto',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+          position: 'relative',
+          border: '1px solid #e0e0e0'
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '1rem',
+            borderBottom: '1px solid #e0e0e0',
+            paddingBottom: '0.5rem'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                📊
+              </div>
+              <div>
+                <h2 style={{ margin: '0', color: '#2c3e50', fontSize: '1.1rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                  Variaciones de Valor Ganado
+                </h2>
+                <p style={{ margin: '0.2rem 0 0 0', color: '#7f8c8d', fontSize: '0.8rem', fontFamily: 'Arial, sans-serif' }}>
+                  {fechaSeguimiento}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                color: '#7f8c8d',
+                padding: '0.4rem',
+                borderRadius: '50%',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#f8f9fa';
+                e.target.style.color = '#e74c3c';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.color = '#7f8c8d';
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Contenido */}
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {Object.entries(explicaciones).map(([key, item]) => (
+              <div key={key} style={{
+                backgroundColor: '#f8fafc',
+                borderRadius: '8px',
+                padding: '1rem',
+                border: '1px solid #e0e0e0'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: item.valor >= 0 ? 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)' : 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {item.valor >= 0 ? '✓' : '✗'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: '0', color: '#2c3e50', fontSize: '1rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                      {item.titulo}
+                    </h3>
+                    <p style={{ margin: '0.2rem 0 0 0', color: '#7f8c8d', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                      {item.formula}
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{
+                      fontSize: '1.1rem',
+                      fontWeight: '700',
+                      color: item.valor >= 0 ? '#27ae60' : '#e74c3c',
+                      fontFamily: 'Arial, sans-serif'
+                    }}>
+                      {formatearMoneda(item.valor)}
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <h4 style={{ margin: '0 0 0.4rem 0', color: '#2c3e50', fontSize: '0.9rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                    ¿Qué significa esto?
+                  </h4>
+                  <p style={{ margin: '0', color: '#34495e', fontSize: '0.85rem', lineHeight: '1.5', fontFamily: 'Arial, sans-serif' }}>
+                    {item.explicacion}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 style={{ margin: '0 0 0.4rem 0', color: '#2c3e50', fontSize: '0.9rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                    Recomendación
+                  </h4>
+                  <p style={{ margin: '0', color: '#34495e', fontSize: '0.85rem', lineHeight: '1.5', fontStyle: 'italic', fontFamily: 'Arial, sans-serif' }}>
+                    {item.recomendacion}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            marginTop: '1.5rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid #e0e0e0',
+            textAlign: 'center'
+          }}>
+            <p style={{ margin: '0', color: '#7f8c8d', fontSize: '0.8rem', fontFamily: 'Arial, sans-serif' }}>
+              💡 <strong>Consejo:</strong> Monitorea estas variaciones regularmente para mantener el control del proyecto.
+            </p>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   // --- COMPONENTE POPUP DE ANÁLISIS DESCRIPTIVO ---
   const PopupAnalisisDescriptivo = ({ indicadores, fechaSeguimiento, onClose }) => {
-    const formatearMoneda = (valor) => `$${(valor / 1000000).toFixed(2)}M`;
+    const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
     const formatearPorcentaje = (valor) => `${valor.toFixed(1)}%`;
     const formatearIndice = (valor) => valor.toFixed(3);
 
@@ -4102,6 +5597,15 @@ const Vectores = ({ proyectoId }) => {
           indicadores={indicadoresEVM}
           fechaSeguimiento={fechaSeguimiento}
           onClose={() => setMostrarPopupAnalisis(false)}
+        />
+      )}
+
+      {/* Popup de Variaciones de Valor Ganado */}
+      {popupVariacionesVisible && indicadoresEVM && fechaSeguimiento && (
+        <PopupVariacionesValorGanado
+          indicadores={indicadoresEVM}
+          fechaSeguimiento={fechaSeguimiento}
+          onClose={() => setPopupVariacionesVisible(false)}
         />
       )}
     </div>
