@@ -54,6 +54,25 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
         zIndex: 100,
       }}
     >
+      {/* Botón de colapsar/expandir dentro del sidebar */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 8,
+          background: 'none',
+          border: 'none',
+          color: '#FFD000',
+          fontSize: 22,
+          cursor: 'pointer',
+          zIndex: 1100,
+        }}
+        title={collapsed ? 'Expandir menú' : 'Minimizar menú'}
+      >
+        {collapsed ? '▶' : '◀'}
+      </button>
+      
       <Menu
         menuItemStyles={{
           button: ({ active, disabled }) => ({
@@ -69,8 +88,9 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
               : '#fff',
             fontWeight: active ? 'bold' : 'normal',
             borderRadius: '6px',
-            margin: '4px 8px',
+            margin: '2px 8px', // Reducido de 4px a 2px
             transition: 'background 0.18s, color 0.18s',
+            marginTop: '40px', // Solo para el primer elemento
           }),
           hover: ({ disabled }) => ({
             backgroundColor: disabled ? '#b0b0b0' : '#fff',
@@ -90,12 +110,15 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
           }),
         }}
       >
-        {opcionesVisibles.map(opcion => (
+        {opcionesVisibles.map((opcion, index) => (
           <MenuItem
             key={opcion.clave}
             icon={opcion.icono}
             active={seleccionado === opcion.clave}
             onClick={() => onSelect(opcion.clave)}
+            style={{
+              marginTop: index === 0 ? '40px' : '2px', // Solo el primer elemento tiene margen superior
+            }}
           >
             {opcion.texto}
           </MenuItem>
@@ -126,26 +149,6 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
           <div style={{color: '#fff', fontSize: 14}}>Descripción: <span style={{fontWeight: 600}}>{projectToShow.descripcion}</span></div>
         </div>
       )}
-      {/* Botón de colapsar/expandir */}
-      <div style={{
-        position: 'absolute',
-        bottom: 24,
-        left: 0,
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '12px 0',
-        cursor: 'pointer',
-        borderTop: '1px solid #d1d5db',
-        background: 'transparent',
-        zIndex: 1000
-      }}
-        onClick={() => setCollapsed(!collapsed)}
-        title={collapsed ? 'Expandir menú' : 'Minimizar menú'}
-      >
-        {collapsed ? <FaChevronUp size={22} color="#F2A900" /> : <FaChevronDown size={22} color="#F2A900" />}
-      </div>
     </Sidebar>
   );
 };

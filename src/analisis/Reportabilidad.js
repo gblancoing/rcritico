@@ -81,9 +81,13 @@ if (typeof document !== 'undefined') {
 
 // Definir los diferentes tipos de reportes de reportabilidad
 const reportes = [
-  { value: 'predictividad', label: 'Predictividad' },
+  
+  
   { value: 'eficiencia_gasto', label: 'Eficiencia del Gasto' },
   { value: 'cumplimiento_fisico', label: 'Cumplimiento Físico' },
+  { value: 'predictividad', label: 'Predictividad' },
+  
+  
 ];
 
 const ALTURA_BARRA_SUPERIOR = 56;
@@ -130,7 +134,7 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
       </button>
       <div style={{ marginBottom: 16, marginTop: 16 }}>
         <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Reportes de Reportabilidad</h4>
-        <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {reportes.map(reporte => (
             <button
               key={reporte.value}
@@ -181,7 +185,7 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
 );
 
 const Reportabilidad = ({ proyectoId }) => {
-  const [seleccion, setSeleccion] = useState('predictividad');
+  const [seleccion, setSeleccion] = useState('eficiencia_gasto');
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');

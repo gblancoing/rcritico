@@ -14,11 +14,33 @@
   font-family: 'Segoe UI', 'Arial', sans-serif;
   z-index: 100;
   border-right: 6px solid #F2A900; /* Dorado Codelco */
-  transition: width 0.2s;
+  transition: width 0.3s ease, transform 0.3s ease;
 }
 
 .sidebar.fijado {
   border-right: 6px solid #F2A900;
+}
+
+/* Botón de minimización dentro del sidebar */
+.sidebar-toggle-button {
+  position: absolute;
+  top: 12px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #FFD000;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 1100;
+}
+
+.sidebar-toggle-button:hover {
+  color: #F2A900;
+}
+
+/* Ajuste para el menú cuando el botón está presente */
+.sidebar-menu {
+  margin-top: 40px;
 }
 
 /* Header del sidebar refinado */

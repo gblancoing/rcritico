@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell, ReferenceArea, ReferenceLine } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { buildAppUrl } from '../config';
@@ -185,6 +186,24 @@ const Vectores = ({ proyectoId }) => {
   const [cargandoInforme, setCargandoInforme] = useState(false);
   // --- NUEVO: Tabla Transpuesta ---
   const [vectorTranspuesta, setVectorTranspuesta] = useState('real_parcial');
+
+  // --- NUEVO: Estados para el zoom del gráfico Curva S ---
+  const [left, setLeft] = useState('dataMin');
+  const [right, setRight] = useState('dataMax');
+  const [refAreaLeft, setRefAreaLeft] = useState('');
+  const [refAreaRight, setRefAreaRight] = useState('');
+  const [top, setTop] = useState('dataMax+1');
+  const [bottom, setBottom] = useState('dataMin-1');
+  const [animation, setAnimation] = useState(true);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState(null);
+
+  // --- NUEVO: Estados para análisis EVM dinámico ---
+  const [fechaSeguimiento, setFechaSeguimiento] = useState('');
+  const [indicadoresEVM, setIndicadoresEVM] = useState(null);
+  const [mostrarAnalisisEVM, setMostrarAnalisisEVM] = useState(false);
+  const [modoGrafico, setModoGrafico] = useState('normal'); // 'normal' o 'evm'
+  const [mostrarPopupAnalisis, setMostrarPopupAnalisis] = useState(false);
 
   const categorias = [
     'CONSTRUCCION',
@@ -633,28 +652,228 @@ const Vectores = ({ proyectoId }) => {
       };
     });
   };
-  // --- COMPONENTE DE GRÁFICO CURVA S ---
-  const CurvaSChart = ({ data }) => (
-    <ResponsiveContainer width="100%" height={400}>
-      <LineChart data={data} margin={{ top: 40, right: 40, left: 10, bottom: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          dataKey="periodo"
-          angle={-45}
-          textAnchor="end"
-          height={60}
-          interval="preserveStartEnd" // <-- Esto es clave
-        />
-        <YAxis tickFormatter={v => `$${(v/1_000_000).toLocaleString('en-US', { maximumFractionDigits: 0 })}M`} width={90} />
-        <Tooltip formatter={v => `USD ${Number(v).toLocaleString('en-US')}`} />
-        <Legend verticalAlign="top" align="center" height={36} iconType="circle" wrapperStyle={{ top: 0 }} />
-        <Line type="monotone" dataKey="Real Parcial" stroke="#1ecb4f" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="V0 Parcial" stroke="#16355D" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="NPC Parcial" stroke="#FFD000" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="API Parcial" stroke="#0177FF" strokeWidth={2} dot={false} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
+  // --- COMPONENTE DE GRÁFICO CURVA S CON ZOOM ---
+  const CurvaSChart = ({ data, left, right, refAreaLeft, refAreaRight, top, bottom, animation, isPanning, panStart, setLeft, setRight, setRefAreaLeft, setRefAreaRight, setTop, setBottom, setAnimation, setIsPanning, setPanStart }) => {
+    const zoom = () => {
+      if (refAreaLeft === refAreaRight || refAreaRight === '') {
+        setRefAreaLeft('');
+        setRefAreaRight('');
+        return;
+      }
+
+      if (refAreaLeft > refAreaRight) {
+        const temp = refAreaLeft;
+        setRefAreaLeft(refAreaRight);
+        setRefAreaRight(temp);
+      }
+
+      setLeft(refAreaLeft);
+      setRight(refAreaRight);
+      setTop('dataMax+1');
+      setBottom('dataMin-1');
+      setRefAreaLeft('');
+      setRefAreaRight('');
+    };
+
+    const zoomOut = () => {
+      setLeft('dataMin');
+      setRight('dataMax');
+      setTop('dataMax+1');
+      setBottom('dataMin-1');
+      setRefAreaLeft('');
+      setRefAreaRight('');
+    };
+
+    const handleMouseDown = (e) => {
+      if (!e) return;
+      
+      console.log('Mouse down:', e.activeLabel, 'Ctrl:', e.ctrlKey);
+      
+      // Si se presiona Ctrl/Cmd, activar modo pan
+      if (e.ctrlKey || e.metaKey) {
+        setIsPanning(true);
+        setPanStart(e.activeLabel);
+        console.log('Panning activated');
+        return;
+      }
+      
+      // Modo zoom normal
+      setRefAreaLeft(e.activeLabel);
+      console.log('Zoom area started:', e.activeLabel);
+    };
+
+    const handleMouseMove = (e) => {
+      if (!e) return;
+      
+      if (isPanning && panStart) {
+        // Modo pan - mover el área visible
+        const currentIndex = data.findIndex(item => item.periodo === e.activeLabel);
+        const startIndex = data.findIndex(item => item.periodo === panStart);
+        
+        if (currentIndex !== -1 && startIndex !== -1) {
+          const delta = currentIndex - startIndex;
+          
+          // Determinar los índices actuales, manejando el estado inicial
+          let currentLeftIndex, currentRightIndex;
+          
+          if (left === 'dataMin') {
+            currentLeftIndex = 0;
+          } else {
+            currentLeftIndex = data.findIndex(item => item.periodo === left);
+            if (currentLeftIndex === -1) currentLeftIndex = 0;
+          }
+          
+          if (right === 'dataMax') {
+            currentRightIndex = data.length - 1;
+          } else {
+            currentRightIndex = data.findIndex(item => item.periodo === right);
+            if (currentRightIndex === -1) currentRightIndex = data.length - 1;
+          }
+          
+          const range = currentRightIndex - currentLeftIndex;
+          
+          const newLeftIndex = Math.max(0, currentLeftIndex - delta);
+          const newRightIndex = Math.min(data.length - 1, newLeftIndex + range);
+          
+          setLeft(data[newLeftIndex]?.periodo || 'dataMin');
+          setRight(data[newRightIndex]?.periodo || 'dataMax');
+          setPanStart(e.activeLabel);
+        }
+      } else {
+        // Modo zoom normal
+        setRefAreaRight(e.activeLabel);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        setPanStart(null);
+      } else {
+        zoom();
+        setAnimation(true);
+      }
+    };
+
+    const handleDoubleClick = () => {
+      console.log('Double click - zooming out');
+      zoomOut();
+      setAnimation(true);
+    };
+
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const delta = e.deltaY;
+      const zoomFactor = 0.1;
+      
+      console.log('Wheel event:', delta, 'Current left:', left, 'Current right:', right);
+      
+      // Determinar los índices actuales, manejando el estado inicial
+      let currentLeftIndex, currentRightIndex;
+      
+      if (left === 'dataMin') {
+        currentLeftIndex = 0;
+      } else {
+        currentLeftIndex = data.findIndex(item => item.periodo === left);
+        if (currentLeftIndex === -1) currentLeftIndex = 0;
+      }
+      
+      if (right === 'dataMax') {
+        currentRightIndex = data.length - 1;
+      } else {
+        currentRightIndex = data.findIndex(item => item.periodo === right);
+        if (currentRightIndex === -1) currentRightIndex = data.length - 1;
+      }
+      
+      const currentRange = currentRightIndex - currentLeftIndex;
+      const centerIndex = Math.floor((currentLeftIndex + currentRightIndex) / 2);
+      
+      if (delta > 0) {
+        // Zoom out
+        const newRange = Math.max(currentRange * (1 + zoomFactor), 2);
+        const newLeftIndex = Math.max(0, centerIndex - Math.floor(newRange / 2));
+        const newRightIndex = Math.min(data.length - 1, centerIndex + Math.floor(newRange / 2));
+        
+        setLeft(data[newLeftIndex]?.periodo || 'dataMin');
+        setRight(data[newRightIndex]?.periodo || 'dataMax');
+      } else {
+        // Zoom in
+        const newRange = Math.max(currentRange * (1 - zoomFactor), 2);
+        const newLeftIndex = Math.max(0, centerIndex - Math.floor(newRange / 2));
+        const newRightIndex = Math.min(data.length - 1, centerIndex + Math.floor(newRange / 2));
+        
+        setLeft(data[newLeftIndex]?.periodo || 'dataMin');
+        setRight(data[newRightIndex]?.periodo || 'dataMax');
+      }
+    };
+
+    return (
+      <ResponsiveContainer width="100%" height={400}>
+        <LineChart
+          data={data}
+          margin={{ top: 40, right: 40, left: 10, bottom: 20 }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onDoubleClick={handleDoubleClick}
+          onWheel={handleWheel}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="periodo"
+            angle={-45}
+            textAnchor="end"
+            height={60}
+            interval="preserveStartEnd"
+            domain={[left, right]}
+            type="category"
+          />
+          <YAxis 
+            tickFormatter={v => `$${(v/1_000_000).toLocaleString('en-US', { maximumFractionDigits: 0 })}M`} 
+            width={90}
+            domain={[bottom, top]}
+          />
+          <Tooltip formatter={v => `USD ${Number(v).toLocaleString('en-US')}`} />
+          <Legend verticalAlign="top" align="center" height={36} iconType="circle" wrapperStyle={{ top: 0 }} />
+          <Line 
+            type="monotone" 
+            dataKey="Real Parcial" 
+            stroke="#1ecb4f" 
+            strokeWidth={2} 
+            dot={false}
+            animationDuration={animation ? 300 : 0}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="V0 Parcial" 
+            stroke="#16355D" 
+            strokeWidth={2} 
+            dot={false}
+            animationDuration={animation ? 300 : 0}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="NPC Parcial" 
+            stroke="#FFD000" 
+            strokeWidth={2} 
+            dot={false}
+            animationDuration={animation ? 300 : 0}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="API Parcial" 
+            stroke="#0177FF" 
+            strokeWidth={2} 
+            dot={false}
+            animationDuration={animation ? 300 : 0}
+          />
+          {refAreaLeft && refAreaRight && refAreaLeft !== refAreaRight ? (
+            <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#888" />
+          ) : null}
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  };
 
   // --- FUNCIÓN PARA PREPARAR DATOS DE CURVA S ACUMULADOS ---
   const prepararDatosCurvaS_Acumulados = (real, v0, npc, api, fechaDesde, fechaHasta) => {
@@ -1156,6 +1375,717 @@ const Vectores = ({ proyectoId }) => {
     { value: 'api_parcial', label: 'API Parcial' },
   ];
 
+  // --- NUEVO: Funciones para análisis EVM ---
+  const calcularIndicadoresEVM = (data, fechaSeguimiento) => {
+    if (!data || data.length === 0 || !fechaSeguimiento) {
+      return null;
+    }
+
+    // Encontrar el índice de la fecha de seguimiento
+    const fechaIndex = data.findIndex(item => item.periodo === fechaSeguimiento);
+    if (fechaIndex === -1) {
+      return null;
+    }
+
+    // Obtener valores en la fecha de seguimiento
+    const puntoSeguimiento = data[fechaIndex];
+    
+    // Definir las curvas según la información proporcionada
+    const AC = puntoSeguimiento['Real Parcial']; // Actual Cost (Costo Real)
+    const PV = puntoSeguimiento['V0 Parcial'];   // Planned Value (Costo Planeado Escenario 1)
+    const EV = puntoSeguimiento['NPC Parcial'];  // Earned Value (Costo Planeado Escenario 2)
+    const BAC = data[data.length - 1]['V0 Parcial']; // Budget at Completion (Presupuesto total)
+
+    // Calcular variaciones
+    const CV = EV - AC;  // Cost Variance
+    const SV = EV - PV;  // Schedule Variance
+    
+    // Calcular índices de rendimiento
+    const CPI = AC !== 0 ? EV / AC : 0;  // Cost Performance Index
+    const SPI = PV !== 0 ? EV / PV : 0;  // Schedule Performance Index
+    
+    // Calcular estimaciones
+    const EAC = CPI !== 0 ? BAC / CPI : BAC;  // Estimate at Completion
+    const ETC = EAC - AC;  // Estimate to Complete
+    const VAC = BAC - EAC; // Variance at Completion
+    
+    // Calcular porcentajes
+    const porcentajeCompletado = BAC !== 0 ? (EV / BAC) * 100 : 0;
+    const porcentajePlaneado = BAC !== 0 ? (PV / BAC) * 100 : 0;
+    const porcentajeReal = BAC !== 0 ? (AC / BAC) * 100 : 0;
+
+    return {
+      fechaSeguimiento,
+      AC: AC || 0,
+      PV: PV || 0,
+      EV: EV || 0,
+      BAC: BAC || 0,
+      CV: CV || 0,
+      SV: SV || 0,
+      CPI: CPI || 0,
+      SPI: SPI || 0,
+      EAC: EAC || 0,
+      ETC: ETC || 0,
+      VAC: VAC || 0,
+      porcentajeCompletado: porcentajeCompletado || 0,
+      porcentajePlaneado: porcentajePlaneado || 0,
+      porcentajeReal: porcentajeReal || 0,
+      estadoCosto: CV >= 0 ? 'Bajo Presupuesto' : 'Sobre Presupuesto',
+      estadoCronograma: SV >= 0 ? 'Adelantado' : 'Atrasado',
+      estadoRendimiento: CPI >= 1 && SPI >= 1 ? 'Excelente' : 
+                        CPI >= 1 && SPI < 1 ? 'Costo OK, Atrasado' :
+                        CPI < 1 && SPI >= 1 ? 'Sobre Costo, Adelantado' : 'Crítico'
+    };
+  };
+
+  const actualizarAnalisisEVM = () => {
+    if (!fechaSeguimiento) {
+      setIndicadoresEVM(null);
+      return;
+    }
+
+    const datosCurvaS = prepararDatosCurvaS(tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial);
+    const indicadores = calcularIndicadoresEVM(datosCurvaS, fechaSeguimiento);
+    setIndicadoresEVM(indicadores);
+  };
+
+  // --- useEffect para actualizar análisis EVM ---
+  useEffect(() => {
+    actualizarAnalisisEVM();
+  }, [fechaSeguimiento, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial]);
+
+  // --- useEffect para inicializar fecha de seguimiento ---
+  useEffect(() => {
+    if (seleccion === 'reporte1' && tablaRealParcial.length > 0 && !fechaSeguimiento) {
+      // Obtener la fecha más reciente de los datos disponibles
+      const datosCurvaS = prepararDatosCurvaS(tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial);
+      if (datosCurvaS.length > 0) {
+        // Usar la fecha del medio de los datos como fecha de seguimiento por defecto
+        const fechaMedia = datosCurvaS[Math.floor(datosCurvaS.length / 2)]?.periodo;
+        if (fechaMedia) {
+          setFechaSeguimiento(fechaMedia);
+        }
+      }
+    }
+  }, [seleccion, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial, fechaSeguimiento]);
+
+  // --- useEffect para cambiar automáticamente al modo EVM cuando se selecciona fecha ---
+  useEffect(() => {
+    if (fechaSeguimiento && modoGrafico === 'normal') {
+      setModoGrafico('evm');
+    }
+  }, [fechaSeguimiento]);
+
+  // --- COMPONENTE DE GRÁFICO EVM ---
+  const GraficoEVM = ({ data, fechaSeguimiento, indicadores }) => {
+    if (!data || data.length === 0) return null;
+
+    const fechaIndex = data.findIndex(item => item.periodo === fechaSeguimiento);
+    if (fechaIndex === -1) return null;
+
+    // Crear datos para el gráfico EVM
+    const datosEVM = data.map((item, index) => ({
+      ...item,
+      esFechaSeguimiento: index === fechaIndex,
+      EAC: index >= fechaIndex ? indicadores?.EAC : null
+    }));
+
+    return (
+      <ResponsiveContainer width="100%" height={500}>
+        <LineChart
+          data={datosEVM}
+          margin={{ top: 40, right: 40, left: 10, bottom: 20 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="periodo"
+            angle={-45}
+            textAnchor="end"
+            height={60}
+            interval="preserveStartEnd"
+          />
+          <YAxis 
+            domain={['dataMin', 'dataMax']}
+            tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`}
+          />
+          <Tooltip 
+            formatter={(value, name) => [`$${(value / 1000000).toFixed(2)}M`, name]}
+            labelFormatter={(label) => `Período: ${label}`}
+          />
+          <Legend />
+          
+          {/* Curvas principales */}
+          <Line 
+            type="monotone" 
+            dataKey="Real Parcial" 
+            stroke="#ff0000" 
+            strokeWidth={3}
+            name="Costo Real (AC)"
+            dot={{ fill: '#ff0000', strokeWidth: 2, r: 4 }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="V0 Parcial" 
+            stroke="#0066cc" 
+            strokeWidth={3}
+            name="Costo Planeado (PV)"
+            dot={{ fill: '#0066cc', strokeWidth: 2, r: 4 }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="NPC Parcial" 
+            stroke="#00cc00" 
+            strokeWidth={3}
+            name="Valor Ganado (EV)"
+            dot={{ fill: '#00cc00', strokeWidth: 2, r: 4 }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="API Parcial" 
+            stroke="#666666" 
+            strokeWidth={2}
+            name="Escenario 3"
+            dot={{ fill: '#666666', strokeWidth: 1, r: 3 }}
+          />
+
+          {/* Línea de fecha de seguimiento */}
+          <ReferenceLine 
+            x={fechaSeguimiento} 
+            stroke="#ff6600" 
+            strokeDasharray="5 5"
+            strokeWidth={2}
+            label={{ value: "Fecha Seguimiento", position: "top" }}
+          />
+
+          {/* Línea BAC */}
+          <ReferenceLine 
+            y={indicadores?.BAC} 
+            stroke="#000000" 
+            strokeDasharray="3 3"
+            strokeWidth={2}
+            label={{ value: `BAC: $${(indicadores?.BAC / 1000000).toFixed(0)}M`, position: "right" }}
+          />
+
+          {/* Línea EAC proyectada */}
+          {indicadores && (
+            <Line 
+              type="monotone" 
+              dataKey="EAC" 
+              stroke="#ff6600" 
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              name="EAC Proyectado"
+              connectNulls={false}
+            />
+          )}
+
+          {/* Puntos de seguimiento */}
+          {indicadores && (
+            <>
+              <ReferenceLine 
+                x={fechaSeguimiento} 
+                y={indicadores.AC}
+                stroke="#ff0000"
+                strokeWidth={3}
+                label={{ value: `AC: $${(indicadores.AC / 1000000).toFixed(1)}M`, position: "insideTopRight" }}
+              />
+              <ReferenceLine 
+                x={fechaSeguimiento} 
+                y={indicadores.PV}
+                stroke="#0066cc"
+                strokeWidth={3}
+                label={{ value: `PV: $${(indicadores.PV / 1000000).toFixed(1)}M`, position: "insideTopLeft" }}
+              />
+              <ReferenceLine 
+                x={fechaSeguimiento} 
+                y={indicadores.EV}
+                stroke="#00cc00"
+                strokeWidth={3}
+                label={{ value: `EV: $${(indicadores.EV / 1000000).toFixed(1)}M`, position: "insideBottomRight" }}
+              />
+            </>
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  // --- COMPONENTE DE PANEL DE INDICADORES EVM ---
+  const PanelIndicadoresEVM = ({ indicadores }) => {
+    if (!indicadores) return null;
+
+    const formatearMoneda = (valor) => `$${(valor / 1000000).toFixed(2)}M`;
+    const formatearPorcentaje = (valor) => `${valor.toFixed(1)}%`;
+    const formatearIndice = (valor) => valor.toFixed(3);
+
+    const getColorEstado = (estado) => {
+      switch (estado) {
+        case 'Excelente': return '#00cc00';
+        case 'Bajo Presupuesto': return '#00cc00';
+        case 'Adelantado': return '#00cc00';
+        case 'Costo OK, Atrasado': return '#ffaa00';
+        case 'Sobre Costo, Adelantado': return '#ffaa00';
+        case 'Sobre Presupuesto': return '#ff0000';
+        case 'Atrasado': return '#ff0000';
+        case 'Crítico': return '#ff0000';
+        default: return '#666666';
+      }
+    };
+
+    return (
+      <div style={{ 
+        backgroundColor: '#f8f9fa', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        marginTop: '20px',
+        border: '1px solid #dee2e6'
+      }}>
+        <h3 style={{ marginBottom: '20px', color: '#333' }}>Análisis EVM - {indicadores.fechaSeguimiento}</h3>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+          
+          {/* Valores Básicos */}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Valores Básicos</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div><strong>AC (Costo Real):</strong></div>
+              <div style={{ color: '#ff0000' }}>{formatearMoneda(indicadores.AC)}</div>
+              
+              <div><strong>PV (Costo Planeado):</strong></div>
+              <div style={{ color: '#0066cc' }}>{formatearMoneda(indicadores.PV)}</div>
+              
+              <div><strong>EV (Valor Ganado):</strong></div>
+              <div style={{ color: '#00cc00' }}>{formatearMoneda(indicadores.EV)}</div>
+              
+              <div><strong>BAC (Presupuesto Total):</strong></div>
+              <div style={{ color: '#000000' }}>{formatearMoneda(indicadores.BAC)}</div>
+            </div>
+          </div>
+
+          {/* Variaciones */}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Variaciones</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div><strong>CV (Variación Costo):</strong></div>
+              <div style={{ color: indicadores.CV >= 0 ? '#00cc00' : '#ff0000' }}>
+                {formatearMoneda(indicadores.CV)} ({formatearPorcentaje((indicadores.CV / indicadores.AC) * 100)})
+              </div>
+              
+              <div><strong>SV (Variación Cronograma):</strong></div>
+              <div style={{ color: indicadores.SV >= 0 ? '#00cc00' : '#ff0000' }}>
+                {formatearMoneda(indicadores.SV)} ({formatearPorcentaje((indicadores.SV / indicadores.PV) * 100)})
+              </div>
+              
+              <div><strong>VAC (Variación Final):</strong></div>
+              <div style={{ color: indicadores.VAC >= 0 ? '#00cc00' : '#ff0000' }}>
+                {formatearMoneda(indicadores.VAC)} ({formatearPorcentaje((indicadores.VAC / indicadores.BAC) * 100)})
+              </div>
+            </div>
+          </div>
+
+          {/* Índices de Rendimiento */}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Índices de Rendimiento</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div><strong>CPI (Índice Costo):</strong></div>
+              <div style={{ color: indicadores.CPI >= 1 ? '#00cc00' : '#ff0000' }}>
+                {formatearIndice(indicadores.CPI)}
+              </div>
+              
+              <div><strong>SPI (Índice Cronograma):</strong></div>
+              <div style={{ color: indicadores.SPI >= 1 ? '#00cc00' : '#ff0000' }}>
+                {formatearIndice(indicadores.SPI)}
+              </div>
+            </div>
+          </div>
+
+          {/* Estimaciones */}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Estimaciones</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div><strong>EAC (Costo Estimado Total):</strong></div>
+              <div style={{ color: '#ff6600' }}>{formatearMoneda(indicadores.EAC)}</div>
+              
+              <div><strong>ETC (Costo para Completar):</strong></div>
+              <div style={{ color: '#ff6600' }}>{formatearMoneda(indicadores.ETC)}</div>
+            </div>
+          </div>
+
+          {/* Estados */}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Estados del Proyecto</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div><strong>Estado Costo:</strong></div>
+              <div style={{ color: getColorEstado(indicadores.estadoCosto) }}>
+                {indicadores.estadoCosto}
+              </div>
+              
+              <div><strong>Estado Cronograma:</strong></div>
+              <div style={{ color: getColorEstado(indicadores.estadoCronograma) }}>
+                {indicadores.estadoCronograma}
+              </div>
+              
+              <div><strong>Estado General:</strong></div>
+              <div style={{ color: getColorEstado(indicadores.estadoRendimiento) }}>
+                {indicadores.estadoRendimiento}
+              </div>
+            </div>
+          </div>
+
+          {/* Porcentajes de Avance */}
+          <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ marginBottom: '15px', color: '#495057' }}>Porcentajes de Avance</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div><strong>% Completado (EV):</strong></div>
+              <div style={{ color: '#00cc00' }}>{formatearPorcentaje(indicadores.porcentajeCompletado)}</div>
+              
+              <div><strong>% Planeado (PV):</strong></div>
+              <div style={{ color: '#0066cc' }}>{formatearPorcentaje(indicadores.porcentajePlaneado)}</div>
+              
+              <div><strong>% Real (AC):</strong></div>
+              <div style={{ color: '#ff0000' }}>{formatearPorcentaje(indicadores.porcentajeReal)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // --- COMPONENTE POPUP DE ANÁLISIS DESCRIPTIVO ---
+  const PopupAnalisisDescriptivo = ({ indicadores, fechaSeguimiento, onClose }) => {
+    const formatearMoneda = (valor) => `$${(valor / 1000000).toFixed(2)}M`;
+    const formatearPorcentaje = (valor) => `${valor.toFixed(1)}%`;
+    const formatearIndice = (valor) => valor.toFixed(3);
+
+    const generarAnalisisDescriptivo = () => {
+      const { AC, PV, EV, CV, SV, CPI, SPI, EAC, ETC, VAC, estadoCosto, estadoCronograma, estadoRendimiento } = indicadores;
+      
+      let analisis = {
+        resumen: '',
+        costo: '',
+        cronograma: '',
+        rendimiento: '',
+        recomendaciones: []
+      };
+
+      // Análisis de Costo
+      if (CV > 0) {
+        analisis.costo = `El proyecto está por debajo del presupuesto. El costo real (${formatearMoneda(AC)}) es menor que el valor ganado (${formatearMoneda(EV)}), lo que indica que se está gastando menos de lo presupuestado para el trabajo completado.`;
+      } else if (CV < 0) {
+        analisis.costo = `El proyecto está por encima del presupuesto. El costo real (${formatearMoneda(AC)}) es mayor que el valor ganado (${formatearMoneda(EV)}), lo que indica que se está gastando más de lo presupuestado para el trabajo completado.`;
+      } else {
+        analisis.costo = `El proyecto está en el presupuesto. El costo real (${formatearMoneda(AC)}) es igual al valor ganado (${formatearMoneda(EV)}).`;
+      }
+
+      // Análisis de Cronograma
+      if (SV > 0) {
+        analisis.cronograma = `El proyecto está adelantado en el cronograma. El valor ganado (${formatearMoneda(EV)}) es mayor que el valor planeado (${formatearMoneda(PV)}), lo que indica que se ha completado más trabajo del programado.`;
+      } else if (SV < 0) {
+        analisis.cronograma = `El proyecto está retrasado en el cronograma. El valor ganado (${formatearMoneda(EV)}) es menor que el valor planeado (${formatearMoneda(PV)}), lo que indica que se ha completado menos trabajo del programado.`;
+      } else {
+        analisis.cronograma = `El proyecto está en el cronograma. El valor ganado (${formatearMoneda(EV)}) es igual al valor planeado (${formatearMoneda(PV)}).`;
+      }
+
+      // Análisis de Rendimiento
+      if (CPI > 1 && SPI > 1) {
+        analisis.rendimiento = `Excelente rendimiento del proyecto. Tanto el índice de rendimiento de costo (${formatearIndice(CPI)}) como el de cronograma (${formatearIndice(SPI)}) son superiores a 1, indicando eficiencia en costos y adelanto en el cronograma.`;
+      } else if (CPI > 1 && SPI < 1) {
+        analisis.rendimiento = `Buen rendimiento en costos pero retraso en cronograma. El índice de rendimiento de costo (${formatearIndice(CPI)}) es favorable, pero el de cronograma (${formatearIndice(SPI)}) indica retrasos.`;
+      } else if (CPI < 1 && SPI > 1) {
+        analisis.rendimiento = `Adelanto en cronograma pero sobrecostos. El índice de rendimiento de cronograma (${formatearIndice(SPI)}) es favorable, pero el de costo (${formatearIndice(CPI)}) indica sobrecostos.`;
+      } else {
+        analisis.rendimiento = `Rendimiento desfavorable. Tanto el índice de rendimiento de costo (${formatearIndice(CPI)}) como el de cronograma (${formatearIndice(SPI)}) son inferiores a 1, indicando sobrecostos y retrasos.`;
+      }
+
+      // Resumen general
+      analisis.resumen = `A la fecha ${fechaSeguimiento}, el proyecto presenta un estado ${estadoRendimiento.toLowerCase()}. El costo está ${estadoCosto.toLowerCase()} y el cronograma está ${estadoCronograma.toLowerCase()}.`;
+
+      // Recomendaciones
+      if (CV < 0) {
+        analisis.recomendaciones.push("Revisar y optimizar los procesos de ejecución para reducir costos.");
+        analisis.recomendaciones.push("Analizar las causas raíz de los sobrecostos e implementar medidas correctivas.");
+      }
+      if (SV < 0) {
+        analisis.recomendaciones.push("Acelerar las actividades críticas del proyecto para recuperar el cronograma.");
+        analisis.recomendaciones.push("Evaluar la posibilidad de agregar recursos adicionales en actividades clave.");
+      }
+      if (CPI < 1) {
+        analisis.recomendaciones.push("Implementar controles más estrictos en la gestión de costos.");
+        analisis.recomendaciones.push("Negociar mejores precios con proveedores y contratistas.");
+      }
+      if (SPI < 1) {
+        analisis.recomendaciones.push("Optimizar la secuencia de actividades para mejorar la eficiencia.");
+        analisis.recomendaciones.push("Considerar la paralelización de actividades no críticas.");
+      }
+
+      return analisis;
+    };
+
+    const analisis = generarAnalisisDescriptivo();
+
+    return createPortal(
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 99999,
+        padding: '20px',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '20px',
+          width: '85%',
+          maxWidth: '500px',
+          maxHeight: '75vh',
+          overflow: 'auto',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+          position: 'relative',
+          border: '1px solid #e0e0e0'
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '25px',
+            paddingBottom: '15px',
+            borderBottom: '2px solid #e9ecef'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                color: '#0a3265', 
+                fontSize: '24px',
+                fontWeight: '700'
+              }}>
+                📊 Análisis Descriptivo EVM
+              </h2>
+              <p style={{ 
+                margin: '5px 0 0 0', 
+                color: '#6c757d', 
+                fontSize: '14px' 
+              }}>
+                Fecha de seguimiento: {fechaSeguimiento}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#6c757d',
+                padding: '5px',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+              onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Resumen Ejecutivo */}
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            padding: '20px',
+            borderRadius: '8px',
+            marginBottom: '25px',
+            border: '1px solid #dee2e6'
+          }}>
+            <h3 style={{ 
+              margin: '0 0 15px 0', 
+              color: '#0a3265',
+              fontSize: '18px',
+              fontWeight: '600'
+            }}>
+              📋 Resumen Ejecutivo
+            </h3>
+            <p style={{ 
+              margin: 0, 
+              fontSize: '16px', 
+              lineHeight: '1.6',
+              color: '#495057'
+            }}>
+              {analisis.resumen}
+            </p>
+          </div>
+
+          {/* Análisis Detallado */}
+          <div style={{ marginBottom: '25px' }}>
+            <h3 style={{ 
+              margin: '0 0 15px 0', 
+              color: '#0a3265',
+              fontSize: '18px',
+              fontWeight: '600'
+            }}>
+              🔍 Análisis Detallado
+            </h3>
+            
+            {/* Análisis de Costo */}
+            <div style={{
+              backgroundColor: 'white',
+              padding: '15px',
+              borderRadius: '8px',
+              marginBottom: '15px',
+              border: '1px solid #dee2e6'
+            }}>
+              <h4 style={{ 
+                margin: '0 0 10px 0', 
+                color: '#495057',
+                fontSize: '16px',
+                fontWeight: '600'
+              }}>
+                💰 Análisis de Costo
+              </h4>
+              <p style={{ 
+                margin: 0, 
+                fontSize: '14px', 
+                lineHeight: '1.5',
+                color: '#495057'
+              }}>
+                {analisis.costo}
+              </p>
+            </div>
+
+            {/* Análisis de Cronograma */}
+            <div style={{
+              backgroundColor: 'white',
+              padding: '15px',
+              borderRadius: '8px',
+              marginBottom: '15px',
+              border: '1px solid #dee2e6'
+            }}>
+              <h4 style={{ 
+                margin: '0 0 10px 0', 
+                color: '#495057',
+                fontSize: '16px',
+                fontWeight: '600'
+              }}>
+                ⏰ Análisis de Cronograma
+              </h4>
+              <p style={{ 
+                margin: 0, 
+                fontSize: '14px', 
+                lineHeight: '1.5',
+                color: '#495057'
+              }}>
+                {analisis.cronograma}
+              </p>
+            </div>
+
+            {/* Análisis de Rendimiento */}
+            <div style={{
+              backgroundColor: 'white',
+              padding: '15px',
+              borderRadius: '8px',
+              marginBottom: '15px',
+              border: '1px solid #dee2e6'
+            }}>
+              <h4 style={{ 
+                margin: '0 0 10px 0', 
+                color: '#495057',
+                fontSize: '16px',
+                fontWeight: '600'
+              }}>
+                📈 Análisis de Rendimiento
+              </h4>
+              <p style={{ 
+                margin: 0, 
+                fontSize: '14px', 
+                lineHeight: '1.5',
+                color: '#495057'
+              }}>
+                {analisis.rendimiento}
+              </p>
+            </div>
+          </div>
+
+          {/* Recomendaciones */}
+          {analisis.recomendaciones.length > 0 && (
+            <div style={{
+              backgroundColor: '#fff3cd',
+              padding: '20px',
+              borderRadius: '8px',
+              border: '1px solid #ffeaa7'
+            }}>
+              <h3 style={{ 
+                margin: '0 0 15px 0', 
+                color: '#856404',
+                fontSize: '18px',
+                fontWeight: '600'
+              }}>
+                💡 Recomendaciones
+              </h3>
+              <ul style={{ 
+                margin: 0, 
+                paddingLeft: '20px',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                color: '#856404'
+              }}>
+                {analisis.recomendaciones.map((recomendacion, index) => (
+                  <li key={index} style={{ marginBottom: '8px' }}>
+                    {recomendacion}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Botón de Cerrar */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            marginTop: '25px',
+            paddingTop: '20px',
+            borderTop: '1px solid #e9ecef'
+          }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
+              Cerrar Análisis
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div style={{
       position: 'absolute',
@@ -1560,6 +2490,7 @@ const Vectores = ({ proyectoId }) => {
         seleccion === 'reporte1' ? (
           <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
             <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Curva S - Evolución de Parciales</h4>
+
             {/* Filtros de fecha y barredor */}
             <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end', marginBottom: 12 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1614,17 +2545,226 @@ const Vectores = ({ proyectoId }) => {
                 <span role="img" aria-label="barrer">🧹</span>
               </button>
             </div>
+
+            {/* Controles de Análisis EVM */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'row', 
+              gap: 12, 
+              alignItems: 'flex-end', 
+              marginBottom: 12,
+              padding: '12px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '8px',
+              border: '1px solid #dee2e6'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Fecha de Seguimiento EVM</label>
+                <input
+                  type="date"
+                  value={fechaSeguimiento}
+                  onChange={e => setFechaSeguimiento(e.target.value)}
+                  style={{
+                    border: '2px solid #ff6600',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    fontSize: 10,
+                    color: '#222',
+                    fontWeight: 500,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {fechaSeguimiento && (
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  padding: '4px 8px',
+                  backgroundColor: '#e9ecef',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  color: '#495057'
+                }}>
+                  <span>📅</span>
+                  <span>Fecha: {fechaSeguimiento}</span>
+                </div>
+              )}
+              <button
+                onClick={() => { setFechaSeguimiento(''); setIndicadoresEVM(null); }}
+                title="Limpiar fecha de seguimiento"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#dc3545',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <span role="img" aria-label="limpiar">🗑️</span>
+              </button>
+              
+              {fechaSeguimiento && indicadoresEVM && (
+                <button
+                  onClick={() => setMostrarPopupAnalisis(true)}
+                  title="Ver análisis descriptivo detallado"
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }}
+                >
+                  <span role="img" aria-label="analisis">📊</span>
+                  Análisis Detallado
+                </button>
+              )}
+            </div>
+            {/* Indicador de estado del zoom */}
+
+            {/* Selector de modo de gráfico */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '10px', 
+              marginBottom: '15px',
+              padding: '10px',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '6px',
+              border: '1px solid #dee2e6'
+            }}>
+              <button
+                onClick={() => setModoGrafico('normal')}
+                style={{
+                  background: modoGrafico === 'normal' ? '#0a3265' : '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s'
+                }}
+              >
+                📊 Gráfico Normal
+              </button>
+              <button
+                onClick={() => setModoGrafico('evm')}
+                style={{
+                  background: modoGrafico === 'evm' ? '#ff6600' : '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s'
+                }}
+              >
+                📈 Análisis EVM
+              </button>
+            </div>
+
             {/* Gráfico usando SOLO los vectores validados */}
             <div ref={graficoRef}>
-              <CurvaSChart
-                data={prepararDatosCurvaS(
-                  tablaRealParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
-                  tablaV0Parcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
-                  tablaNpcParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
-                  tablaApiParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta))
-                )}
-              />
+              {modoGrafico === 'normal' ? (
+                <CurvaSChart
+                  data={prepararDatosCurvaS(
+                    tablaRealParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
+                    tablaV0Parcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
+                    tablaNpcParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
+                    tablaApiParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta))
+                  )}
+                  left={left}
+                  right={right}
+                  refAreaLeft={refAreaLeft}
+                  refAreaRight={refAreaRight}
+                  top={top}
+                  bottom={bottom}
+                  animation={animation}
+                  isPanning={isPanning}
+                  panStart={panStart}
+                  setLeft={setLeft}
+                  setRight={setRight}
+                  setRefAreaLeft={setRefAreaLeft}
+                  setRefAreaRight={setRefAreaRight}
+                  setTop={setTop}
+                  setBottom={setBottom}
+                  setAnimation={setAnimation}
+                  setIsPanning={setIsPanning}
+                  setPanStart={setPanStart}
+                />
+              ) : (
+                fechaSeguimiento ? (
+                  <GraficoEVM
+                    data={prepararDatosCurvaS(
+                      tablaRealParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
+                      tablaV0Parcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
+                      tablaNpcParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta)),
+                      tablaApiParcial.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta))
+                    )}
+                    fechaSeguimiento={fechaSeguimiento}
+                    indicadores={indicadoresEVM}
+                  />
+                ) : (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '400px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '2px dashed #dee2e6',
+                    color: '#6c757d',
+                    fontSize: '16px'
+                  }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📅</div>
+                    <div style={{ marginBottom: '8px', fontWeight: '600' }}>Selecciona una fecha de seguimiento</div>
+                    <div style={{ fontSize: '14px', textAlign: 'center' }}>
+                      Para ver el análisis EVM, selecciona una fecha de seguimiento<br />
+                      en el control superior
+                    </div>
+                  </div>
+                )
+              )}
             </div>
+
+            {/* Panel de Indicadores EVM */}
+            {modoGrafico === 'evm' && fechaSeguimiento && indicadoresEVM && (
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '20px', 
+                backgroundColor: '#f8f9fa', 
+                borderRadius: '8px',
+                border: '1px solid #dee2e6'
+              }}>
+                <PanelIndicadoresEVM indicadores={indicadoresEVM} />
+              </div>
+            )}
             {/* Tarjetas KPI usando SOLO los vectores validados y sumando correctamente los detalles factoriales */}
             <div style={{
               width: '100%',
@@ -2955,6 +4095,15 @@ const Vectores = ({ proyectoId }) => {
       }}>
         {/* Contenido de la tarjeta */}
       </div>
+
+      {/* Popup de Análisis Descriptivo EVM */}
+      {mostrarPopupAnalisis && indicadoresEVM && fechaSeguimiento && (
+        <PopupAnalisisDescriptivo
+          indicadores={indicadoresEVM}
+          fechaSeguimiento={fechaSeguimiento}
+          onClose={() => setMostrarPopupAnalisis(false)}
+        />
+      )}
     </div>
   );
 };
