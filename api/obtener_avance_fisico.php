@@ -27,11 +27,10 @@ try {
     }
     
     // Consulta SQL para obtener avance físico ACUMULADO hasta la fecha
-    $sql = "SELECT cf.vector, SUM(cf.parcial_periodo) as acumulado_periodo 
+    $sql = "SELECT cf.vector, cf.porcentaje_periodo as acumulado_periodo 
             FROM cumplimiento_fisico cf 
-            WHERE cf.periodo <= ? 
+            WHERE cf.periodo = ? 
             AND cf.vector IN ('REAL', 'API') 
-            GROUP BY cf.vector 
             ORDER BY cf.vector";
     
     $stmt = $conn->prepare($sql);

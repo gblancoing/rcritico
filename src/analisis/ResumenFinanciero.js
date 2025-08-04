@@ -20,6 +20,7 @@ import { API_BASE } from '../config';
   const [proyectoInfo, setProyectoInfo] = useState(null);
   const [filtrosActualizados, setFiltrosActualizados] = useState(0);
       const [popupActivo, setPopupActivo] = useState(null); // Para controlar popups de información KPI
+  const [cumplimientoFisico, setCumplimientoFisico] = useState({}); // Para almacenar datos de cumplimiento físico
 
 
   // Objeto de filtros para el análisis dinámico
@@ -135,6 +136,32 @@ import { API_BASE } from '../config';
     };
 
     cargarDatos();
+  }, [proyectoId]);
+
+  // Función para cargar datos de cumplimiento físico
+  const cargarCumplimientoFisico = async () => {
+    if (!proyectoId) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/obtener_cumplimiento_fisico_mensual.php?proyecto_id=${proyectoId}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setCumplimientoFisico(data.cumplimiento_fisico_mensual);
+      }
+    } catch (err) {
+      console.error('Error cargando datos de cumplimiento físico:', err);
+    }
+  };
+
+  // Cargar datos de cumplimiento físico cuando cambie el proyecto
+  useEffect(() => {
+    cargarCumplimientoFisico();
   }, [proyectoId]);
 
   // Efecto para recalcular KPIs cuando cambien los filtros
@@ -1329,7 +1356,7 @@ import { API_BASE } from '../config';
                           border: intensidad > 80 ? '2px solid #004d4d' : '1px solid rgba(32, 178, 170, 0.2)',
                           color: colorTexto
                         }}
-                        data-tooltip={`${mes}: ${formatearMonedaUSD(monto)} | Intensidad: ${intensidad.toFixed(1)}% del máximo mensual${datosVisualizacion.esAcumulado ? ' | Datos acumulados' : ' | Datos parciales'}`}
+                        data-tooltip={`${mes}: ${formatearMonedaUSD(monto)}${cumplimientoFisico[mes] ? ` | Avance físico REAL Parcial: ${cumplimientoFisico[mes].parcial.toFixed(2)}% | Avance físico REAL Acumulado: ${cumplimientoFisico[mes].acumulado.toFixed(2)}%` : ''}`}
                       >
                         <div className="heatmap-label">{mes}</div>
                         <div className="heatmap-valor">{formatearMonedaUSD(monto)}</div>

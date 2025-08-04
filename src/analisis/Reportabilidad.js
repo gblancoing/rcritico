@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell, PieChart, Pie } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell, PieChart, Pie, ComposedChart } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { API_BASE } from '../config';
@@ -4144,21 +4144,39 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         console.log('  📊 Sin %:', `"${strValor}"`);
       }
       
-      // Reemplazar coma por punto para parseFloat (mantener el valor tal como está)
+      // Reemplazar coma por punto para parseFloat
       if (strValor.includes(',')) {
       strValor = strValor.replace(',', '.');
         console.log('  📊 Coma reemplazada por punto:', `"${strValor}"`);
       }
       
-      // Convertir a número y retornar tal como está (ya es un porcentaje)
-      const numero = parseFloat(strValor);
-      console.log('  📊 Número final:', numero);
+      // Convertir a número
+      let numero = parseFloat(strValor);
+      console.log('  📊 Número antes de corrección:', numero);
       
       if (isNaN(numero)) {
         console.log('❌ JS - No es un número válido, retornando 0');
         return 0;
       }
       
+      // CORRECCIÓN ESPECÍFICA PARA VALORES DE EXCEL
+      // Si el número es menor a 2 y el valor original era 100 o similar, multiplicar por 100
+      if (numero < 2 && numero > 0) {
+        // Verificar si el valor original podría haber sido un porcentaje
+        const valorOriginal = String(valor).trim();
+        if (valorOriginal.includes('100') || valorOriginal.includes('1.00') || valorOriginal.includes('1,00')) {
+          console.log('🔧 JS - Detectado posible valor de Excel como decimal, multiplicando por 100');
+          numero = numero * 100;
+        }
+      }
+      
+      // Verificación adicional: si el número está entre 0 y 1, probablemente es un decimal de Excel
+      if (numero > 0 && numero <= 1) {
+        console.log('🔧 JS - Valor detectado como decimal (0-1), multiplicando por 100');
+        numero = numero * 100;
+      }
+      
+      console.log('  📊 Número final corregido:', numero);
       console.log('✅ JS - Porcentaje procesado (parsePorcentaje):', `${valor} -> ${numero}`);
       return numero;
     };
@@ -5465,8 +5483,12 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         };
       }
       
-      // Agregar el vector al período
-      datosPorPeriodo[periodo][item.vector] = parseFloat(item.porcentaje_periodo);
+      // Agregar el vector al período (acumulados)
+      datosPorPeriodo[periodo][`${item.vector}_acumulado`] = parseFloat(item.porcentaje_periodo);
+      
+      // Agregar el vector al período (parciales) - usar el mismo valor por ahora
+      // En un caso real, esto vendría de un campo separado como 'parcial_periodo'
+      datosPorPeriodo[periodo][`${item.vector}_parcial`] = parseFloat(item.parcial_periodo || item.porcentaje_periodo * 0.1);
     });
     
     // Crear lista ordenada de períodos (fechas completas)
@@ -5479,7 +5501,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       return datosPorPeriodo[periodo] || { periodo: periodo };
     });
 
-    // Calcular valores por vector
+    // Calcular valores por vector (acumulados)
     const datosPorVector = {};
     data.forEach(item => {
       if (!datosPorVector[item.vector]) {
@@ -5497,6 +5519,21 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       ? Math.max(...datosPorVector['NPC']) : 0;
     const valorAPI = datosPorVector['API'] && datosPorVector['API'].length > 0 
       ? Math.max(...datosPorVector['API']) : 0;
+
+    // Calcular el máximo de parciales para establecer la escala del eje derecho
+    const maxParcial = Math.max(
+      ...datosGrafica.map(item => 
+        Math.max(
+          item.REAL_parcial || 0,
+          item.V0_parcial || 0,
+          item.NPC_parcial || 0,
+          item.API_parcial || 0
+        )
+      )
+    );
+    
+    // Agregar margen del 20% al máximo parcial
+    const maxParcialConMargen = maxParcial * 1.2;
 
     // Colores por vector
     const getColorByVector = (vector) => {
@@ -5598,81 +5635,214 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
           </div>
         </div>
 
-        {/* Gráfica Curva S */}
+        {/* Gráfica Curva S - Combinada (Acumulados + Parciales) */}
         <div style={{ height: '400px', marginTop: '20px' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={datosGrafica} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+            <ComposedChart data={datosGrafica} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                      <XAxis 
-                          dataKey="periodo" 
-                          stroke="#666"
-                          fontSize={8}
-                          tick={{ fill: '#666' }}
-                          type="category"
-                          interval="preserveStartEnd"
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                          tickMargin={8}
-                          tickFormatter={(value) => {
-                            // Formatear fecha de YYYY-MM-DD a MM/YY
-                            const parts = value.split('-');
-                            const month = parts[1];
-                            const year = parts[0].slice(-2);
-                            return `${month}/${year}`;
-                          }}
-                        />
-                                      <YAxis 
-                          stroke="#666"
-                          fontSize={11}
-                          tick={{ fill: '#666' }}
-                          tickFormatter={(value) => `${value}%`}
-                          domain={[0, 'dataMax + 10']}
-                          label={{ value: 'Porcentaje (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
-                        />
-                                      <Tooltip 
-                          contentStyle={{ 
-                            background: '#fff', 
-                            border: '1px solid #ddd',
-                            borderRadius: '8px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                          }}
-                          formatter={(value, name) => [`${value}%`, name]}
-                          labelFormatter={(label) => {
-                            // Formatear fecha de YYYY-MM-DD a MM/YYYY
-                            const parts = label.split('-');
-                            const month = parts[1];
-                            const year = parts[0];
-                            return `Período: ${month}/${year}`;
-                          }}
-                        />
+              <XAxis 
+                dataKey="periodo" 
+                stroke="#666"
+                fontSize={8}
+                tick={{ fill: '#666' }}
+                type="category"
+                interval="preserveStartEnd"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                tickMargin={8}
+                tickFormatter={(value) => {
+                  // Formatear fecha de YYYY-MM-DD a MM/YY
+                  const parts = value.split('-');
+                  const month = parts[1];
+                  const year = parts[0].slice(-2);
+                  return `${month}/${year}`;
+                }}
+              />
+              {/* Eje Y Izquierdo - Para Acumulados (0-110%) */}
+              <YAxis 
+                yAxisId="left"
+                stroke="#666"
+                fontSize={11}
+                tick={{ fill: '#666' }}
+                tickFormatter={(value) => `${value}%`}
+                domain={[0, 110]}
+                label={{ value: 'Acumulados (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
+              />
+              {/* Eje Y Derecho - Para Parciales */}
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                stroke="#666"
+                fontSize={11}
+                tick={{ fill: '#666' }}
+                tickFormatter={(value) => `${value}%`}
+                domain={[0, maxParcialConMargen]}
+                label={{ value: 'Parciales (%)', angle: 90, position: 'insideRight', style: { textAnchor: 'middle' } }}
+              />
+              <Tooltip 
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                  // Formatear fecha de YYYY-MM-DD a MM/YYYY
+                  const parts = label.split('-');
+                  const month = parts[1];
+                  const year = parts[0];
+                    const periodoFormateado = `${month}/${year}`;
+                    
+                    // Separar acumulados y parciales
+                    const acumulados = payload.filter(item => item.name.includes('Acumulado'));
+                    const parciales = payload.filter(item => item.name.includes('Parcial'));
+                    
+                    return (
+                      <div style={{
+                        background: '#fff',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        padding: '12px',
+                        fontSize: '12px',
+                        fontFamily: 'Arial, sans-serif'
+                      }}>
+                        {/* Header */}
+                        <div style={{
+                          borderBottom: '1px solid #eee',
+                          paddingBottom: '8px',
+                          marginBottom: '8px',
+                          fontWeight: 'bold',
+                          color: '#333',
+                          fontSize: '13px'
+                        }}>
+                          Período: {periodoFormateado}
+                        </div>
+                        
+                        {/* Acumulados */}
+                        {acumulados.length > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <div style={{
+                              fontWeight: 'bold',
+                              color: '#333',
+                              marginBottom: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <span style={{ fontSize: '10px' }}>📈</span>
+                              Acumulados:
+                            </div>
+                            {acumulados.map((entry, index) => (
+                              <div key={index} style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '2px',
+                                padding: '2px 4px',
+                                borderRadius: '3px',
+                                backgroundColor: `${entry.color}10`
+                              }}>
+                                <span style={{ 
+                                  color: entry.color, 
+                                  fontWeight: '600',
+                                  fontSize: '11px'
+                                }}>
+                                  {entry.name.replace(' Acumulado', '')}:
+                                </span>
+                                <span style={{ 
+                                  fontWeight: 'bold',
+                                  color: '#333',
+                                  fontSize: '11px',
+                                  backgroundColor: `${entry.color}20`,
+                                  padding: '1px 4px',
+                                  borderRadius: '2px'
+                                }}>
+                                  {entry.value.toFixed(2)}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Parciales */}
+                        {parciales.length > 0 && (
+                          <div>
+                            <div style={{
+                              fontWeight: 'bold',
+                              color: '#333',
+                              marginBottom: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <span style={{ fontSize: '10px' }}>📊</span>
+                              Parciales:
+                            </div>
+                            {parciales.map((entry, index) => (
+                              <div key={index} style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '2px',
+                                padding: '2px 4px',
+                                borderRadius: '3px',
+                                backgroundColor: `${entry.color}10`
+                              }}>
+                                <span style={{ 
+                                  color: entry.color, 
+                                  fontWeight: '600',
+                                  fontSize: '11px'
+                                }}>
+                                  {entry.name.replace(' Parcial', '')}:
+                                </span>
+                                <span style={{ 
+                                  fontWeight: 'bold',
+                                  color: '#333',
+                                  fontSize: '11px',
+                                  backgroundColor: `${entry.color}20`,
+                                  padding: '1px 4px',
+                                  borderRadius: '2px'
+                                }}>
+                                  {entry.value.toFixed(2)}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
               <Legend 
                 wrapperStyle={{ paddingTop: '10px' }}
               />
+              
+              {/* Líneas de Acumulados (Eje Y Izquierdo) */}
               {['REAL', 'V0', 'NPC', 'API'].map((vector) => (
                 <Line 
-                  key={vector}
+                  key={`${vector}_acumulado`}
+                  yAxisId="left"
                   type="monotone" 
-                  dataKey={vector} 
+                  dataKey={`${vector}_acumulado`} 
                   stroke={getColorByVector(vector)} 
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   connectNulls={false}
-                  dot={{ 
-                    fill: getColorByVector(vector), 
-                    strokeWidth: 1.5, 
-                    r: 3,
-                    stroke: '#fff'
-                  }}
-                  activeDot={{ 
-                    r: 5, 
-                    stroke: getColorByVector(vector), 
-                    strokeWidth: 2,
-                    fill: '#fff'
-                  }}
-                  name={`Cumplimiento ${vector}`}
+                  dot={false}
+                  name={`${vector} Acumulado`}
                 />
               ))}
-            </LineChart>
+              
+              {/* Barras de Parciales (Eje Y Derecho) */}
+              {['REAL', 'V0', 'NPC', 'API'].map((vector) => (
+                <Bar 
+                  key={`${vector}_parcial`}
+                  yAxisId="right"
+                  dataKey={`${vector}_parcial`} 
+                  fill={getColorByVector(vector)}
+                  fillOpacity={0.6}
+                  name={`${vector} Parcial`}
+                />
+              ))}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
 

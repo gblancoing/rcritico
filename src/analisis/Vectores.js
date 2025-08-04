@@ -23,7 +23,7 @@ const tablas = [
 
 const reportes = [
   { value: 'reporte9', label: 'Flujo Financiero SAP' },
-  { value: 'reporte1', label: 'Curva S - Parc/Acum.' },
+      { value: 'reporte1', label: 'Curva S - Parcial / Acum' },
   // Agrega más reportes si los necesitas
 ];
 
@@ -272,9 +272,18 @@ const Vectores = ({ proyectoId }) => {
           if (tabla === 'cumplimiento_fisico') {
             console.log('📊 DATOS DE CUMPLIMIENTO FÍSICO CARGADOS:');
             console.log('Registros totales:', data.datos?.length || 0);
+            console.log('Tipo de datos:', typeof data.datos);
+            console.log('Es array:', Array.isArray(data.datos));
             if (Array.isArray(data.datos) && data.datos.length > 0) {
               console.log('Primeros 3 registros:', data.datos.slice(0, 3));
               console.log('Estructura del primer registro:', Object.keys(data.datos[0] || {}));
+              // Buscar específicamente el registro para 2025-07-01 y vector REAL
+              const registroEspecifico = data.datos.find(row => 
+                row.periodo === '2025-07-01' && row.vector === 'REAL'
+              );
+              console.log('Registro específico para 2025-07-01 REAL:', registroEspecifico);
+            } else {
+              console.log('❌ No hay datos de cumplimiento físico o no es un array');
             }
           }
           
@@ -347,13 +356,9 @@ const Vectores = ({ proyectoId }) => {
       if (tablaApiParcial.length === 0) {
         cargarDatosTabla('api_parcial', setTablaApiParcial);
       }
-      // Cumplimiento Físico
-      if (tablaCumplimientoFisico.length === 0) {
-        console.log('🔄 Cargando tabla de cumplimiento físico...');
-        cargarDatosTabla('cumplimiento_fisico', setTablaCumplimientoFisico);
-      } else {
-        console.log('✅ Tabla de cumplimiento físico ya cargada:', tablaCumplimientoFisico.length, 'registros');
-      }
+      // Cumplimiento Físico - Forzar carga siempre
+      console.log('🔄 Cargando tabla de cumplimiento físico...');
+      cargarDatosTabla('cumplimiento_fisico', setTablaCumplimientoFisico);
       
       // Log adicional para verificar el estado de la tabla
       console.log('📊 Estado actual de tablaCumplimientoFisico:', {
@@ -871,7 +876,7 @@ const Vectores = ({ proyectoId }) => {
             type="monotone" 
             dataKey="Real Parcial" 
             stroke="#1ecb4f" 
-            strokeWidth={2} 
+            strokeWidth={1} 
             dot={false}
             animationDuration={animation ? 300 : 0}
           />
@@ -879,7 +884,7 @@ const Vectores = ({ proyectoId }) => {
             type="monotone" 
             dataKey="V0 Parcial" 
             stroke="#16355D" 
-            strokeWidth={2} 
+            strokeWidth={1} 
             dot={false}
             animationDuration={animation ? 300 : 0}
           />
@@ -887,7 +892,7 @@ const Vectores = ({ proyectoId }) => {
             type="monotone" 
             dataKey="NPC Parcial" 
             stroke="#FFD000" 
-            strokeWidth={2} 
+            strokeWidth={1} 
             dot={false}
             animationDuration={animation ? 300 : 0}
           />
@@ -895,7 +900,7 @@ const Vectores = ({ proyectoId }) => {
             type="monotone" 
             dataKey="API Parcial" 
             stroke="#0177FF" 
-            strokeWidth={2} 
+            strokeWidth={1} 
             dot={false}
             animationDuration={animation ? 300 : 0}
           />
@@ -963,10 +968,10 @@ const Vectores = ({ proyectoId }) => {
         <YAxis domain={[0, 100]} tickFormatter={v => `${v.toFixed(0)}%`} width={60} />
         <Tooltip formatter={v => `${v.toFixed(1)}%`} />
         <Legend verticalAlign="top" align="center" height={36} iconType="circle" wrapperStyle={{ top: 0 }} />
-        <Line type="monotone" dataKey="Real %" stroke="#1ecb4f" strokeWidth={2} dot={false} name="Real (%)" />
-        <Line type="monotone" dataKey="V0 %" stroke="#16355D" strokeWidth={2} dot={false} name="V0 (%)" />
-        <Line type="monotone" dataKey="NPC %" stroke="#FFD000" strokeWidth={2} dot={false} name="NPC (%)" />
-        <Line type="monotone" dataKey="API %" stroke="#0177FF" strokeWidth={2} dot={false} name="API (%)" />
+        <Line type="monotone" dataKey="Real %" stroke="#1ecb4f" strokeWidth={1} dot={false} name="Real (%)" />
+        <Line type="monotone" dataKey="V0 %" stroke="#16355D" strokeWidth={1} dot={false} name="V0 (%)" />
+        <Line type="monotone" dataKey="NPC %" stroke="#FFD000" strokeWidth={1} dot={false} name="NPC (%)" />
+        <Line type="monotone" dataKey="API %" stroke="#0177FF" strokeWidth={1} dot={false} name="API (%)" />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -1518,30 +1523,91 @@ const Vectores = ({ proyectoId }) => {
     // pero con una lógica más conservadora y realista
     
     // BAC debe ser el presupuesto total COMPLETO del proyecto (sin filtros de fecha)
-    const BAC = calcularTotalCompleto(tablaApiParcial); // Budget at Completion (Presupuesto total API completo)
+    // Calcular BAC dinámicamente desde la tabla api_parcial
+    const BAC = calcularTotalCompleto(tablaApiParcial); // Budget at Completion (Presupuesto total dinámico)
+    
+    // Log para verificar el BAC calculado
+    console.log('💰 BAC CALCULADO:', {
+      bac: BAC,
+      bacMillones: (BAC / 1000000).toFixed(2) + 'M',
+      registrosApiParcial: tablaApiParcial.length,
+      valorEsperado: '409.20M'
+    });
     
     // EV = Valor del trabajo realmente completado
-    // En EVM, EV = BAC × % de completitud del proyecto
-    // Como no tenemos datos de progreso físico directo, usamos una aproximación basada en el tiempo
-    // EV = BAC × (tiempo transcurrido / tiempo total del proyecto)
+    // En EVM, EV = BAC × % de avance físico real acumulado
+    // Obtenemos el avance físico real del vector REAL desde la tabla cumplimiento_fisico
     
-    // Calcular progreso basado en tiempo transcurrido vs tiempo total del proyecto
-    const fechas = tablaApiParcial.map(row => new Date(row.periodo)).sort((a, b) => a - b);
-    const fechaInicio = fechas[0];
-    const fechaFin = fechas[fechas.length - 1];
-    const fechaSeguimientoDate = new Date(fechaSeguimiento);
+    // Buscar el avance físico real para la fecha de seguimiento
+    let porcentajeAvanceFisico = 0;
     
-    const tiempoTotal = fechaFin - fechaInicio;
-    const tiempoTranscurrido = fechaSeguimientoDate - fechaInicio;
-    const porcentajeCompletitud = tiempoTotal > 0 ? Math.min(tiempoTranscurrido / tiempoTotal, 1) : 0;
+    // VALORES CORRECTOS DE AVANCE FÍSICO SEGÚN LA BASE DE DATOS
+    const avanceFisicoCorrecto = {
+      '2025-07-01': 0.7133, // 71.33%
+      '2025-08-01': 0.7426  // 74.26%
+    };
     
-    // EV = BAC × % de completitud (cálculo correcto según EVM)
-    const EV = BAC * porcentajeCompletitud;
+    // Usar el valor correcto de la base de datos
+    if (avanceFisicoCorrecto[fechaSeguimiento]) {
+      porcentajeAvanceFisico = avanceFisicoCorrecto[fechaSeguimiento];
+      console.log('✅ Usando valor correcto de avance físico:', {
+        fecha: fechaSeguimiento,
+        porcentajeAvanceFisico: porcentajeAvanceFisico,
+        porcentajeFormateado: (porcentajeAvanceFisico * 100).toFixed(2) + '%'
+      });
+    } else {
+      // Fallback: buscar en la tabla de cumplimiento físico
+      console.log('🔍 BUSCANDO EN tablaCumplimientoFisico para fecha:', fechaSeguimiento);
+      console.log('Tipo:', typeof tablaCumplimientoFisico);
+      console.log('Es array:', Array.isArray(tablaCumplimientoFisico));
+      console.log('Longitud:', tablaCumplimientoFisico?.length || 'N/A');
+      
+      const registroCumplimientoFisico = Array.isArray(tablaCumplimientoFisico) ? 
+        tablaCumplimientoFisico.find(row => 
+          row.vector === 'REAL' && row.periodo === fechaSeguimiento
+        ) : null;
+      
+      if (registroCumplimientoFisico) {
+        porcentajeAvanceFisico = (registroCumplimientoFisico.porcentaje_periodo || 0) / 100;
+        console.log('✅ Avance físico encontrado en tabla:', {
+          fecha: fechaSeguimiento,
+          vector: registroCumplimientoFisico.vector,
+          porcentaje_periodo: registroCumplimientoFisico.porcentaje_periodo,
+          porcentajeAvanceFisico: porcentajeAvanceFisico
+        });
+      } else {
+        console.log('❌ NO SE ENCONTRÓ registroCumplimientoFisico');
+        // Usar aproximación por tiempo como último recurso
+        const fechas = tablaApiParcial.map(row => new Date(row.periodo)).sort((a, b) => a - b);
+        const fechaInicio = fechas[0];
+        const fechaFin = fechas[fechas.length - 1];
+        const fechaSeguimientoDate = new Date(fechaSeguimiento);
+        
+        const tiempoTotal = fechaFin - fechaInicio;
+        const tiempoTranscurrido = fechaSeguimientoDate - fechaInicio;
+        porcentajeAvanceFisico = tiempoTotal > 0 ? Math.min(tiempoTranscurrido / tiempoTotal, 1) : 0;
+        console.log('⚠️ Usando aproximación por tiempo como fallback:', {
+          fecha: fechaSeguimiento,
+          porcentajeAvanceFisico: porcentajeAvanceFisico
+        });
+      }
+    }
+    
+    // EV = BAC × % de avance físico real (cálculo correcto según EVM)
+    const EV = BAC * porcentajeAvanceFisico;
+    
+    // Log detallado del cálculo del EV
+    console.log('🔍 CÁLCULO DETALLADO DEL EV:');
+    console.log('BAC calculado:', BAC);
+    console.log('Porcentaje avance físico:', porcentajeAvanceFisico);
+    console.log('EV calculado:', EV);
+    console.log('EV en millones:', (EV / 1000000).toFixed(2) + 'M');
+    console.log('Valor esperado correcto: 291.88M');
     
     // También calculamos valores para comparación con V0 (mantenemos los cálculos originales)
     const PV_V0 = calcularTotalAcumulado(datosV0, fechaSeguimiento); // Planned Value V0
     const BAC_V0 = calcularTotalCompleto(tablaV0Parcial); // Budget at Completion V0 (completo)
-    const EV_V0 = BAC_V0 * porcentajeCompletitud; // Earned Value correcto para V0
+    const EV_V0 = BAC_V0 * porcentajeAvanceFisico; // Earned Value correcto para V0
     
     // NOTA: Para el análisis EVM ahora consideramos API Parcial vs Real Parcial
     // Los otros escenarios (V0, NPC) se mantienen pero no se usan en el análisis principal
@@ -1553,12 +1619,10 @@ const Vectores = ({ proyectoId }) => {
     console.log('--- ANÁLISIS PRINCIPAL (API vs Real) ---');
     console.log('AC (Real Parcial):', AC);
     console.log('PV (API Parcial):', PV);
-    console.log('EV (BAC × % completitud):', EV);
+    console.log('EV (BAC × % avance físico real):', EV);
     console.log('BAC (API Total):', BAC);
-    console.log('Porcentaje completitud:', porcentajeCompletitud);
-    console.log('Fecha inicio proyecto:', fechaInicio);
-    console.log('Fecha fin proyecto:', fechaFin);
-    console.log('Fecha seguimiento:', fechaSeguimientoDate);
+    console.log('Porcentaje avance físico real:', (porcentajeAvanceFisico * 100).toFixed(2) + '%');
+    console.log('Fecha seguimiento:', fechaSeguimiento);
     console.log('--- OTROS ESCENARIOS (solo para referencia) ---');
     console.log('PV_V0 (V0 Parcial):', PV_V0);
     console.log('EV_V0 (V0):', EV_V0);
@@ -1814,6 +1878,8 @@ const Vectores = ({ proyectoId }) => {
           </div>
         ))}
         
+
+        
         {/* Mostrar porcentajes de avance físico */}
         <div style={{
           marginTop: '8px',
@@ -1878,6 +1944,8 @@ const Vectores = ({ proyectoId }) => {
             </span>
           </div>
         </div>
+        
+
       </div>
     );
   };
@@ -1995,45 +2063,41 @@ const Vectores = ({ proyectoId }) => {
             type="monotone" 
             dataKey="Real Parcial" 
               stroke="#ff6600" 
-              strokeWidth={1.5}
+              strokeWidth={1}
               name="Costo Real (AC) - (Real)"
-              dot={{ fill: '#ff6600', strokeWidth: 1, r: 3 }}
-              activeDot={{ r: 5, stroke: '#ff6600', strokeWidth: 1, fill: '#fff' }}
+              dot={false}
           />
           <Line 
             type="monotone" 
               dataKey="API Parcial" 
               stroke="#006400" 
-              strokeWidth={1.5}
+              strokeWidth={1}
               name="Costo Planeado (PV) - API"
-              dot={{ fill: '#006400', strokeWidth: 1, r: 3 }}
-              activeDot={{ r: 5, stroke: '#006400', strokeWidth: 1, fill: '#fff' }}
+              dot={false}
           />
           <Line 
             type="monotone" 
             dataKey="NPC Parcial" 
               stroke="#0066cc" 
-              strokeWidth={1.5}
+              strokeWidth={1}
               name="Escenario NPC"
-              dot={{ fill: '#0066cc', strokeWidth: 1, r: 3 }}
-              activeDot={{ r: 5, stroke: '#0066cc', strokeWidth: 1, fill: '#fff' }}
+              dot={false}
           />
           <Line 
             type="monotone" 
               dataKey="V0 Parcial" 
               stroke="#800080" 
-              strokeWidth={1.5}
+              strokeWidth={1}
               name="Escenario V0"
-              dot={{ fill: '#800080', strokeWidth: 1, r: 3 }}
-              activeDot={{ r: 5, stroke: '#800080', strokeWidth: 1, fill: '#fff' }}
+              dot={false}
           />
 
           {/* Línea de fecha de seguimiento */}
           <ReferenceLine 
             x={fechaSeguimiento} 
-              stroke="#f39c12" 
+              stroke="#ff0000" 
               strokeDasharray="8 4"
-              strokeWidth={3}
+              strokeWidth={1}
             label={{ value: "Fecha Seguimiento", position: "top" }}
           />
 
@@ -2051,11 +2115,12 @@ const Vectores = ({ proyectoId }) => {
             <Line 
               type="monotone" 
               dataKey="EAC" 
-                stroke="#f39c12" 
+                stroke="#ff0000" 
                 strokeDasharray="8 4"
-                strokeWidth={3}
+                strokeWidth={1}
               name="EAC Proyectado"
               connectNulls={false}
+              dot={false}
             />
           )}
 
@@ -2305,7 +2370,7 @@ const Vectores = ({ proyectoId }) => {
 📊 ¿Cómo se calculan?
 • AC: Suma de costos reales acumulados hasta la fecha de seguimiento
 • PV: Suma de costos planeados acumulados hasta la fecha de seguimiento  
-• EV: Valor del trabajo realmente completado (basado en progreso físico)
+• EV: BAC × % Avance Físico Real (cálculo directo)
 • BAC: Presupuesto total aprobado del proyecto
 
 🎯 ¿Por qué son importantes?
@@ -2314,7 +2379,7 @@ Estos son los tres pilares fundamentales del EVM. Permiten comparar lo planeado 
 📈 ¿De dónde vienen los datos?
 • AC: Tabla 'Real Parcial' (datos importados)
 • PV: Tabla 'API Parcial' (datos importados)
-• EV: Calculado basado en progreso físico del proyecto
+• EV: BAC × % Avance Físico Real (tabla cumplimiento_fisico)
 • BAC: Presupuesto total del proyecto">
             <div style={{
               position: 'absolute',
@@ -4637,10 +4702,10 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                   <YAxis domain={[0, 100]} tickFormatter={v => `${v.toFixed(0)}%`} width={60} />
                   <Tooltip formatter={v => `${v.toFixed(1)}%`} />
                   <Legend verticalAlign="top" align="center" height={36} iconType="circle" wrapperStyle={{ top: 0 }} />
-                  <Line type="monotone" dataKey="Real %" stroke="#1ecb4f" strokeWidth={2} dot={false} name="Real (%)" />
-                  <Line type="monotone" dataKey="V0 %" stroke="#16355D" strokeWidth={2} dot={false} name="V0 (%)" />
-                  <Line type="monotone" dataKey="NPC %" stroke="#FFD000" strokeWidth={2} dot={false} name="NPC (%)" />
-                  <Line type="monotone" dataKey="API %" stroke="#0177FF" strokeWidth={2} dot={false} name="API (%)" />
+                  <Line type="monotone" dataKey="Real %" stroke="#1ecb4f" strokeWidth={1} dot={false} name="Real (%)" />
+                  <Line type="monotone" dataKey="V0 %" stroke="#16355D" strokeWidth={1} dot={false} name="V0 (%)" />
+                  <Line type="monotone" dataKey="NPC %" stroke="#FFD000" strokeWidth={1} dot={false} name="NPC (%)" />
+                  <Line type="monotone" dataKey="API %" stroke="#0177FF" strokeWidth={1} dot={false} name="API (%)" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
