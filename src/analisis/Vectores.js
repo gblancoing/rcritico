@@ -9,6 +9,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { buildAppUrl } from '../config';
 
+
 const tablas = [
 
   { value: 'api_acumulada', label: 'API Acumulada' },
@@ -205,6 +206,7 @@ const Vectores = ({ proyectoId }) => {
   const [mostrarPopupAnalisis, setMostrarPopupAnalisis] = useState(false);
   const [popupVariacionesVisible, setPopupVariacionesVisible] = useState(false);
   const [tablaCumplimientoFisico, setTablaCumplimientoFisico] = useState([]);
+
 
   const categorias = [
     'CONSTRUCCION',
@@ -1046,6 +1048,8 @@ const Vectores = ({ proyectoId }) => {
     pdf.save('informe_ejecutivo.pdf');
   };
 
+
+
   // 1. Función de análisis automático básico
   const generarAnalisis = () => {
     // Ejemplo simple: compara totales y tendencias
@@ -1674,6 +1678,1384 @@ const Vectores = ({ proyectoId }) => {
     };
   };
 
+  // --- FUNCIÓN PARA GENERAR PDF EJECUTIVO DE DIRECTORIO ---
+  const handleGenerarPDFEjecutivo = async () => {
+    try {
+      // Verificar que tenemos fecha de seguimiento
+      if (!fechaSeguimiento) {
+        alert('No hay fecha de seguimiento seleccionada. Por favor, seleccione una fecha en el análisis EVM.');
+        return;
+      }
+
+      // Obtener los indicadores EVM actuales
+      const indicadoresEVM = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+      if (!indicadoresEVM) {
+        alert('No hay datos suficientes para generar el PDF ejecutivo. Asegúrese de tener datos cargados.');
+        return;
+      }
+
+      // Validar que los datos necesarios estén presentes
+      if (!indicadoresEVM.AC || !indicadoresEVM.EV || !indicadoresEVM.PV || !indicadoresEVM.BAC) {
+        alert('Faltan datos críticos para generar el PDF ejecutivo. Asegúrese de que todos los vectores estén cargados.');
+        return;
+      }
+
+      console.log('Generando PDF Ejecutivo de Directorio con indicadores:', indicadoresEVM);
+      
+      // Generar PDF ejecutivo de directorio
+      const doc = new jsPDF();
+      
+      // Configuración de colores profesionales
+      const colors = {
+        primary: [25, 50, 100],     // Azul oscuro profesional (como en la imagen)
+        success: [56, 161, 105],    // Verde éxito
+        warning: [237, 137, 54],    // Naranja advertencia
+        danger: [220, 53, 69],      // Rojo peligro
+        dark: [45, 55, 72],         // Gris oscuro
+        light: [247, 250, 252],     // Gris claro
+        gold: [255, 193, 7]         // Dorado para destacados
+      };
+
+      // ===== PÁGINA 1: RESUMEN EJECUTIVO =====
+      
+      // Fondo con patrón sutil (como en la imagen)
+      doc.setFillColor(240, 245, 250); // Fondo muy claro
+      doc.rect(0, 0, 210, 297, 'F');
+      
+      // Patrón de líneas curvas sutiles
+      doc.setDrawColor(220, 230, 240);
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < 297; i += 20) {
+        doc.line(0, i, 210, i + 10);
+      }
+      
+      // Header profesional
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, 210, 45, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(28);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REPORTE EJECUTIVO EVM', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(14);
+      doc.text('CODELCO - Análisis de Gestión de Proyectos', 105, 32, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`Fecha de Análisis: ${fechaSeguimiento}`, 105, 40, { align: 'center' });
+
+      let y = 60;
+
+      // Título de sección
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RESUMEN GENERAL DEL PROYECTO', 20, y);
+      y += 15;
+
+      // Información básica del proyecto
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Información del Proyecto:', 20, y);
+      y += 6;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`• Fecha de seguimiento: ${fechaSeguimiento}`, 25, y);
+      y += 4;
+      doc.text(`• Presupuesto total (BAC): $${(indicadoresEVM.BAC/1000000).toFixed(2)}M`, 25, y);
+      y += 4;
+      doc.text(`• Costo real (AC): $${(indicadoresEVM.AC/1000000).toFixed(2)}M (gastos acumulados hasta la fecha)`, 25, y);
+      y += 4;
+      doc.text(`• Valor ganado (EV): $${(indicadoresEVM.EV/1000000).toFixed(2)}M (valor del trabajo completado)`, 25, y);
+      y += 4;
+      doc.text(`• Costo planificado (PV): $${(indicadoresEVM.PV/1000000).toFixed(2)}M (valor planificado para esta fecha)`, 25, y);
+      y += 12;
+
+      // Estado del Proyecto
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ESTADO DEL PROYECTO', 20, y);
+      y += 8;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Avance del Proyecto:', 20, y);
+      y += 6;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      // Calcular porcentajes si no existen
+      const porcentajeEV = indicadoresEVM.porcentajeEV || ((indicadoresEVM.EV / indicadoresEVM.BAC) * 100);
+      const porcentajePV = indicadoresEVM.porcentajePV || ((indicadoresEVM.PV / indicadoresEVM.BAC) * 100);
+      const porcentajeAC = indicadoresEVM.porcentajeAC || ((indicadoresEVM.AC / indicadoresEVM.BAC) * 100);
+      
+      doc.text(`• ${porcentajeEV.toFixed(1)}% completado (EV)`, 25, y);
+      y += 4;
+      doc.text(`• ${porcentajePV.toFixed(1)}% planificado (PV)`, 25, y);
+      y += 4;
+      doc.text(`• ${porcentajeAC.toFixed(1)}% real (AC)`, 25, y);
+      y += 6;
+
+      // Evaluación del estado
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Evaluación:', 20, y);
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+      doc.text('El proyecto está adelantado en términos de valor ganado y dentro de presupuesto,', 25, y);
+      y += 3;
+      doc.text('con un desempeño financiero y de cronograma favorable.', 25, y);
+      y += 6;
+
+      // Estado del cronograma y costo con iconos y colores
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      
+      // Estado del cronograma
+      const estadoCronograma = indicadoresEVM.estadoCronograma || 'Sin datos';
+      
+      doc.setTextColor(...colors.dark);
+      doc.text(`Estado del cronograma: ${estadoCronograma}`, 20, y);
+      y += 4;
+      
+      // Estado de costo
+      const estadoCosto = indicadoresEVM.estadoCosto || 'Sin datos';
+      
+      doc.setTextColor(...colors.dark);
+      doc.text(`Estado de costo: ${estadoCosto}`, 20, y);
+      y += 10;
+
+      // Indicadores de Rendimiento
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INDICADORES CLAVE DE RENDIMIENTO', 20, y);
+      y += 8;
+
+      // Tabla de indicadores más compacta
+      const indicadoresTableY = y;
+      const indicadoresTableWidth = 170;
+      const indicadoresColWidth = indicadoresTableWidth / 2;
+      const indicadoresRowHeight = 10;
+
+      // Encabezado
+      doc.setFillColor(...colors.primary);
+      doc.rect(20, indicadoresTableY, indicadoresColWidth, indicadoresRowHeight, 'F');
+      doc.rect(20 + indicadoresColWidth, indicadoresTableY, indicadoresColWidth, indicadoresRowHeight, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Indicador', 20 + indicadoresColWidth/2, indicadoresTableY + 6, { align: 'center' });
+      doc.text('Valor y Análisis', 20 + indicadoresColWidth + indicadoresColWidth/2, indicadoresTableY + 6, { align: 'center' });
+
+      // Datos de indicadores
+      const indicadoresData = [
+        {
+          nombre: 'CPI (Índice de Desempeño de Costos)',
+          valor: indicadoresEVM.CPI?.toFixed(3) || '0.000',
+          analisis: indicadoresEVM.CPI > 1 ? 
+            `Eficiencia excelente: $${indicadoresEVM.CPI.toFixed(3)} de valor por dólar gastado` :
+            'Requiere atención en gestión de costos'
+        },
+        {
+          nombre: 'SPI (Índice de Desempeño del Cronograma)',
+          valor: indicadoresEVM.SPI?.toFixed(3) || '0.000',
+          analisis: indicadoresEVM.SPI > 1 ? 
+            'Proyecto adelantado respecto al cronograma planificado' :
+            'Requiere atención en gestión del tiempo'
+        }
+      ];
+
+      indicadoresData.forEach((item, index) => {
+        const rowY = indicadoresTableY + indicadoresRowHeight + (index * indicadoresRowHeight * 1.5);
+        
+        // Fondo
+        doc.setFillColor(255, 255, 255);
+        doc.rect(20, rowY, indicadoresColWidth, indicadoresRowHeight * 1.5, 'F');
+        doc.rect(20 + indicadoresColWidth, rowY, indicadoresColWidth, indicadoresRowHeight * 1.5, 'F');
+        
+        // Bordes
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(20, rowY, indicadoresColWidth, indicadoresRowHeight * 1.5, 'S');
+        doc.rect(20 + indicadoresColWidth, rowY, indicadoresColWidth, indicadoresRowHeight * 1.5, 'S');
+        
+        // Texto
+        doc.setTextColor(45, 55, 72);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text(item.nombre, 22, rowY + 4);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Valor: ${item.valor}`, 22, rowY + 12);
+        
+        // Análisis más compacto
+        const analisisLines = doc.splitTextToSize(item.analisis, indicadoresColWidth - 4);
+        analisisLines.forEach((line, lineIndex) => {
+          doc.text(line, 22 + indicadoresColWidth, rowY + 4 + (lineIndex * 3));
+        });
+      });
+
+      y = indicadoresTableY + indicadoresRowHeight + (indicadoresData.length * indicadoresRowHeight * 1.5) + 15;
+
+      // Footer página 1
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFillColor(...colors.dark);
+      doc.rect(0, pageHeight - 20, 210, 20, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text('CODELCO - Reporte Ejecutivo EVM | Página 1 de 4', 105, pageHeight - 12, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, 105, pageHeight - 6, { align: 'center' });
+
+      // ===== PÁGINA 2: VARIACIONES Y ESTIMACIONES =====
+      doc.addPage();
+
+      // Fondo con patrón sutil para página 2
+      doc.setFillColor(240, 245, 250);
+      doc.rect(0, 0, 210, 297, 'F');
+      
+      // Patrón de líneas curvas sutiles
+      doc.setDrawColor(220, 230, 240);
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < 297; i += 20) {
+        doc.line(0, i, 210, i + 10);
+      }
+
+      // Header página 2
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, 210, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ANÁLISIS DE VARIACIONES Y ESTIMACIONES', 105, 15, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`CODELCO | ${fechaSeguimiento}`, 105, 25, { align: 'center' });
+
+      y = 45;
+
+      // Variaciones
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ANÁLISIS DE VARIACIONES', 20, y);
+      y += 12;
+
+      // Tabla de variaciones más compacta
+      const variacionesTableY = y;
+      const variacionesTableWidth = 170;
+      const variacionesColWidth = variacionesTableWidth / 3;
+      const variacionesRowHeight = 10;
+
+      // Encabezado
+      doc.setFillColor(...colors.primary);
+      doc.rect(20, variacionesTableY, variacionesColWidth, variacionesRowHeight, 'F');
+      doc.rect(20 + variacionesColWidth, variacionesTableY, variacionesColWidth, variacionesRowHeight, 'F');
+      doc.rect(20 + variacionesColWidth * 2, variacionesTableY, variacionesColWidth, variacionesRowHeight, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Variación', 20 + variacionesColWidth/2, variacionesTableY + 6, { align: 'center' });
+      doc.text('Valor', 20 + variacionesColWidth + variacionesColWidth/2, variacionesTableY + 6, { align: 'center' });
+      doc.text('Interpretación', 20 + variacionesColWidth * 2 + variacionesColWidth/2, variacionesTableY + 6, { align: 'center' });
+
+      // Datos de variaciones
+      const variacionesData = [
+        {
+          nombre: 'CV (Variación de Costo)',
+          valor: `$${(indicadoresEVM.CV/1000000).toFixed(2)}M`,
+          interpretacion: indicadoresEVM.CV > 0 ? 'Proyecto bajo presupuesto' : 'Proyecto sobre presupuesto'
+        },
+        {
+          nombre: 'SV (Variación de Cronograma)',
+          valor: `$${(indicadoresEVM.SV/1000000).toFixed(2)}M`,
+          interpretacion: indicadoresEVM.SV > 0 ? 'Proyecto adelantado' : 'Proyecto atrasado'
+        },
+        {
+          nombre: 'VAC (Variación Final Prevista)',
+          valor: `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M`,
+          interpretacion: indicadoresEVM.VAC > 0 ? 'Ahorro final proyectado' : 'Sobre costo final proyectado'
+        }
+      ];
+
+      variacionesData.forEach((item, index) => {
+        const rowY = variacionesTableY + variacionesRowHeight + (index * variacionesRowHeight);
+        
+        // Fondo
+        doc.setFillColor(255, 255, 255);
+        doc.rect(20, rowY, variacionesColWidth, variacionesRowHeight, 'F');
+        doc.rect(20 + variacionesColWidth, rowY, variacionesColWidth, variacionesRowHeight, 'F');
+        doc.rect(20 + variacionesColWidth * 2, rowY, variacionesColWidth, variacionesRowHeight, 'F');
+        
+        // Bordes
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(20, rowY, variacionesColWidth, variacionesRowHeight, 'S');
+        doc.rect(20 + variacionesColWidth, rowY, variacionesColWidth, variacionesRowHeight, 'S');
+        doc.rect(20 + variacionesColWidth * 2, rowY, variacionesColWidth, variacionesRowHeight, 'S');
+        
+        // Texto
+        doc.setTextColor(45, 55, 72);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(item.nombre, 22, rowY + 6);
+        doc.text(item.valor, 22 + variacionesColWidth, rowY + 6);
+        doc.text(item.interpretacion, 22 + variacionesColWidth * 2, rowY + 6);
+      });
+
+      y = variacionesTableY + variacionesRowHeight + (variacionesData.length * variacionesRowHeight) + 20;
+
+      // Estimaciones
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ESTIMACIONES FINANCIERAS', 20, y);
+      y += 12;
+
+      // Tabla de estimaciones más compacta
+      const estimacionesTableY = y;
+      const estimacionesTableWidth = 170;
+      const estimacionesColWidth = estimacionesTableWidth / 2;
+      const estimacionesRowHeight = 10;
+
+      // Encabezado
+      doc.setFillColor(...colors.primary);
+      doc.rect(20, estimacionesTableY, estimacionesColWidth, estimacionesRowHeight, 'F');
+      doc.rect(20 + estimacionesColWidth, estimacionesTableY, estimacionesColWidth, estimacionesRowHeight, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Estimación', 20 + estimacionesColWidth/2, estimacionesTableY + 6, { align: 'center' });
+      doc.text('Valor y Análisis', 20 + estimacionesColWidth + estimacionesColWidth/2, estimacionesTableY + 6, { align: 'center' });
+
+      // Datos de estimaciones con análisis inteligente
+      const estimacionesData = [
+        {
+          nombre: 'EAC (Costo Estimado Total)',
+          valor: `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M`,
+          analisis: generarAnalisisEAC(indicadoresEVM)
+        },
+        {
+          nombre: 'ETC (Costo para Completar)',
+          valor: `$${(indicadoresEVM.ETC/1000000).toFixed(2)}M`,
+          analisis: generarAnalisisETC(indicadoresEVM)
+        },
+        {
+          nombre: 'VAC (Variación Final)',
+          valor: `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M`,
+          analisis: generarAnalisisVAC(indicadoresEVM)
+        },
+        {
+          nombre: 'TCPI (To-Complete Performance Index)',
+          valor: calcularTCPI(indicadoresEVM).toFixed(3),
+          analisis: generarAnalisisTCPI(indicadoresEVM)
+        }
+      ];
+
+      estimacionesData.forEach((item, index) => {
+        const rowY = estimacionesTableY + estimacionesRowHeight + (index * estimacionesRowHeight * 1.5);
+        
+        // Fondo
+        doc.setFillColor(255, 255, 255);
+        doc.rect(20, rowY, estimacionesColWidth, estimacionesRowHeight * 1.5, 'F');
+        doc.rect(20 + estimacionesColWidth, rowY, estimacionesColWidth, estimacionesRowHeight * 1.5, 'F');
+        
+        // Bordes
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(20, rowY, estimacionesColWidth, estimacionesRowHeight * 1.5, 'S');
+        doc.rect(20 + estimacionesColWidth, rowY, estimacionesColWidth, estimacionesRowHeight * 1.5, 'S');
+        
+        // Texto
+        doc.setTextColor(45, 55, 72);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text(item.nombre, 22, rowY + 4);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Valor: ${item.valor}`, 22, rowY + 12);
+        
+        // Análisis más compacto
+        const analisisLines = doc.splitTextToSize(item.analisis, estimacionesColWidth - 4);
+        analisisLines.forEach((line, lineIndex) => {
+          doc.text(line, 22 + estimacionesColWidth, rowY + 4 + (lineIndex * 3));
+        });
+      });
+
+      y = estimacionesTableY + estimacionesRowHeight + (estimacionesData.length * estimacionesRowHeight * 2) + 10;
+
+      // Análisis de la Curva S con inteligencia dinámica
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ANÁLISIS DE LA CURVA S', 20, y);
+      y += 6;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      // Análisis dinámico de la Curva S
+      const analisisCurvaS = generarAnalisisCurvaS(indicadoresEVM);
+      const lineasAnalisis = doc.splitTextToSize(analisisCurvaS, 170);
+      
+      lineasAnalisis.forEach(line => {
+        doc.text(line, 20, y);
+        y += 4;
+      });
+      
+      y += 5;
+      
+      // Análisis de tendencias
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ANÁLISIS DE TENDENCIAS:', 20, y);
+      y += 5;
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      const analisisTendencias = generarAnalisisTendencias(indicadoresEVM);
+      const lineasTendencias = doc.splitTextToSize(analisisTendencias, 170);
+      
+      lineasTendencias.forEach(line => {
+        doc.text(line, 20, y);
+        y += 4;
+      });
+
+      // Footer página 2
+      doc.setFillColor(...colors.dark);
+      doc.rect(0, pageHeight - 20, 210, 20, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text('CODELCO - Reporte Ejecutivo EVM | Página 2 de 4', 105, pageHeight - 12, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, 105, pageHeight - 6, { align: 'center' });
+
+      // ===== PÁGINA 3: ANÁLISIS DE LA CURVA S (HORIZONTAL) =====
+      doc.addPage([297, 210], 'landscape');
+
+      // Fondo con patrón sutil para página 3 horizontal
+      doc.setFillColor(240, 245, 250);
+      doc.rect(0, 0, 297, 210, 'F');
+      
+      // Patrón de líneas curvas sutiles
+      doc.setDrawColor(220, 230, 240);
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < 297; i += 20) {
+        doc.line(i, 0, i + 10, 210);
+      }
+
+      // Header página 3 horizontal
+      const pageWidth3 = doc.internal.pageSize.width;
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, pageWidth3, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ANÁLISIS DE LA CURVA S - GRÁFICO DE EVOLUCIÓN', pageWidth3/2, 15, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`CODELCO | ${fechaSeguimiento}`, pageWidth3/2, 25, { align: 'center' });
+
+      y = 45;
+
+      // Título de la sección eliminado para ganar espacio
+      // El encabezado de la página ya informa sobre el contenido
+
+                      // Área para el gráfico (reducida verticalmente para que se vea completo)
+                const graphAreaX = 20;
+                const graphAreaY = y;
+                const graphAreaWidth = 257; // 297 - 40 (márgenes)
+                const graphAreaHeight = 140; // Reducido a 140 para que no se corte
+
+                      // Capturar el gráfico de Curva S con alta resolución
+                try {
+                  // Esperar un momento para asegurar que el gráfico esté completamente renderizado
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  const graficoElement = document.querySelector('.recharts-wrapper');
+                  if (graficoElement) {
+                    const canvas = await html2canvas(graficoElement, {
+                      backgroundColor: '#ffffff',
+                      scale: 4, // Aumentado de 2 a 4 para mayor resolución
+                      useCORS: true,
+                      allowTaint: true,
+                      logging: false, // Desactivar logs para mejor rendimiento
+                      width: graficoElement.offsetWidth,
+                      height: graficoElement.offsetHeight + 30, // Altura ajustada para incluir leyenda sin cortar
+                      imageTimeout: 15000, // Aumentar timeout para gráficos complejos
+                      removeContainer: true // Limpiar contenedores temporales
+                    });
+          
+          const imgData = canvas.toDataURL('image/png', 1.0); // Máxima calidad PNG
+          
+          // Insertar la imagen del gráfico en el área reservada con mejor calidad
+          doc.addImage(imgData, 'PNG', graphAreaX, graphAreaY, graphAreaWidth, graphAreaHeight, undefined, 'FAST');
+        } else {
+          // Si no se encuentra el gráfico, mostrar un mensaje
+          doc.setTextColor(...colors.dark);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Gráfico de Curva S', graphAreaX + graphAreaWidth/2, graphAreaY + graphAreaHeight/2 - 10, { align: 'center' });
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          doc.text('No disponible en este momento', graphAreaX + graphAreaWidth/2, graphAreaY + graphAreaHeight/2 + 10, { align: 'center' });
+        }
+      } catch (error) {
+        console.error('Error al capturar el gráfico:', error);
+        // Mostrar mensaje de error
+        doc.setTextColor(...colors.dark);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Gráfico de Curva S', graphAreaX + graphAreaWidth/2, graphAreaY + graphAreaHeight/2 - 10, { align: 'center' });
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Error al cargar el gráfico', graphAreaX + graphAreaWidth/2, graphAreaY + graphAreaHeight/2 + 10, { align: 'center' });
+      }
+
+                      // Texto informativo sobre el gráfico
+                doc.setTextColor(...colors.dark);
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.text('El gráfico muestra la evolución del proyecto con las líneas de Valor Ganado (EV), Costo Real (AC) y Costo Planificado (PV).', 20, graphAreaY + graphAreaHeight + 15);
+                y = graphAreaY + graphAreaHeight + 30;
+
+      // Análisis de la Curva S
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ANÁLISIS DE LA CURVA S', 20, y);
+      y += 10;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('La curva muestra que el valor ganado (EV) supera tanto el costo planificado (PV) como el', 20, y);
+      y += 5;
+      doc.text('costo real (AC), lo que respalda el adelanto y la eficiencia financiera.', 20, y);
+      y += 8;
+      doc.text('El EAC proyectado y los escenarios indican proyecciones optimistas del proyecto.', 20, y);
+
+      // Footer página 3 horizontal
+      const pageHeight3 = doc.internal.pageSize.height;
+      doc.setFillColor(...colors.dark);
+      doc.rect(0, pageHeight3 - 20, pageWidth3, 20, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text('CODELCO - Reporte Ejecutivo EVM | Página 3 de 4', pageWidth3/2, pageHeight3 - 12, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, pageWidth3/2, pageHeight3 - 6, { align: 'center' });
+
+      // ===== PÁGINA 4: CONCLUSIONES Y RECOMENDACIONES =====
+      doc.addPage([210, 297], 'portrait');
+
+      // Fondo con patrón sutil para página 4
+      const pageWidth4 = doc.internal.pageSize.width;
+      const pageHeight4 = doc.internal.pageSize.height;
+      doc.setFillColor(240, 245, 250);
+      doc.rect(0, 0, pageWidth4, pageHeight4, 'F');
+      
+      // Patrón de líneas curvas sutiles
+      doc.setDrawColor(220, 230, 240);
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < pageHeight4; i += 20) {
+        doc.line(0, i, pageWidth4, i + 10);
+      }
+
+      // Header página 4
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, pageWidth4, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CONCLUSIONES Y RECOMENDACIONES ESTRATÉGICAS', pageWidth4/2, 15, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`CODELCO | ${fechaSeguimiento}`, pageWidth4/2, 25, { align: 'center' });
+
+      y = 45;
+
+      // Conclusión General
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CONCLUSIÓN GENERAL', 20, y);
+      y += 12;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('El proyecto está en una posición sólida: adelantado en el cronograma, bajo presupuesto y', 20, y);
+      y += 5;
+      doc.text('con un desempeño eficiente tanto en costos como en tiempo.', 20, y);
+      y += 12;
+
+      // Recomendaciones
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RECOMENDACIONES ESTRATÉGICAS', 20, y);
+      y += 12;
+
+      const recomendaciones = [
+        'Monitorear si el adelanto y el ahorro se mantienen a medida que el proyecto avance.',
+        'Revisar si el valor ganado refleja avances reales o si hay riesgos de retrasos futuros.',
+        'Ajustar planes si surgen imprevistos para maximizar los beneficios del desempeño actual.',
+        'Mantener las prácticas actuales que están generando resultados sobresalientes.',
+        'Considerar la reasignación de recursos ahorrados a otras iniciativas estratégicas.',
+        'Implementar un sistema de alertas tempranas para detectar cambios en las tendencias.'
+      ];
+
+      recomendaciones.forEach((rec, index) => {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${index + 1}.`, 20, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(rec, 30, y);
+        y += 6;
+      });
+
+      y += 12;
+
+      // Métricas Detalladas Completas
+      doc.setFontSize(15);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MÉTRICAS DETALLADAS COMPLETAS', 20, y);
+      y += 12;
+
+      // Tabla completa de métricas más compacta
+      const metricasTableY = y;
+      const metricasTableWidth = 170;
+      const metricasColWidth = metricasTableWidth / 3;
+      const metricasRowHeight = 10;
+
+      // Encabezado
+      doc.setFillColor(...colors.primary);
+      doc.rect(20, metricasTableY, metricasColWidth, metricasRowHeight, 'F');
+      doc.rect(20 + metricasColWidth, metricasTableY, metricasColWidth, metricasRowHeight, 'F');
+      doc.rect(20 + metricasColWidth * 2, metricasTableY, metricasColWidth, metricasRowHeight, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Métrica', 20 + metricasColWidth/2, metricasTableY + 6, { align: 'center' });
+      doc.text('Valor', 20 + metricasColWidth + metricasColWidth/2, metricasTableY + 6, { align: 'center' });
+      doc.text('Estado', 20 + metricasColWidth * 2 + metricasColWidth/2, metricasTableY + 6, { align: 'center' });
+
+      // Datos completos
+      const metricasCompletas = [
+        ['Costo Real (AC)', `$${(indicadoresEVM.AC/1000000).toFixed(2)}M`, 'Actual'],
+        ['Valor Ganado (EV)', `$${(indicadoresEVM.EV/1000000).toFixed(2)}M`, 'Completado'],
+        ['Costo Planeado (PV)', `$${(indicadoresEVM.PV/1000000).toFixed(2)}M`, 'Planificado'],
+        ['Presupuesto Total (BAC)', `$${(indicadoresEVM.BAC/1000000).toFixed(2)}M`, 'Objetivo'],
+        ['Variación Costo (CV)', `$${(indicadoresEVM.CV/1000000).toFixed(2)}M`, (indicadoresEVM.CV || 0) > 0 ? 'Favorable' : 'Desfavorable'],
+        ['Variación Cronograma (SV)', `$${(indicadoresEVM.SV/1000000).toFixed(2)}M`, (indicadoresEVM.SV || 0) > 0 ? 'Favorable' : 'Desfavorable'],
+        ['Variación Final (VAC)', `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M`, (indicadoresEVM.VAC || 0) > 0 ? 'Favorable' : 'Desfavorable'],
+        ['EAC Proyectado', `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M`, 'Estimación'],
+        ['ETC', `$${(indicadoresEVM.ETC/1000000).toFixed(2)}M`, 'Para Completar'],
+        ['CPI', indicadoresEVM.CPI?.toFixed(3) || '0.000', indicadoresEVM.CPI > 1 ? 'Excelente' : 'Requiere Atención'],
+        ['SPI', indicadoresEVM.SPI?.toFixed(3) || '0.000', indicadoresEVM.SPI > 1 ? 'Adelantado' : 'Atrasado']
+      ];
+
+      metricasCompletas.forEach((row, index) => {
+        const rowY = metricasTableY + metricasRowHeight + (index * metricasRowHeight);
+        
+        // Fondo
+        doc.setFillColor(255, 255, 255);
+        doc.rect(20, rowY, metricasColWidth, metricasRowHeight, 'F');
+        doc.rect(20 + metricasColWidth, rowY, metricasColWidth, metricasRowHeight, 'F');
+        doc.rect(20 + metricasColWidth * 2, rowY, metricasColWidth, metricasRowHeight, 'F');
+        
+        // Bordes
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(20, rowY, metricasColWidth, metricasRowHeight, 'S');
+        doc.rect(20 + metricasColWidth, rowY, metricasColWidth, metricasRowHeight, 'S');
+        doc.rect(20 + metricasColWidth * 2, rowY, metricasColWidth, metricasRowHeight, 'S');
+        
+        // Texto
+        doc.setTextColor(45, 55, 72);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(row[0], 22, rowY + 6);
+        doc.text(row[1], 22 + metricasColWidth, rowY + 6);
+        doc.text(row[2], 22 + metricasColWidth * 2, rowY + 6);
+      });
+
+      // Footer página 4
+      doc.setFillColor(...colors.dark);
+      doc.rect(0, pageHeight4 - 20, 210, 20, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text('CODELCO - Reporte Ejecutivo EVM | Página 4 de 4', 105, pageHeight4 - 12, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, 105, pageHeight4 - 6, { align: 'center' });
+
+      // Guardar el PDF
+      doc.save('reporte_ejecutivo_evm_directorio.pdf');
+      
+    } catch (error) {
+      console.error('Error al generar PDF ejecutivo:', error);
+      console.error('Detalles del error:', error.message);
+      console.error('Stack trace:', error.stack);
+      alert(`Error al generar el PDF ejecutivo: ${error.message}. Por favor, intente nuevamente.`);
+    }
+  };
+
+  // --- FUNCIÓN PARA GENERAR PDF EJECUTIVO FINAL ---
+
+
+  // Función para generar análisis inteligente
+  const generarAnalisisInteligente = (indicadoresEVM) => {
+    const {
+      AC, PV, EV, BAC, CV, SV, VAC, CPI, SPI, EAC, ETC,
+      porcentajeEV, porcentajePV, porcentajeAC,
+      estadoCosto, estadoCronograma, estadoRendimiento
+    } = indicadoresEVM;
+
+    let analisis = '';
+
+    // Validar que los datos necesarios estén presentes
+    if (!CPI || !SPI || !CV || !SV || !EAC || !BAC || !porcentajeEV || !porcentajePV) {
+      return 'Análisis no disponible debido a datos incompletos.';
+    }
+
+    // Análisis de rendimiento
+    if (CPI > 1.2 && SPI > 1.2) {
+      analisis += 'El proyecto presenta un rendimiento EXCELENTE tanto en costos como en cronograma. ';
+    } else if (CPI > 1.0 && SPI > 1.0) {
+      analisis += 'El proyecto muestra un rendimiento BUENO con eficiencia en costos y adelanto en cronograma. ';
+    } else if (CPI < 0.9 || SPI < 0.9) {
+      analisis += 'El proyecto requiere ATENCIÓN INMEDIATA debido a desviaciones significativas. ';
+    }
+
+    // Análisis de variaciones
+    if (CV > 0 && SV > 0) {
+      analisis += `El proyecto está generando ahorros de $${(CV/1000000).toFixed(2)}M en costos y adelantos de $${(SV/1000000).toFixed(2)}M en cronograma. `;
+    }
+
+    // Análisis de proyecciones
+    if (EAC < BAC) {
+      const ahorroProyectado = BAC - EAC;
+      analisis += `Se proyecta un ahorro final de $${(ahorroProyectado/1000000).toFixed(2)}M respecto al presupuesto original. `;
+    }
+
+    // Análisis de avance
+    if (porcentajeEV > porcentajePV) {
+      analisis += `El avance real (${porcentajeEV.toFixed(1)}%) supera lo planificado (${porcentajePV.toFixed(1)}%), indicando eficiencia operativa. `;
+    }
+
+    return analisis;
+  };
+
+  // --- FUNCIONES DE ANÁLISIS INTELIGENTE PARA ESTIMACIONES ---
+  
+  // Función para generar análisis inteligente de EAC
+  const generarAnalisisEAC = (indicadoresEVM) => {
+    const { EAC, BAC, CPI } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!EAC || !BAC) {
+      return 'Datos insuficientes para análisis EAC.';
+    }
+    
+    const diferencia = BAC - EAC;
+    const porcentajeAhorro = ((diferencia / BAC) * 100).toFixed(1);
+    
+    if (EAC < BAC * 0.9) {
+      return `Excelente proyección: ${porcentajeAhorro}% bajo presupuesto. Confirma gestión financiera sobresaliente.`;
+    } else if (EAC < BAC) {
+      return `Proyección favorable: ${porcentajeAhorro}% bajo presupuesto. El proyecto se completará con ahorro.`;
+    } else if (EAC < BAC * 1.1) {
+      return `Proyección controlada: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Requiere monitoreo de costos.`;
+    } else {
+      return `Proyección crítica: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Necesita medidas correctivas.`;
+    }
+  };
+
+  // Función para generar análisis inteligente de ETC
+  const generarAnalisisETC = (indicadoresEVM) => {
+    const { ETC, BAC, AC, porcentajeEV } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!ETC || !BAC) {
+      return 'Datos insuficientes para análisis ETC.';
+    }
+    
+    const trabajoRestante = porcentajeEV ? (100 - porcentajeEV) : 0;
+    
+    if (ETC < BAC * 0.2) {
+      return `Costo restante bajo: $${(ETC/1000000).toFixed(2)}M para completar ${trabajoRestante.toFixed(1)}% del proyecto.`;
+    } else if (ETC < BAC * 0.3) {
+      return `Costo restante moderado: $${(ETC/1000000).toFixed(2)}M para finalizar el proyecto.`;
+    } else {
+      return `Costo restante alto: $${(ETC/1000000).toFixed(2)}M. Requiere optimización de recursos.`;
+    }
+  };
+
+  // Función para generar análisis inteligente de VAC
+  const generarAnalisisVAC = (indicadoresEVM) => {
+    const { VAC, BAC } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!VAC || !BAC) {
+      return 'Datos insuficientes para análisis VAC.';
+    }
+    
+    const porcentajeVAC = ((VAC / BAC) * 100).toFixed(1);
+    
+    if (VAC > BAC * 0.1) {
+      return `Ahorro significativo: ${porcentajeVAC}% del presupuesto. Oportunidad para reasignar recursos.`;
+    } else if (VAC > 0) {
+      return `Ahorro proyectado: ${porcentajeVAC}% del presupuesto. Confirma eficiencia financiera.`;
+    } else if (VAC > -BAC * 0.1) {
+      return `Sobre costo controlado: ${Math.abs(porcentajeVAC)}% del presupuesto. Requiere atención.`;
+    } else {
+      return `Sobre costo crítico: ${Math.abs(porcentajeVAC)}% del presupuesto. Necesita intervención.`;
+    }
+  };
+
+  // Función para calcular TCPI
+  const calcularTCPI = (indicadoresEVM) => {
+    const { BAC, EV, AC } = indicadoresEVM;
+    
+    // Validar que los datos existan y evitar división por cero
+    if (!BAC || !EV || !AC || BAC === AC) {
+      return 1.0; // Valor por defecto
+    }
+    
+    return (BAC - EV) / (BAC - AC);
+  };
+
+  // Función para generar análisis inteligente de TCPI
+  const generarAnalisisTCPI = (indicadoresEVM) => {
+    const { BAC, EV, AC } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!BAC || !EV || !AC) {
+      return 'Datos insuficientes para análisis TCPI.';
+    }
+    
+    const tcpi = calcularTCPI(indicadoresEVM);
+    
+    if (tcpi < 0.8) {
+      return `TCPI favorable: ${tcpi.toFixed(3)}. El proyecto puede relajarse en costos futuros.`;
+    } else if (tcpi < 1.0) {
+      return `TCPI aceptable: ${tcpi.toFixed(3)}. Mantener control de costos actual.`;
+    } else if (tcpi < 1.2) {
+      return `TCPI exigente: ${tcpi.toFixed(3)}. Requiere mayor eficiencia en costos futuros.`;
+    } else {
+      return `TCPI crítico: ${tcpi.toFixed(3)}. Necesita medidas drásticas de control de costos.`;
+    }
+  };
+
+  // Función para generar análisis inteligente de la Curva S
+  const generarAnalisisCurvaS = (indicadoresEVM) => {
+    const { EV, PV, AC, BAC, porcentajeEV, porcentajePV, porcentajeAC } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!EV || !PV || !AC || !BAC) {
+      return 'Datos insuficientes para generar análisis de la Curva S.';
+    }
+    
+    let analisis = '';
+    
+    // Análisis de posición de las curvas
+    if (EV > PV && EV > AC) {
+      analisis += `La curva de Valor Ganado (EV: $${(EV/1000000).toFixed(2)}M) supera significativamente tanto el Costo Planificado (PV: $${(PV/1000000).toFixed(2)}M) como el Costo Real (AC: $${(AC/1000000).toFixed(2)}M). `;
+      if (porcentajeEV && porcentajePV) {
+        analisis += `Esto confirma un desempeño excepcional con ${porcentajeEV.toFixed(1)}% de avance real vs ${porcentajePV.toFixed(1)}% planificado. `;
+      }
+    } else if (EV > PV && EV <= AC) {
+      analisis += `El Valor Ganado (EV: $${(EV/1000000).toFixed(2)}M) supera lo planificado pero está cerca del costo real, indicando eficiencia en cronograma. `;
+    } else {
+      analisis += `El proyecto requiere atención en la gestión de valor ganado vs costos y planificación. `;
+    }
+    
+    // Análisis de eficiencia
+    if (PV > 0 && AC > 0) {
+      const eficienciaCronograma = ((EV - PV) / PV * 100).toFixed(1);
+      const eficienciaCosto = ((EV - AC) / AC * 100).toFixed(1);
+      
+      if (eficienciaCronograma > 20) {
+        analisis += `El adelanto del ${eficienciaCronograma}% sugiere posibilidad de completar antes del cronograma. `;
+      }
+      
+      if (eficienciaCosto > 15) {
+        analisis += `La eficiencia del ${eficienciaCosto}% en costos confirma excelente gestión financiera. `;
+      }
+    }
+    
+    return analisis;
+  };
+
+  // Función para generar análisis de tendencias
+  const generarAnalisisTendencias = (indicadoresEVM) => {
+    const { CPI, SPI, EAC, BAC, VAC } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!CPI || !SPI || !EAC || !BAC || !VAC) {
+      return 'Datos insuficientes para generar análisis de tendencias.';
+    }
+    
+    let analisis = '';
+    
+    // Análisis de tendencias de rendimiento
+    if (CPI > 1.2 && SPI > 1.2) {
+      analisis += `Tendencia EXCELENTE: Los índices CPI (${CPI.toFixed(3)}) y SPI (${SPI.toFixed(3)}) indican mejora continua. `;
+    } else if (CPI > 1.0 && SPI > 1.0) {
+      analisis += `Tendencia POSITIVA: Los índices muestran desempeño favorable y estable. `;
+    } else {
+      analisis += `Tendencia que requiere ATENCIÓN: Los índices sugieren necesidad de medidas correctivas. `;
+    }
+    
+    // Análisis de proyecciones financieras
+    if (EAC < BAC * 0.9) {
+      analisis += `Proyección MUY OPTIMISTA: Ahorro significativo del ${((BAC-EAC)/BAC*100).toFixed(1)}% proyectado. `;
+    } else if (EAC < BAC) {
+      analisis += `Proyección FAVORABLE: El proyecto se completará bajo presupuesto. `;
+    } else {
+      analisis += `Proyección que requiere MONITOREO: Posibles sobrecostos futuros. `;
+    }
+    
+    // Análisis de oportunidades
+    if (VAC > BAC * 0.1) {
+      analisis += `OPORTUNIDAD: Ahorro de $${(VAC/1000000).toFixed(2)}M permite reasignar recursos estratégicos.`;
+    }
+    
+    return analisis;
+  };
+
+  // --- FUNCIÓN PARA GENERAR PDF DEL ANÁLISIS EVM ---
+  const handleGenerarPDFEVM = async () => {
+    try {
+      // Verificar que tenemos fecha de seguimiento
+      if (!fechaSeguimiento) {
+        alert('No hay fecha de seguimiento seleccionada. Por favor, seleccione una fecha en el análisis EVM.');
+        return;
+      }
+
+      // Obtener los indicadores EVM actuales
+      const indicadoresEVM = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+      if (!indicadoresEVM) {
+        alert('No hay datos suficientes para generar el PDF del análisis EVM. Asegúrese de tener datos cargados.');
+        return;
+      }
+
+      // Verificar que los datos básicos estén disponibles
+      console.log('Indicadores EVM obtenidos:', indicadoresEVM);
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+                          // Configurar colores estilo imagen de referencia
+                    const colorPrimario = '#000000'; // Negro para header/footer
+                    const colorSecundario = '#000000'; // Negro
+                    const colorTexto = '#000000';
+                    const colorTextoClaro = '#666666';
+                    const colorFondo = '#ffffff';
+                    const colorExito = '#00a651';
+                    const colorAdvertencia = '#ff9500';
+                    const colorError = '#e74c3c';
+                    const colorAmarillo = '#ffff00'; // Amarillo para CODELC
+
+      // Función para formatear moneda
+      const formatearMoneda = (valor) => {
+        if (valor === null || valor === undefined || isNaN(valor)) return 'USD 0.00M';
+        return `USD ${(valor / 1000000).toFixed(2)}M`;
+      };
+      const formatearPorcentaje = (valor) => {
+        if (valor === null || valor === undefined || isNaN(valor)) return '0.0%';
+        return `${valor.toFixed(1)}%`;
+      };
+      const formatearIndice = (valor) => {
+        if (valor === null || valor === undefined || isNaN(valor)) return '0.000';
+        return valor.toFixed(3);
+      };
+
+      // Función para obtener color de estado
+      const getColorEstado = (estado) => {
+        switch (estado.toLowerCase()) {
+          case 'excelente': return colorExito;
+          case 'bueno': return colorExito;
+          case 'adelantado': return colorExito;
+          case 'bajo presupuesto': return colorExito;
+          case 'regular': return colorAdvertencia;
+          case 'atrasado': return colorError;
+          case 'sobre presupuesto': return colorError;
+          default: return colorTexto;
+        }
+      };
+
+      // Función para obtener icono de estado
+      const getIconoEstado = (estado) => {
+        switch (estado.toLowerCase()) {
+          case 'excelente': return '✓';
+          case 'bueno': return '✓';
+          case 'adelantado': return '✓';
+          case 'bajo presupuesto': return '✓';
+          case 'regular': return '⚠';
+          case 'atrasado': return '✗';
+          case 'sobre presupuesto': return '✗';
+          default: return '•';
+        }
+      };
+
+      let y = 20;
+
+                          // Header del PDF - Negro con caja amarilla CODELC
+                    pdf.setFillColor(0, 0, 0); // Negro
+                    pdf.rect(0, 0, pageWidth, 60, 'F');
+                    
+                    // Caja amarilla CODELC
+                    pdf.setFillColor(255, 255, 0); // Amarillo
+                    pdf.rect(30, 15, 80, 30, 'F');
+                    pdf.setTextColor(0, 0, 0); // Texto negro
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('CODELC', 50, 32);
+                    
+                    // Título principal
+                    pdf.setTextColor(255, 255, 255); // Texto blanco
+                    pdf.setFontSize(18);
+                    pdf.text('ANÁLISIS EVM - REPORTE EJECUTIVO', pageWidth / 2, 35, { align: 'center' });
+                    
+                    // Fecha de análisis
+                    pdf.setFontSize(12);
+                    const fechaActual = new Date().toLocaleDateString('es-ES');
+                    const horaActual = new Date().toLocaleTimeString('es-ES');
+                    pdf.text('Fecha de Análisis:', pageWidth - 150, 35, { align: 'right' });
+
+                          y = 80;
+
+                    // LEYENDA al inicio (como en la primera imagen)
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text('Leyenda: AC (Costo Real) | PV (Costo Planeado) | EV (Valor Ganado) | BAC (Presupuesto Total)', 40, y + 12);
+                    
+                    y += 25;
+
+                    // RESUMEN EJECUTIVO - Layout exacto como la imagen
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('RESUMEN EJECUTIVO', pageWidth / 2, y + 15, { align: 'center' });
+                    
+                    // Estado General
+                    const estadoGeneral = indicadoresEVM?.estadoRendimiento || 'Sin datos';
+                    const colorEstado = getColorEstado(estadoGeneral);
+                    const iconoEstado = getIconoEstado(estadoGeneral);
+                    
+                    // Caja con fondo blanco y borde verde
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(40, y + 25, 120, 35, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, y + 25, 120, 35, 'S');
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('ESTADO GENERAL', 50, y + 38);
+                    pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(`${iconoEstado} ${estadoGeneral}`, 50, y + 52);
+                    
+                    // Cost Performance
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(180, y + 25, 120, 35, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(180, y + 25, 120, 35, 'S');
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('COST PERFORMANCE', 190, y + 38);
+                    pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(formatearIndice(indicadoresEVM?.CPI), 190, y + 52);
+                    
+                    // Schedule Performance
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(320, y + 25, 120, 35, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(320, y + 25, 120, 35, 'S');
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('SCHEDULE PERFORMANCE', 330, y + 38);
+                    pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(formatearIndice(indicadoresEVM?.SPI), 330, y + 52);
+                    
+                    // Variación Neta
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(460, y + 25, 120, 35, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(460, y + 25, 120, 35, 'S');
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('VARIACIÓN NETA', 470, y + 38);
+                    pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(formatearMoneda(indicadoresEVM?.VAC), 470, y + 52);
+
+                    y += 70;
+
+                          // DASHBOARD EVM - CURVA S DE RENDIMIENTO - Sin gráfico, solo espacio en blanco
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('DASHBOARD EVM - CURVA S DE RENDIMIENTO', pageWidth / 2, y + 15, { align: 'center' });
+                    
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('Gráfico EVM - Curva S', pageWidth / 2, y + 30, { align: 'center' });
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text(`Fecha de Seguimiento: ${indicadoresEVM?.fechaSeguimiento || 'No disponible'}`, pageWidth / 2, y + 42, { align: 'center' });
+                    
+                    // Espacio en blanco para el gráfico (sin mostrar nada)
+                    y += 80;
+
+                          // KPIs EJECUTIVOS - Con tablas profesionales
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('KPIs EJECUTIVOS', pageWidth / 2, y + 15, { align: 'center' });
+                    
+                    // Tabla de KPIs principales
+                    const kpiTableY = y + 25;
+                    const kpiTableWidth = pageWidth - 80;
+                    const kpiColWidth = kpiTableWidth / 2;
+                    
+                    // Encabezado de tabla
+                    pdf.setFillColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.rect(40, kpiTableY, kpiColWidth, 25, 'F');
+                    pdf.rect(40 + kpiColWidth, kpiTableY, kpiColWidth, 25, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, kpiTableY, kpiTableWidth, 25, 'S');
+                    
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(11);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('AHORRO EN COSTOS', 40 + kpiColWidth/2, kpiTableY + 15, { align: 'center' });
+                    pdf.text('ADELANTO CRONOGRAMA', 40 + kpiColWidth + kpiColWidth/2, kpiTableY + 15, { align: 'center' });
+                    
+                    // Valores de tabla
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(40, kpiTableY + 25, kpiColWidth, 30, 'F');
+                    pdf.rect(40 + kpiColWidth, kpiTableY + 25, kpiColWidth, 30, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, kpiTableY + 25, kpiTableWidth, 30, 'S');
+                    
+                    pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.setFontSize(14);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(formatearMoneda(indicadoresEVM?.CV), 40 + kpiColWidth/2, kpiTableY + 42, { align: 'center' });
+                    pdf.text(formatearMoneda(indicadoresEVM?.SV), 40 + kpiColWidth + kpiColWidth/2, kpiTableY + 42, { align: 'center' });
+                    
+                    // Tabla de datos detallados
+                    y += 80;
+                    const tableY = y;
+                    const tableWidth = pageWidth - 80;
+                    const colWidth = tableWidth / 4;
+                    const rowHeight = 20;
+                    
+                    // Encabezados de columnas
+                    pdf.setFillColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.rect(40, tableY, colWidth, 25, 'F');
+                    pdf.rect(40 + colWidth, tableY, colWidth, 25, 'F');
+                    pdf.rect(40 + colWidth * 2, tableY, colWidth, 25, 'F');
+                    pdf.rect(40 + colWidth * 3, tableY, colWidth, 25, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, tableY, tableWidth, 25, 'S');
+                    
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('VALORES BÁSICOS', 40 + colWidth/2, tableY + 15, { align: 'center' });
+                    pdf.text('VARIACIONES', 40 + colWidth + colWidth/2, tableY + 15, { align: 'center' });
+                    pdf.text('ÍNDICES Y ESTIMACIONES', 40 + colWidth * 2 + colWidth/2, tableY + 15, { align: 'center' });
+                    pdf.text('PORCENTAJES DE AVANCE', 40 + colWidth * 3 + colWidth/2, tableY + 15, { align: 'center' });
+                    
+                    // Datos de la tabla
+                    const tableData = [
+                        // Columna 1: Valores Básicos
+                        [
+                            `AC (Costo Real): ${formatearMoneda(indicadoresEVM?.AC)}`,
+                            `PV (Costo Planeado): ${formatearMoneda(indicadoresEVM?.PV)}`,
+                            `EV (Valor Ganado): ${formatearMoneda(indicadoresEVM?.EV)}`,
+                            `BAC (Presupuesto Total): ${formatearMoneda(indicadoresEVM?.BAC)}`
+                        ],
+                        // Columna 2: Variaciones
+                        [
+                            `CV (Variación Costo): ${formatearMoneda(indicadoresEVM?.CV)}`,
+                            `SV (Variación Cronograma): ${formatearMoneda(indicadoresEVM?.SV)}`,
+                            `VAC (Variación Final): ${formatearMoneda(indicadoresEVM?.VAC)}`,
+                            ''
+                        ],
+                        // Columna 3: Índices y Estimaciones
+                        [
+                            `CPI: ${formatearIndice(indicadoresEVM?.CPI)}`,
+                            `SPI: ${formatearIndice(indicadoresEVM?.SPI)}`,
+                            `EAC: ${formatearMoneda(indicadoresEVM?.EAC)}`,
+                            `ETC: ${formatearMoneda(indicadoresEVM?.ETC)}`
+                        ],
+                        // Columna 4: Porcentajes
+                        [
+                            `EV: ${formatearPorcentaje(indicadoresEVM?.porcentajeEV)}`,
+                            `PV: ${formatearPorcentaje(indicadoresEVM?.porcentajePV)}`,
+                            `AC: ${formatearPorcentaje(indicadoresEVM?.porcentajeAC)}`,
+                            ''
+                        ]
+                    ];
+                    
+                    // Dibujar filas de datos
+                    for (let row = 0; row < 4; row++) {
+                        const rowY = tableY + 25 + (row * rowHeight);
+                        
+                        // Fondo de fila
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.rect(40, rowY, colWidth, rowHeight, 'F');
+                        pdf.rect(40 + colWidth, rowY, colWidth, rowHeight, 'F');
+                        pdf.rect(40 + colWidth * 2, rowY, colWidth, rowHeight, 'F');
+                        pdf.rect(40 + colWidth * 3, rowY, colWidth, rowHeight, 'F');
+                        
+                        // Bordes de fila
+                        pdf.setDrawColor(200, 200, 200);
+                        pdf.rect(40, rowY, colWidth, rowHeight, 'S');
+                        pdf.rect(40 + colWidth, rowY, colWidth, rowHeight, 'S');
+                        pdf.rect(40 + colWidth * 2, rowY, colWidth, rowHeight, 'S');
+                        pdf.rect(40 + colWidth * 3, rowY, colWidth, rowHeight, 'S');
+                        
+                        // Texto de datos
+                        pdf.setTextColor(colorTexto);
+                        pdf.setFontSize(9);
+                        pdf.setFont('helvetica', 'normal');
+                        
+                        for (let col = 0; col < 4; col++) {
+                            if (tableData[col][row]) {
+                                const textX = 40 + (col * colWidth) + 5;
+                                const textY = rowY + 12;
+                                pdf.text(tableData[col][row], textX, textY);
+                            }
+                        }
+                    }
+                    
+                    // Borde exterior de la tabla
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, tableY, tableWidth, 25 + (4 * rowHeight), 'S');
+
+                    y += 25 + (4 * rowHeight) + 20;
+
+                                              // ANÁLISIS EJECUTIVO Y RECOMENDACIONES - Con tabla profesional
+                    pdf.setTextColor(colorTexto);
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('ANÁLISIS EJECUTIVO Y RECOMENDACIONES', pageWidth / 2, y + 15, { align: 'center' });
+                    
+                    // Tabla de análisis ejecutivo
+                    const analisisTableY = y + 25;
+                    const analisisTableWidth = pageWidth - 80;
+                    const analisisColWidth = analisisTableWidth / 3;
+                    const analisisRowHeight = 25;
+                    
+                    // Encabezado de tabla
+                    pdf.setFillColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                    pdf.rect(40, analisisTableY, analisisColWidth, 30, 'F');
+                    pdf.rect(40 + analisisColWidth, analisisTableY, analisisColWidth, 30, 'F');
+                    pdf.rect(40 + analisisColWidth * 2, analisisTableY, analisisColWidth, 30, 'F');
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, analisisTableY, analisisTableWidth, 30, 'S');
+                    
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('GESTIÓN DE COSTOS', 40 + analisisColWidth/2, analisisTableY + 15, { align: 'center' });
+                    pdf.text('GESTIÓN DE CRONOGRAMA', 40 + analisisColWidth + analisisColWidth/2, analisisTableY + 15, { align: 'center' });
+                    pdf.text('PROYECCIÓN FINAL', 40 + analisisColWidth * 2 + analisisColWidth/2, analisisTableY + 15, { align: 'center' });
+                    
+                    // Datos de la tabla de análisis
+                    const analisisData = [
+                        // Gestión de Costos
+                        {
+                            estado: indicadoresEVM?.estadoCosto || 'Sin datos',
+                            icono: getIconoEstado(indicadoresEVM?.estadoCosto || 'Sin datos'),
+                            recomendacion: 'Mantener control actual',
+                            valor: formatearMoneda(indicadoresEVM?.CV)
+                        },
+                        // Gestión de Cronograma
+                        {
+                            estado: indicadoresEVM?.estadoCronograma || 'Sin datos',
+                            icono: getIconoEstado(indicadoresEVM?.estadoCronograma || 'Sin datos'),
+                            recomendacion: 'Mantener ritmo actual',
+                            valor: formatearMoneda(indicadoresEVM?.SV)
+                        },
+                        // Proyección Final
+                        {
+                            estado: indicadoresEVM?.estadoRendimiento || 'Sin datos',
+                            icono: getIconoEstado(indicadoresEVM?.estadoRendimiento || 'Sin datos'),
+                            recomendacion: 'Mantener rendimiento',
+                            valor: formatearMoneda(indicadoresEVM?.VAC)
+                        }
+                    ];
+                    
+                    // Dibujar filas de datos de análisis
+                    for (let col = 0; col < 3; col++) {
+                        const colX = 40 + (col * analisisColWidth);
+                        const data = analisisData[col];
+                        
+                        // Fondo de columna
+                        pdf.setFillColor(255, 255, 255);
+                        pdf.rect(colX, analisisTableY + 30, analisisColWidth, analisisRowHeight * 3, 'F');
+                        pdf.setDrawColor(0, 166, 81);
+                        pdf.rect(colX, analisisTableY + 30, analisisColWidth, analisisRowHeight * 3, 'S');
+                        
+                        // Estado e icono
+                        pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                        pdf.setFontSize(12);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.text(`${data.icono} ${data.estado}`, colX + analisisColWidth/2, analisisTableY + 45, { align: 'center' });
+                        
+                        // Recomendación
+                        pdf.setTextColor(colorTexto);
+                        pdf.setFontSize(9);
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.text(data.recomendacion, colX + analisisColWidth/2, analisisTableY + 70, { align: 'center' });
+                        
+                        // Valor
+                        pdf.setTextColor(parseInt(colorExito.slice(1, 3), 16), parseInt(colorExito.slice(3, 5), 16), parseInt(colorExito.slice(5, 7), 16));
+                        pdf.setFontSize(10);
+                        pdf.setFont('helvetica', 'bold');
+                        pdf.text(data.valor, colX + analisisColWidth/2, analisisTableY + 95, { align: 'center' });
+                    }
+                    
+                    // Borde exterior de la tabla
+                    pdf.setDrawColor(0, 166, 81);
+                    pdf.rect(40, analisisTableY, analisisTableWidth, 30 + (analisisRowHeight * 3), 'S');
+
+                    y += 30 + (analisisRowHeight * 3) + 20;
+
+                          // Footer - Negro
+                    y = pageHeight - 30;
+                    pdf.setFillColor(0, 0, 0); // Negro
+                    pdf.rect(0, y, pageWidth, 30, 'F');
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.text('CODELCO - Sistema de Análisis EVM | Generado: ' + fechaActual + ' ' + horaActual, pageWidth / 2, y + 20, { align: 'center' });
+
+      // Guardar el PDF
+      pdf.save('analisis_evm_ejecutivo.pdf');
+      
+    } catch (error) {
+      console.error('Error al generar PDF del análisis EVM:', error);
+      alert('Error al generar el PDF del análisis EVM. Por favor, intente nuevamente.');
+    }
+  };
+
 
   // --- FUNCIÓN PARA CALCULAR VALORES V0 (mantenemos para referencia) ---
   const calcularValoresV0 = (indicadoresEVM) => {
@@ -1986,12 +3368,12 @@ const Vectores = ({ proyectoId }) => {
 
     return (
       <div style={{
-        backgroundColor: 'white',
-        borderRadius: '16px',
-        padding: '2rem',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-        border: '1px solid #e1e8ed',
-        marginBottom: '2rem'
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          padding: '2rem',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          border: '1px solid #e1e8ed',
+          marginBottom: '2rem'
       }}>
         {/* Header del gráfico */}
         <div style={{
@@ -2289,54 +3671,133 @@ const Vectores = ({ proyectoId }) => {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '1rem',
+          justifyContent: 'space-between',
           marginBottom: '2rem',
           paddingBottom: '1rem',
           borderBottom: '2px solid #e1e8ed'
         }}>
           <div style={{
-            width: '50px',
-            height: '50px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0a6ebd 0%, #005a8c 100%)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontSize: '1.5rem',
-            fontWeight: 'bold'
+            gap: '1rem'
           }}>
-            EVM
+            <div style={{
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #0a6ebd 0%, #005a8c 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>
+              EVM
+            </div>
+            <div>
+              <h3 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1.8rem',
+                fontWeight: '700',
+                letterSpacing: '0.5px'
+              }}>
+                Análisis EVM (Earned Value Management).
+              </h3>
+              <p style={{ 
+                margin: '0.25rem 0 0 0', 
+                color: '#7f8c8d', 
+                fontSize: '1rem',
+                fontWeight: '500'
+              }}>
+                Fecha de Seguimiento: {indicadores.fechaSeguimiento}
+              </p>
+              <p style={{ 
+                margin: '0.25rem 0 0 0', 
+                color: '#e74c3c', 
+                fontSize: '0.85rem',
+                fontWeight: '500'
+              }}>
+                {fechaDesde && fechaHasta ? `Filtro: ${fechaDesde} a ${fechaHasta}` : 
+                 fechaDesde ? `Filtro: Desde ${fechaDesde}` :
+                 fechaHasta ? `Filtro: Hasta ${fechaHasta}` : 'Sin filtros de fecha'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 style={{ 
-              margin: '0', 
-              color: '#2c3e50', 
-              fontSize: '1.8rem',
+          
+              {/* Botones para generar PDF */}
+    <div style={{
+      display: 'flex',
+      gap: '10px',
+      alignItems: 'center'
+    }}>
+          <button
+        onClick={handleGenerarPDFEVM}
+            style={{
+          backgroundColor: '#1877f2',
+              color: 'white',
+              border: 'none',
+          borderRadius: '8px',
+          padding: '10px 16px',
+          fontSize: '12px',
+          fontWeight: '600',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          boxShadow: '0 4px 12px rgba(24, 119, 242, 0.3)',
+          transition: 'all 0.3s ease',
+          minWidth: '120px',
+          justifyContent: 'center'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.backgroundColor = '#166fe5';
+          e.target.style.transform = 'translateY(-2px)';
+          e.target.style.boxShadow = '0 6px 16px rgba(24, 119, 242, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.backgroundColor = '#1877f2';
+          e.target.style.transform = 'translateY(0)';
+          e.target.style.boxShadow = '0 4px 12px rgba(24, 119, 242, 0.3)';
+        }}
+      >
+        📄 PDF Técnico
+      </button>
+      
+      <button
+        onClick={handleGenerarPDFEjecutivo}
+        style={{
+          backgroundColor: '#38a169',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '12px 20px',
+          fontSize: '14px',
               fontWeight: '700',
-              letterSpacing: '0.5px'
-            }}>
-              Análisis EVM (Earned Value Management).
-            </h3>
-            <p style={{ 
-              margin: '0.25rem 0 0 0', 
-              color: '#7f8c8d', 
-              fontSize: '1rem',
-              fontWeight: '500'
-            }}>
-              Fecha de Seguimiento: {indicadores.fechaSeguimiento}
-            </p>
-            <p style={{ 
-              margin: '0.25rem 0 0 0', 
-              color: '#e74c3c', 
-              fontSize: '0.85rem',
-              fontWeight: '500'
-            }}>
-              {fechaDesde && fechaHasta ? `Filtro: ${fechaDesde} a ${fechaHasta}` : 
-               fechaDesde ? `Filtro: Desde ${fechaDesde}` :
-               fechaHasta ? `Filtro: Hasta ${fechaHasta}` : 'Sin filtros de fecha'}
-            </p>
-          </div>
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 4px 12px rgba(56, 161, 105, 0.4)',
+          transition: 'all 0.3s ease',
+          minWidth: '160px',
+          justifyContent: 'center'
+            }}
+            onMouseEnter={(e) => {
+          e.target.style.backgroundColor = '#2f855a';
+          e.target.style.transform = 'translateY(-2px)';
+          e.target.style.boxShadow = '0 6px 16px rgba(56, 161, 105, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+          e.target.style.backgroundColor = '#38a169';
+          e.target.style.transform = 'translateY(0)';
+          e.target.style.boxShadow = '0 4px 12px rgba(56, 161, 105, 0.4)';
+            }}
+          >
+        🎯 PDF Ejecutivo
+          </button>
+    </div>
         </div>
         
         <div style={{ 
@@ -2721,7 +4182,7 @@ Calculadas automáticamente usando BAC, AC, EV y CPI. Son proyecciones basadas e
                 fontWeight: 'bold'
               }}>
                 ⚡
-            </div>
+              </div>
               <h4 style={{ 
                 margin: '0', 
                 color: '#2c3e50', 
@@ -2923,7 +4384,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                 fontWeight: 'bold'
               }}>
                 📈
-            </div>
+              </div>
               <h4 style={{ 
                 margin: '0', 
                 color: '#2c3e50', 
@@ -4167,7 +5628,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
               >
                 <span role="img" aria-label="limpiar">🗑️</span>
               </button>
-              
+
               {fechaSeguimiento && indicadoresEVM && (
                 <button
                   onClick={() => setMostrarPopupAnalisis(true)}
@@ -5673,6 +7134,8 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
           onClose={() => setPopupVariacionesVisible(false)}
         />
       )}
+
+      
     </div>
   );
 };
