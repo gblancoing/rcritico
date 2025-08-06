@@ -2459,13 +2459,13 @@ const Vectores = ({ proyectoId }) => {
     const porcentajeAhorro = ((diferencia / BAC) * 100).toFixed(1);
     
     if (EAC < BAC * 0.9) {
-      return `Excelente proyección: ${porcentajeAhorro}% bajo presupuesto. Confirma gestión financiera sobresaliente.`;
+      return `Excelente: ${porcentajeAhorro}% bajo presupuesto. Gestión financiera sobresaliente.`;
     } else if (EAC < BAC) {
-      return `Proyección favorable: ${porcentajeAhorro}% bajo presupuesto. El proyecto se completará con ahorro.`;
+      return `Favorable: ${porcentajeAhorro}% bajo presupuesto. Proyecto con ahorro.`;
     } else if (EAC < BAC * 1.1) {
-      return `Proyección controlada: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Requiere monitoreo de costos.`;
+      return `Controlada: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Requiere monitoreo.`;
     } else {
-      return `Proyección crítica: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Necesita medidas correctivas.`;
+      return `Crítica: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Necesita medidas.`;
     }
   };
 
@@ -2478,7 +2478,15 @@ const Vectores = ({ proyectoId }) => {
       return 'Datos insuficientes para análisis ETC.';
     }
     
-    const trabajoRestante = porcentajeEV ? (100 - porcentajeEV) : 0;
+    // Calcular trabajo restante de manera más robusta
+    let trabajoRestante = 0;
+    if (porcentajeEV && porcentajeEV > 0 && porcentajeEV < 100) {
+      trabajoRestante = 100 - porcentajeEV;
+    } else if (indicadoresEVM.EV && indicadoresEVM.BAC) {
+      // Calcular porcentaje EV si no está disponible
+      const porcentajeCalculado = (indicadoresEVM.EV / indicadoresEVM.BAC) * 100;
+      trabajoRestante = Math.max(0, 100 - porcentajeCalculado);
+    }
     
     if (ETC < BAC * 0.2) {
       return `Costo restante bajo: $${(ETC/1000000).toFixed(2)}M para completar ${trabajoRestante.toFixed(1)}% del proyecto.`;
@@ -2501,13 +2509,13 @@ const Vectores = ({ proyectoId }) => {
     const porcentajeVAC = ((VAC / BAC) * 100).toFixed(1);
     
     if (VAC > BAC * 0.1) {
-      return `Ahorro significativo: ${porcentajeVAC}% del presupuesto. Oportunidad para reasignar recursos.`;
+      return `Ahorro significativo: ${porcentajeVAC}% del presupuesto. Oportunidad estratégica.`;
     } else if (VAC > 0) {
-      return `Ahorro proyectado: ${porcentajeVAC}% del presupuesto. Confirma eficiencia financiera.`;
+      return `Ahorro proyectado: ${porcentajeVAC}% del presupuesto. Eficiencia confirmada.`;
     } else if (VAC > -BAC * 0.1) {
       return `Sobre costo controlado: ${Math.abs(porcentajeVAC)}% del presupuesto. Requiere atención.`;
     } else {
-      return `Sobre costo crítico: ${Math.abs(porcentajeVAC)}% del presupuesto. Necesita intervención.`;
+      return `Sobre costo crítico: ${Math.abs(porcentajeVAC)}% del presupuesto. Intervención necesaria.`;
     }
   };
 
@@ -2620,6 +2628,290 @@ const Vectores = ({ proyectoId }) => {
     }
     
     return analisis;
+  };
+
+  // --- FUNCIÓN PARA GENERAR PDF TÉCNICO ---
+  const handleGenerarPDFTecnico = async () => {
+    try {
+      // Verificar que tenemos fecha de seguimiento
+      if (!fechaSeguimiento) {
+        alert('No hay fecha de seguimiento seleccionada. Por favor, seleccione una fecha en el análisis EVM.');
+        return;
+      }
+
+      // Obtener los indicadores EVM actuales
+      const indicadoresEVM = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+      if (!indicadoresEVM) {
+        alert('No hay datos suficientes para generar el PDF técnico. Asegúrese de tener datos cargados.');
+        return;
+      }
+
+      console.log('Generando PDF Técnico con indicadores:', indicadoresEVM);
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      
+      // Configuración de colores profesionales
+      const colors = {
+        primary: [25, 50, 100],     // Azul oscuro profesional
+        success: [56, 161, 105],    // Verde éxito
+        warning: [237, 137, 54],    // Naranja advertencia
+        danger: [220, 53, 69],      // Rojo peligro
+        dark: [45, 55, 72],         // Gris oscuro
+        light: [247, 250, 252],     // Gris claro
+        gold: [255, 193, 7]         // Dorado para destacados
+      };
+
+      // Fondo con patrón sutil
+      doc.setFillColor(240, 245, 250);
+      doc.rect(0, 0, 210, 297, 'F');
+      
+      // Patrón de líneas curvas sutiles
+      doc.setDrawColor(220, 230, 240);
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < 297; i += 20) {
+        doc.line(0, i, 210, i + 10);
+      }
+
+      // Header
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, 210, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('REPORTE TÉCNICO EVM', 105, 15, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`CODELCO | ${fechaSeguimiento}`, 105, 25, { align: 'center' });
+
+      let y = 45;
+
+      // Resumen General
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RESUMEN GENERAL', 20, y);
+      y += 8;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Fecha de seguimiento: ${fechaSeguimiento}`, 20, y);
+      y += 5;
+      doc.text(`Presupuesto total (BAC): $${(indicadoresEVM.BAC/1000000).toFixed(2)}M`, 20, y);
+      y += 5;
+      doc.text(`Costo real (AC): $${(indicadoresEVM.AC/1000000).toFixed(2)}M`, 20, y);
+      y += 5;
+      doc.text(`Valor ganado (EV): $${(indicadoresEVM.EV/1000000).toFixed(2)}M`, 20, y);
+      y += 5;
+      doc.text(`Costo planificado (PV): $${(indicadoresEVM.PV/1000000).toFixed(2)}M`, 20, y);
+      y += 12;
+
+      // Estado del Proyecto
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ESTADO DEL PROYECTO', 20, y);
+      y += 8;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      const porcentajeEV = indicadoresEVM.porcentajeEV || ((indicadoresEVM.EV / indicadoresEVM.BAC) * 100);
+      const porcentajePV = indicadoresEVM.porcentajePV || ((indicadoresEVM.PV / indicadoresEVM.BAC) * 100);
+      const porcentajeAC = indicadoresEVM.porcentajeAC || ((indicadoresEVM.AC / indicadoresEVM.BAC) * 100);
+
+      doc.text(`• ${porcentajeEV.toFixed(1)}% completado (EV)`, 20, y);
+      y += 5;
+      doc.text(`• ${porcentajePV.toFixed(1)}% planificado (PV)`, 20, y);
+      y += 5;
+      doc.text(`• ${porcentajeAC.toFixed(1)}% real (AC)`, 20, y);
+      y += 8;
+
+      // Estado del cronograma y costo
+      const estadoCronograma = indicadoresEVM.SPI > 1 ? 'Adelantado' : 'Atrasado';
+      const estadoCosto = indicadoresEVM.CPI > 1 ? 'Bajo Presupuesto' : 'Sobre Presupuesto';
+      
+      doc.text(`Estado del cronograma: ${estadoCronograma}`, 20, y);
+      y += 5;
+      doc.text(`Estado de costo: ${estadoCosto}`, 20, y);
+      y += 12;
+
+      // Indicadores Clave de Rendimiento
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INDICADORES CLAVE DE RENDIMIENTO', 20, y);
+      y += 8;
+
+      // Tabla de indicadores (formato técnico simplificado)
+      const indicadoresData = [
+        { nombre: 'CPI (Índice de Desempeño de Costos)', valor: `${indicadoresEVM.CPI.toFixed(3)} (${indicadoresEVM.CPI > 1 ? 'Eficiente' : 'Ineficiente'})` },
+        { nombre: 'SPI (Índice de Desempeño del Cronograma)', valor: `${indicadoresEVM.SPI.toFixed(3)} (${indicadoresEVM.SPI > 1 ? 'Adelantado' : 'Atrasado'})` },
+        { nombre: 'CV (Variación de Costo)', valor: `$${(indicadoresEVM.CV/1000000).toFixed(2)}M (${indicadoresEVM.CV > 0 ? 'Favorable' : 'Desfavorable'})` },
+        { nombre: 'SV (Variación de Cronograma)', valor: `$${(indicadoresEVM.SV/1000000).toFixed(2)}M (${indicadoresEVM.SV > 0 ? 'Favorable' : 'Desfavorable'})` }
+      ];
+
+      const indicadoresColWidth = 85; // Aumentado para consistencia con estimaciones
+      const indicadoresRowHeight = 12; // Aumentado para más espacio vertical
+      const indicadoresTableY = y;
+
+      // Encabezado con líneas
+      doc.setFillColor(...colors.primary);
+      doc.rect(20, indicadoresTableY, indicadoresColWidth, indicadoresRowHeight, 'F');
+      doc.rect(20 + indicadoresColWidth, indicadoresTableY, indicadoresColWidth, indicadoresRowHeight, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Indicador', 20 + indicadoresColWidth/2, indicadoresTableY + 5, { align: 'center' });
+      doc.text('Valor y Estado', 20 + indicadoresColWidth + indicadoresColWidth/2, indicadoresTableY + 5, { align: 'center' });
+
+      // Líneas horizontales del encabezado
+      doc.setDrawColor(...colors.primary);
+      doc.setLineWidth(0.5);
+      doc.line(20, indicadoresTableY, 20 + indicadoresColWidth * 2, indicadoresTableY);
+      doc.line(20, indicadoresTableY + indicadoresRowHeight, 20 + indicadoresColWidth * 2, indicadoresTableY + indicadoresRowHeight);
+
+      // Datos con líneas
+      indicadoresData.forEach((item, index) => {
+        const rowY = indicadoresTableY + indicadoresRowHeight + (index * indicadoresRowHeight);
+        
+        doc.setFillColor(255, 255, 255);
+        doc.rect(20, rowY, indicadoresColWidth, indicadoresRowHeight, 'F');
+        doc.rect(20 + indicadoresColWidth, rowY, indicadoresColWidth, indicadoresRowHeight, 'F');
+        
+        // Líneas horizontales de datos
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        doc.line(20, rowY, 20 + indicadoresColWidth * 2, rowY);
+        doc.line(20, rowY + indicadoresRowHeight, 20 + indicadoresColWidth * 2, rowY + indicadoresRowHeight);
+        
+        // Línea vertical central
+        doc.line(20 + indicadoresColWidth, rowY, 20 + indicadoresColWidth, rowY + indicadoresRowHeight);
+        
+        doc.setTextColor(...colors.dark);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        
+        // Texto de la primera columna (nombre)
+        const lineasNombre = doc.splitTextToSize(item.nombre, indicadoresColWidth - 4);
+        const nombreY = rowY + (indicadoresRowHeight - (lineasNombre.length * 4)) / 2 + 4;
+        lineasNombre.forEach((line, idx) => {
+          doc.text(line, 20 + indicadoresColWidth/2, nombreY + (idx * 4), { align: 'center' });
+        });
+        
+        // Determinar color basado en el contenido del valor
+        const valorText = item.valor.toLowerCase();
+        const colorEstado = valorText.includes('eficiente') || valorText.includes('adelantado') || valorText.includes('favorable') ? colors.success : colors.danger;
+        doc.setTextColor(...colorEstado);
+        
+        // Texto de la segunda columna (valor y estado)
+        const lineasValor = doc.splitTextToSize(item.valor, indicadoresColWidth - 4);
+        const valorY = rowY + (indicadoresRowHeight - (lineasValor.length * 4)) / 2 + 4;
+        lineasValor.forEach((line, idx) => {
+          doc.text(line, 20 + indicadoresColWidth + indicadoresColWidth/2, valorY + (idx * 4), { align: 'center' });
+        });
+      });
+
+      y = indicadoresTableY + indicadoresRowHeight + (indicadoresData.length * indicadoresRowHeight) + 15;
+
+      // Estimaciones Financieras
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ESTIMACIONES FINANCIERAS', 20, y);
+      y += 8;
+
+      const estimacionesData = [
+        {
+          nombre: 'EAC (Costo Estimado Total)',
+          valor: `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M - ${generarAnalisisEAC(indicadoresEVM)}`
+        },
+        {
+          nombre: 'ETC (Costo para Completar)',
+          valor: `$${(indicadoresEVM.ETC/1000000).toFixed(2)}M - ${generarAnalisisETC(indicadoresEVM)}`
+        },
+        {
+          nombre: 'VAC (Variación Final)',
+          valor: `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M - ${generarAnalisisVAC(indicadoresEVM)}`
+        }
+      ];
+
+      const estimacionesColWidth = 85; // Aumentado para dar más espacio al texto
+      const estimacionesRowHeight = 12; // Aumentado para más espacio vertical
+      const estimacionesTableY = y;
+
+      // Encabezado con líneas
+      doc.setFillColor(...colors.primary);
+      doc.rect(20, estimacionesTableY, estimacionesColWidth, estimacionesRowHeight, 'F');
+      doc.rect(20 + estimacionesColWidth, estimacionesTableY, estimacionesColWidth, estimacionesRowHeight, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Estimación', 20 + estimacionesColWidth/2, estimacionesTableY + 5, { align: 'center' });
+      doc.text('Valor y Análisis', 20 + estimacionesColWidth + estimacionesColWidth/2, estimacionesTableY + 5, { align: 'center' });
+
+      // Líneas horizontales del encabezado
+      doc.setDrawColor(...colors.primary);
+      doc.setLineWidth(0.5);
+      doc.line(20, estimacionesTableY, 20 + estimacionesColWidth * 2, estimacionesTableY);
+      doc.line(20, estimacionesTableY + estimacionesRowHeight, 20 + estimacionesColWidth * 2, estimacionesTableY + estimacionesRowHeight);
+
+      // Datos con líneas
+      estimacionesData.forEach((item, index) => {
+        const rowY = estimacionesTableY + estimacionesRowHeight + (index * estimacionesRowHeight);
+        
+        doc.setFillColor(255, 255, 255);
+        doc.rect(20, rowY, estimacionesColWidth, estimacionesRowHeight, 'F');
+        doc.rect(20 + estimacionesColWidth, rowY, estimacionesColWidth, estimacionesRowHeight, 'F');
+        
+        // Líneas horizontales de datos
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        doc.line(20, rowY, 20 + estimacionesColWidth * 2, rowY);
+        doc.line(20, rowY + estimacionesRowHeight, 20 + estimacionesColWidth * 2, rowY + estimacionesRowHeight);
+        
+        // Línea vertical central
+        doc.line(20 + estimacionesColWidth, rowY, 20 + estimacionesColWidth, rowY + estimacionesRowHeight);
+        
+        doc.setTextColor(...colors.dark);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        
+        // Texto de la primera columna (nombre)
+        const lineasNombre = doc.splitTextToSize(item.nombre, estimacionesColWidth - 4);
+        const nombreY = rowY + (estimacionesRowHeight - (lineasNombre.length * 4)) / 2 + 4;
+        lineasNombre.forEach((line, idx) => {
+          doc.text(line, 20 + estimacionesColWidth/2, nombreY + (idx * 4), { align: 'center' });
+        });
+        
+        // Texto de la segunda columna (valor y análisis)
+        const lineasValor = doc.splitTextToSize(item.valor, estimacionesColWidth - 4);
+        const valorY = rowY + (estimacionesRowHeight - (lineasValor.length * 4)) / 2 + 4;
+        lineasValor.forEach((line, idx) => {
+          doc.text(line, 20 + estimacionesColWidth + estimacionesColWidth/2, valorY + (idx * 4), { align: 'center' });
+        });
+      });
+
+      y = estimacionesTableY + estimacionesRowHeight + (estimacionesData.length * estimacionesRowHeight) + 15;
+
+      // Sección de Análisis Técnico eliminada como solicitado
+
+      // Footer
+      doc.setFillColor(...colors.dark);
+      doc.rect(0, 287, 210, 10, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.text('CODELCO - Reporte Técnico EVM | Página 1 de 1', 105, 292, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, 105, 297, { align: 'center' });
+
+      // Guardar el PDF
+      doc.save(`Reporte_Tecnico_EVM_${fechaSeguimiento}.pdf`);
+      
+      console.log('PDF Técnico generado exitosamente');
+    } catch (error) {
+      console.error('Error al generar PDF técnico:', error);
+      alert('Error al generar el PDF técnico. Por favor, intente nuevamente.');
+    }
   };
 
   // --- FUNCIÓN PARA GENERAR PDF DEL ANÁLISIS EVM ---
@@ -3733,7 +4025,7 @@ const Vectores = ({ proyectoId }) => {
       alignItems: 'center'
     }}>
           <button
-        onClick={handleGenerarPDFEVM}
+        onClick={handleGenerarPDFTecnico}
             style={{
           backgroundColor: '#1877f2',
               color: 'white',
