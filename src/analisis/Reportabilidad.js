@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell, PieChart, Pie, ComposedChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, BarChart, Bar, LabelList, Cell, PieChart, Pie, ComposedChart, ReferenceLine } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { API_BASE } from '../config';
@@ -86,6 +86,7 @@ const reportes = [
   { value: 'eficiencia_gasto', label: 'Eficiencia del Gasto' },
   { value: 'cumplimiento_fisico', label: 'Cumplimiento Físico' },
   { value: 'predictividad', label: 'Predictividad' },
+  { value: 'lineas_bases', label: 'Líneas Bases - Real/Proyectado' },
   
   
 ];
@@ -538,6 +539,8 @@ const Reportabilidad = ({ proyectoId }) => {
         return <ReporteEficienciaGasto data={datosReporte} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} />;
       case 'cumplimiento_fisico':
         return <ReporteCumplimientoFisico data={datosReporte} autorizado={autorizado} setAutorizado={setAutorizado} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} datosCumplimientoFisico={datosCumplimientoFisico} filtroVector={filtroVector} setFiltroVector={setFiltroVector} />;
+      case 'lineas_bases':
+        return <ReporteLineasBases proyectoId={proyectoId} />;
       default:
         return <div>Selecciona un reporte</div>;
     }
@@ -5868,103 +5871,107 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       boxSizing: 'border-box',
       zIndex: 1,
     }}>
+
+
       {/* Filtros de fecha */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: 18,
-        marginBottom: 12,
-        flexWrap: 'wrap',
-        width: '100%',
-        margin: 0,
-        padding: '20px 20px 0 20px',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end', margin: 0, padding: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
-            <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
-            <input
-              type="month"
-              value={fechaDesde}
-              onChange={e => setFechaDesde(e.target.value)}
-              style={{
-                border: '2px solid #1d69db',
-                borderRadius: 6,
-                padding: '6px 10px',
-                fontSize: 10,
-                color: '#222',
-                fontWeight: 500,
-                outline: 'none',
-              }}
-            />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
-            <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
-            <input
-              type="month"
-              value={fechaHasta}
-              onChange={e => setFechaHasta(e.target.value)}
-              style={{
-                border: '2px solid #3399ff',
-                borderRadius: 6,
-                padding: '6px 10px',
-                fontSize: 10,
-                color: '#222',
-                fontWeight: 500,
-                outline: 'none',
-              }}
-            />
-          </div>
-          {/* Filtro de descripción solo para predictividad */}
-          {seleccion === 'predictividad' && (
+      {seleccion !== 'lineas_bases' && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 18,
+          marginBottom: 12,
+          flexWrap: 'wrap',
+          width: '100%',
+          margin: 0,
+          padding: '20px 20px 0 20px',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end', margin: 0, padding: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
-              <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Descripción</label>
-              <select
-                value={filtroDescripcion}
-                onChange={e => setFiltroDescripcion(e.target.value)}
+              <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
+              <input
+                type="month"
+                value={fechaDesde}
+                onChange={e => setFechaDesde(e.target.value)}
                 style={{
-                  border: '2px solid rgb(22, 53, 93)',
+                  border: '2px solid #1d69db',
                   borderRadius: 6,
                   padding: '6px 10px',
                   fontSize: 10,
                   color: '#222',
                   fontWeight: 500,
                   outline: 'none',
-                  minWidth: '150px',
-                  backgroundColor: '#fff',
                 }}
-              >
-                <option value="">Todas las descripciones</option>
-                {descripcionesDisponibles.map((descripcion, index) => (
-                  <option key={index} value={descripcion}>
-                    {descripcion}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
-          )}
-          <button
-            onClick={() => { 
-              setFechaDesde(''); 
-              setFechaHasta(''); 
-              setFiltroDescripcion('');
-            }}
-            title="Limpiar todos los filtros"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#6c2eb6',
-              fontSize: 22,
-              marginLeft: 4,
-              cursor: 'pointer',
-              padding: 0,
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <span role="img" aria-label="barrer">🧹</span>
-          </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
+              <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
+              <input
+                type="month"
+                value={fechaHasta}
+                onChange={e => setFechaHasta(e.target.value)}
+                style={{
+                  border: '2px solid #3399ff',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: 10,
+                  color: '#222',
+                  fontWeight: 500,
+                  outline: 'none',
+                }}
+              />
+            </div>
+            {/* Filtro de descripción solo para predictividad */}
+            {seleccion === 'predictividad' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
+                <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Descripción</label>
+                <select
+                  value={filtroDescripcion}
+                  onChange={e => setFiltroDescripcion(e.target.value)}
+                  style={{
+                    border: '2px solid rgb(22, 53, 93)',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    fontSize: 10,
+                    color: '#222',
+                    fontWeight: 500,
+                    outline: 'none',
+                    minWidth: '150px',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  <option value="">Todas las descripciones</option>
+                  {descripcionesDisponibles.map((descripcion, index) => (
+                    <option key={index} value={descripcion}>
+                      {descripcion}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              onClick={() => { 
+                setFechaDesde(''); 
+                setFechaHasta(''); 
+                setFiltroDescripcion('');
+              }}
+              title="Limpiar todos los filtros"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#6c2eb6',
+                fontSize: 22,
+                marginLeft: 4,
+                cursor: 'pointer',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <span role="img" aria-label="barrer">🧹</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Contenido del reporte */}
       <div style={{ padding: '0 20px' }}>
@@ -5978,6 +5985,1137 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         sidebarVisible={sidebarVisible} 
         setSidebarVisible={setSidebarVisible} 
       />
+    </div>
+  );
+};
+
+// Componente para el reporte de Líneas Bases - Real/Proyectado
+const ReporteLineasBases = ({ proyectoId }) => {
+  // Estados para las 5 tablas
+  const [tablaReal, setTablaReal] = useState([]);
+  const [tablaNpc, setTablaNpc] = useState([]);
+  const [tablaPoa, setTablaPoa] = useState([]);
+  const [tablaV0, setTablaV0] = useState([]);
+  const [tablaApi, setTablaApi] = useState([]);
+  
+  // Estados para importación
+  const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
+  const [excelData, setExcelData] = useState([]);
+  const [importando, setImportando] = useState(false);
+  const [tablaSeleccionada, setTablaSeleccionada] = useState('av_fisico_real');
+  const [mensajeImportacion, setMensajeImportacion] = useState('');
+  const [tipoMensaje, setTipoMensaje] = useState('info');
+  const fileInputRef = useRef(null);
+
+  // Estados para filtros
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroVector, setFiltroVector] = useState('');
+  
+  // Estado para controlar qué tabla mostrar
+  const [tablaVisualizar, setTablaVisualizar] = useState('todas');
+  
+  // Estado para fecha de última importación
+  const [ultimaImportacion, setUltimaImportacion] = useState(null);
+
+  // Cargar datos de las tablas
+  const cargarDatosTabla = async (tabla, setter) => {
+    try {
+    if (!proyectoId) return;
+    
+      const response = await fetch(`${API_BASE}/${tabla}.php?proyecto_id=${proyectoId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setter(data.data);
+      } else {
+        setter([]);
+      }
+    } catch (error) {
+      console.error(`Error cargando datos de ${tabla}:`, error);
+      setter([]);
+    }
+  };
+
+  // Cargar todas las tablas al montar el componente
+  useEffect(() => {
+    if (proyectoId) {
+      cargarDatosTabla('av_fisico_real', setTablaReal);
+      cargarDatosTabla('av_fisico_npc', setTablaNpc);
+      cargarDatosTabla('av_fisico_poa', setTablaPoa);
+      cargarDatosTabla('av_fisico_v0', setTablaV0);
+      cargarDatosTabla('av_fisico_api', setTablaApi);
+    }
+  }, [proyectoId]);
+
+  // Función para manejar la selección de archivo
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setArchivoSeleccionado(file);
+      setExcelData([]);
+      setMensajeImportacion('');
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const workbook = XLSX.read(e.target.result, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (data.length > 1) {
+            const headers = data[0];
+            const rows = data.slice(1).map(row => {
+              const obj = {};
+              headers.forEach((header, index) => {
+                obj[header] = row[index];
+              });
+              return obj;
+            });
+            setExcelData(rows);
+            setMensajeImportacion(`✅ Archivo cargado: ${rows.length} filas de datos`);
+            setTipoMensaje('success');
+          }
+        } catch (error) {
+          setMensajeImportacion('❌ Error al leer el archivo Excel');
+          setTipoMensaje('error');
+        }
+      };
+      reader.readAsBinaryString(file);
+    }
+  };
+
+  // Función para convertir fecha de Excel a MySQL
+  const excelDateToMysql = (excelDate) => {
+    if (!excelDate) return null;
+    
+    if (typeof excelDate === 'string') {
+      // Remover " real" del final si existe
+      const cleanDate = excelDate.replace(/\s+real$/i, '');
+      
+      // Si es DD-MM-YYYY
+      if (/^\d{2}-\d{2}-\d{4}$/.test(cleanDate)) {
+        const [day, month, year] = cleanDate.split('-');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // Si es YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+        return cleanDate;
+      }
+      
+      // Intentar parsear como fecha estándar
+      const date = new Date(cleanDate);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    }
+    
+    if (typeof excelDate === 'number') {
+      // Si es un número (fecha de Excel), convertirla
+      const date = new Date((excelDate - 25569) * 86400 * 1000);
+      return date.toISOString().split('T')[0];
+    }
+    
+    return null;
+  };
+
+  // Función para normalizar claves
+  const normalizeKeys = (row) => {
+    const normalized = {};
+    Object.keys(row).forEach(key => {
+      const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
+      normalized[normalizedKey] = row[key];
+    });
+    return normalized;
+  };
+
+  // Función para mapear filas de Excel según la tabla seleccionada
+  const mapExcelRow = (row) => {
+    const normalizedRow = normalizeKeys(row);
+    
+    // Función para limpiar ID (remover "real" del final)
+    const cleanId = (id) => {
+      if (typeof id === 'string') {
+        return id.replace(/real$/i, '');
+      }
+      return id;
+    };
+    
+    // Función para limpiar porcentajes
+    const cleanPercentage = (value) => {
+      if (!value) return 0;
+      
+      let cleanValue = String(value).trim();
+      
+      // Remover símbolo de porcentaje
+      const hasPercentage = cleanValue.includes('%');
+      cleanValue = cleanValue.replace('%', '');
+      
+      // Convertir coma a punto
+      cleanValue = cleanValue.replace(',', '.');
+      
+      const numValue = parseFloat(cleanValue);
+      if (isNaN(numValue)) return 0;
+      
+      // Si tenía símbolo de porcentaje, convertir a decimal (dividir por 100)
+      if (hasPercentage) {
+        return Math.min(numValue / 100, 9.9999); // Máximo para DECIMAL(5,4)
+      }
+      
+      // Si no tenía símbolo de porcentaje, asumir que ya es decimal
+      return Math.min(numValue, 9.9999); // Máximo para DECIMAL(5,4)
+    };
+    
+    const baseMapping = {
+      proyecto_id: proyectoId,
+      periodo: excelDateToMysql(normalizedRow.periodo || normalizedRow.fecha),
+      vector: normalizedRow.vector || '',
+      ie_parcial: cleanPercentage(normalizedRow.ie_parcial || normalizedRow.ie || 0),
+      ie_acumulado: cleanPercentage(normalizedRow.ie_acumulado || normalizedRow.ie_acum || 0),
+      em_parcial: cleanPercentage(normalizedRow.em_parcial || normalizedRow.em || 0),
+      em_acumulado: cleanPercentage(normalizedRow.em_acumulado || normalizedRow.em_acum || 0),
+      mo_parcial: cleanPercentage(normalizedRow.mo_parcial || normalizedRow.mo || 0),
+      mo_acumulado: cleanPercentage(normalizedRow.mo_acumulado || normalizedRow.mo_acum || 0),
+      api_parcial: cleanPercentage(normalizedRow.api_parcial || normalizedRow.api || 0),
+      api_acum: cleanPercentage(normalizedRow.api_acum || normalizedRow.api_acumulado || 0)
+    };
+
+    // Agregar el ID específico según la tabla
+    switch (tablaSeleccionada) {
+      case 'av_fisico_real':
+        return { id: cleanId(normalizedRow.id || normalizedRow.id_av_real || ''), ...baseMapping };
+      case 'av_fisico_npc':
+        return { id: cleanId(normalizedRow.id || normalizedRow.id_av_npc || ''), ...baseMapping };
+      case 'av_fisico_poa':
+        return { id: cleanId(normalizedRow.id || normalizedRow.id_av_poa || ''), ...baseMapping };
+      case 'av_fisico_v0':
+        return { id: cleanId(normalizedRow.id || normalizedRow.id_av_v0 || ''), ...baseMapping };
+      case 'av_fisico_api':
+        return { id: cleanId(normalizedRow.id || normalizedRow.id_av_api || ''), ...baseMapping };
+      default:
+        return baseMapping;
+    }
+  };
+
+  // Función para importar datos
+  const handleImportar = async () => {
+    if (!excelData || excelData.length === 0) {
+      setMensajeImportacion('❌ No hay datos para importar');
+      setTipoMensaje('error');
+      return;
+    }
+
+    setImportando(true);
+    try {
+      const mappedData = excelData.map(mapExcelRow);
+      
+      // Debug: mostrar los datos mapeados
+      console.log('Datos mapeados:', mappedData);
+      
+      const response = await fetch(`${API_BASE}/importaciones/importar_av_real_proyectado.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rows: mappedData,
+          tabla: tablaSeleccionada,
+          proyecto_id: proyectoId
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setMensajeImportacion(`✅ Importación exitosa: ${result.inserted} registros importados`);
+        setTipoMensaje('success');
+        
+        // Actualizar fecha de última importación
+        setUltimaImportacion(new Date().toLocaleString('es-ES'));
+        
+        // Recargar datos de la tabla correspondiente
+        switch (tablaSeleccionada) {
+          case 'av_fisico_real':
+            cargarDatosTabla('av_fisico_real', setTablaReal);
+            break;
+          case 'av_fisico_npc':
+            cargarDatosTabla('av_fisico_npc', setTablaNpc);
+            break;
+          case 'av_fisico_poa':
+            cargarDatosTabla('av_fisico_poa', setTablaPoa);
+            break;
+          case 'av_fisico_v0':
+            cargarDatosTabla('av_fisico_v0', setTablaV0);
+            break;
+          case 'av_fisico_api':
+            cargarDatosTabla('av_fisico_api', setTablaApi);
+            break;
+        }
+        
+        // Limpiar archivo
+        setArchivoSeleccionado(null);
+        setExcelData([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } else {
+        let errorMessage = result.error || 'Error desconocido';
+        if (result.errores && Array.isArray(result.errores)) {
+          errorMessage += '\n\nErrores específicos:\n' + result.errores.join('\n');
+        }
+        setMensajeImportacion(`❌ Error en la importación: ${errorMessage}`);
+        setTipoMensaje('error');
+      }
+    } catch (error) {
+      setMensajeImportacion(`❌ Error de conexión: ${error.message}`);
+      setTipoMensaje('error');
+    }
+    setImportando(false);
+  };
+
+  // Función para obtener datos filtrados
+  const getDatosFiltrados = (datos) => {
+    let filtrados = datos;
+    
+    if (fechaDesde) {
+      filtrados = filtrados.filter(row => row.periodo >= fechaDesde);
+    }
+    if (fechaHasta) {
+      filtrados = filtrados.filter(row => row.periodo <= fechaHasta);
+    }
+    if (filtroVector) {
+      filtrados = filtrados.filter(row => row.vector === filtroVector);
+    }
+    
+    return filtrados;
+  };
+
+  // Obtener vectores únicos para el filtro
+  const obtenerVectoresUnicos = () => {
+    const todosLosDatos = [...tablaReal, ...tablaNpc, ...tablaPoa, ...tablaV0, ...tablaApi];
+    const vectores = [...new Set(todosLosDatos.map(row => row.vector).filter(v => v))];
+    return vectores.sort();
+  };
+
+  // Obtener datos de la tabla seleccionada para visualizar
+  const obtenerDatosTablaSeleccionada = () => {
+    switch (tablaVisualizar) {
+      case 'real':
+        return getDatosFiltrados(tablaReal);
+      case 'npc':
+        return getDatosFiltrados(tablaNpc);
+      case 'poa':
+        return getDatosFiltrados(tablaPoa);
+      case 'v0':
+        return getDatosFiltrados(tablaV0);
+      case 'api':
+        return getDatosFiltrados(tablaApi);
+      case 'todas':
+      default:
+        // Ordenar según preferencia: REAL, V0, NPC, API
+        const datosOrdenados = [
+          ...getDatosFiltrados(tablaReal).map(row => ({ ...row, tipo: 'REAL' })),
+          ...getDatosFiltrados(tablaV0).map(row => ({ ...row, tipo: 'V0' })),
+          ...getDatosFiltrados(tablaNpc).map(row => ({ ...row, tipo: 'NPC' })),
+          ...getDatosFiltrados(tablaApi).map(row => ({ ...row, tipo: 'API' }))
+        ];
+        return datosOrdenados;
+    }
+  };
+
+  // Función para obtener la fecha actual formateada
+  const obtenerFechaActual = () => {
+    const hoy = new Date();
+    const año = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+
+  // Función para obtener la posición de la línea de corte
+  const obtenerPosicionLineaCorte = () => {
+    const datosGrafica = prepararDatosCurvaS();
+    if (datosGrafica.length === 0) return null;
+    
+    const fechaActual = obtenerFechaActual();
+    
+    // Debug: mostrar información
+    console.log('Datos de la gráfica:', datosGrafica.map(d => d.periodo));
+    console.log('Fecha actual:', fechaActual);
+    
+    // Buscar si existe un período exacto para hoy
+    const periodoExacto = datosGrafica.find(dato => dato.periodo === fechaActual);
+    if (periodoExacto) {
+      console.log('Período exacto encontrado:', fechaActual);
+      return fechaActual;
+    }
+    
+    // Si no existe, buscar el período más cercano a la fecha actual
+    const fechaActualObj = new Date(fechaActual);
+    let periodoMasCercano = null;
+    let diferenciaMinima = Infinity;
+    
+    datosGrafica.forEach(dato => {
+      const fechaDato = new Date(dato.periodo);
+      const diferencia = Math.abs(fechaActualObj - fechaDato);
+      if (diferencia < diferenciaMinima) {
+        diferenciaMinima = diferencia;
+        periodoMasCercano = dato.periodo;
+      }
+    });
+    
+    console.log('Período más cercano encontrado:', periodoMasCercano);
+    return periodoMasCercano;
+  };
+
+  // Función para preparar datos de la Curva S
+  const prepararDatosCurvaS = () => {
+    const datosReal = getDatosFiltrados(tablaReal);
+    const datosV0 = getDatosFiltrados(tablaV0);
+    const datosNpc = getDatosFiltrados(tablaNpc);
+    const datosApi = getDatosFiltrados(tablaApi);
+
+    // Obtener todos los períodos únicos
+    const todosLosPeriodos = new Set();
+    [...datosReal, ...datosV0, ...datosNpc, ...datosApi].forEach(row => {
+      if (row.periodo) {
+        todosLosPeriodos.add(row.periodo);
+      }
+    });
+
+    // Ordenar períodos
+    const periodosOrdenados = Array.from(todosLosPeriodos).sort();
+
+    // Crear datos para la gráfica usando api_acum de cada tabla
+    const datosGrafica = periodosOrdenados.map(periodo => {
+      const realData = datosReal.find(row => row.periodo === periodo);
+      const v0Data = datosV0.find(row => row.periodo === periodo);
+      const npcData = datosNpc.find(row => row.periodo === periodo);
+      const apiData = datosApi.find(row => row.periodo === periodo);
+
+      return {
+        periodo: periodo,
+        fecha: new Date(periodo),
+        real: realData ? parseFloat(realData.api_acum || 0) * 100 : 0,
+        v0: v0Data ? parseFloat(v0Data.api_acum || 0) * 100 : 0,
+        npc: npcData ? parseFloat(npcData.api_acum || 0) * 100 : 0,
+        api: apiData ? parseFloat(apiData.api_acum || 0) * 100 : 0
+      };
+    });
+
+    return datosGrafica;
+  };
+
+    return (
+    <div style={{ padding: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ color: '#16355D', margin: 0 }}>
+          Líneas Bases - Real/Proyectado
+        </h2>
+        
+        {ultimaImportacion && (
+          <div style={{ 
+            background: '#e8f5e8', 
+            padding: '8px 12px', 
+            borderRadius: '6px', 
+            border: '1px solid #4caf50',
+            fontSize: '12px',
+            color: '#2e7d32'
+          }}>
+            <span style={{ fontWeight: 'bold' }}>📅 Última importación:</span> {ultimaImportacion}
+          </div>
+        )}
+      </div>
+
+      {/* Sección de importación */}
+      <div style={{ 
+        background: '#f8f9fa', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        marginBottom: '20px',
+        border: '1px solid #dee2e6'
+      }}>
+        <h3 style={{ color: '#16355D', marginBottom: '15px' }}>Importar Datos</h3>
+        
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Seleccionar Tabla:
+            </label>
+            <select
+              value={tablaSeleccionada}
+              onChange={(e) => setTablaSeleccionada(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                minWidth: '200px'
+              }}
+            >
+              <option value="av_fisico_real">Real</option>
+              <option value="av_fisico_npc">NPC</option>
+              <option value="av_fisico_poa">POA</option>
+              <option value="av_fisico_v0">V0</option>
+              <option value="av_fisico_api">API</option>
+            </select>
+      </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Archivo Excel:
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileSelect}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+          
+          <button
+            onClick={handleImportar}
+            disabled={importando || !archivoSeleccionado}
+            style={{
+              background: importando ? '#6c757d' : '#28a745',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '4px',
+              cursor: importando ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            {importando ? 'Importando...' : 'Importar'}
+          </button>
+        </div>
+
+        {mensajeImportacion && (
+      <div style={{ 
+            padding: '10px',
+            borderRadius: '4px',
+            backgroundColor: tipoMensaje === 'success' ? '#d4edda' : '#f8d7da',
+            color: tipoMensaje === 'success' ? '#155724' : '#721c24',
+            border: `1px solid ${tipoMensaje === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+          }}>
+            {mensajeImportacion}
+      </div>
+        )}
+        
+        {ultimaImportacion && (
+          <div style={{ 
+            marginTop: '10px',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            backgroundColor: '#fff3cd',
+            color: '#856404',
+            border: '1px solid #ffeaa7',
+            fontSize: '12px'
+          }}>
+            <span style={{ fontWeight: 'bold' }}>📅 Última importación:</span> {ultimaImportacion}
+          </div>
+        )}
+      </div>
+
+      {/* Filtros */}
+      <div style={{ 
+        background: '#f8f9fa', 
+        padding: '15px', 
+        borderRadius: '8px', 
+        marginBottom: '20px',
+        border: '1px solid #dee2e6'
+      }}>
+        <h4 style={{ color: '#16355D', marginBottom: '10px' }}>Filtros</h4>
+        
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px' }}>Desde:</label>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '12px'
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px' }}>Hasta:</label>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '12px'
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px' }}>Vector:</label>
+            <select
+              value={filtroVector}
+              onChange={(e) => setFiltroVector(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '12px',
+                minWidth: '120px'
+              }}
+            >
+              <option value="">Todos los vectores</option>
+              {obtenerVectoresUnicos().map((vector, index) => (
+                <option key={index} value={vector}>{vector}</option>
+              ))}
+            </select>
+          </div>
+          
+          <button
+            onClick={() => {
+              setFechaDesde('');
+              setFechaHasta('');
+              setFiltroVector('');
+            }}
+            style={{
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      {/* Selector de tabla para visualizar */}
+      <div style={{ 
+        background: '#f8f9fa', 
+        padding: '15px', 
+        borderRadius: '8px', 
+        marginBottom: '20px',
+        border: '1px solid #dee2e6'
+      }}>
+        <h4 style={{ color: '#16355D', marginBottom: '15px' }}>Seleccionar Tabla para Visualizar</h4>
+        
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setTablaVisualizar('todas')}
+            style={{
+              background: tablaVisualizar === 'todas' ? '#16355D' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Todas las Tablas
+          </button>
+          
+          <button
+            onClick={() => setTablaVisualizar('real')}
+            style={{
+              background: tablaVisualizar === 'real' ? '#28a745' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Solo Real
+          </button>
+          
+          <button
+            onClick={() => setTablaVisualizar('npc')}
+            style={{
+              background: tablaVisualizar === 'npc' ? '#007bff' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Solo NPC
+          </button>
+          
+          <button
+            onClick={() => setTablaVisualizar('poa')}
+            style={{
+              background: tablaVisualizar === 'poa' ? '#ffc107' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Solo POA
+          </button>
+          
+          <button
+            onClick={() => setTablaVisualizar('v0')}
+            style={{
+              background: tablaVisualizar === 'v0' ? '#17a2b8' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Solo V0
+          </button>
+          
+          <button
+            onClick={() => setTablaVisualizar('api')}
+            style={{
+              background: tablaVisualizar === 'api' ? '#dc3545' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '10px 15px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Solo API
+          </button>
+        </div>
+      </div>
+
+      {/* Resumen de datos */}
+        <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '15px', 
+        marginBottom: '20px' 
+      }}>
+        <div style={{ 
+          background: '#fff', 
+          padding: '15px', 
+          borderRadius: '8px', 
+          border: '1px solid #dee2e6',
+          textAlign: 'center'
+        }}>
+          <h5 style={{ color: '#16355D', marginBottom: '10px' }}>Real</h5>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
+            {getDatosFiltrados(tablaReal).length}
+        </div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+        </div>
+        
+        <div style={{ 
+          background: '#fff', 
+          padding: '15px', 
+            borderRadius: '8px',
+          border: '1px solid #dee2e6',
+          textAlign: 'center'
+        }}>
+          <h5 style={{ color: '#16355D', marginBottom: '10px' }}>NPC</h5>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>
+            {getDatosFiltrados(tablaNpc).length}
+          </div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+        </div>
+        
+        <div style={{ 
+          background: '#fff', 
+          padding: '15px', 
+          borderRadius: '8px', 
+          border: '1px solid #dee2e6',
+          textAlign: 'center'
+        }}>
+          <h5 style={{ color: '#16355D', marginBottom: '10px' }}>POA</h5>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffc107' }}>
+            {getDatosFiltrados(tablaPoa).length}
+        </div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+        </div>
+        
+        <div style={{ 
+          background: '#fff', 
+          padding: '15px', 
+          borderRadius: '8px', 
+          border: '1px solid #dee2e6',
+          textAlign: 'center'
+        }}>
+          <h5 style={{ color: '#16355D', marginBottom: '10px' }}>V0</h5>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>
+            {getDatosFiltrados(tablaV0).length}
+          </div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+        </div>
+        
+        <div style={{ 
+          background: '#fff', 
+          padding: '15px', 
+          borderRadius: '8px', 
+          border: '1px solid #dee2e6',
+          textAlign: 'center'
+        }}>
+          <h5 style={{ color: '#16355D', marginBottom: '10px' }}>API</h5>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc3545' }}>
+            {getDatosFiltrados(tablaApi).length}
+          </div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+        </div>
+      </div>
+
+      {/* Gráfico Curva S */}
+      <div style={{ 
+        background: '#fff', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        border: '1px solid #dee2e6',
+        marginBottom: '20px'
+      }}>
+        <h4 style={{ color: '#16355D', marginBottom: '15px', textAlign: 'center' }}>
+          📈 Curva S - API Acumulado (Real, V0, NPC, API)
+        </h4>
+        
+        {prepararDatosCurvaS().length > 0 ? (
+          <div style={{ height: '400px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={prepararDatosCurvaS()} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="periodo" 
+                  stroke="#666"
+                  fontSize={10}
+                  tick={{ fill: '#666' }}
+                  type="category"
+                  interval="preserveStartEnd"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  tickMargin={8}
+                  tickFormatter={(value) => {
+                    // Formatear fecha de YYYY-MM-DD a MM/YY
+                    const parts = value.split('-');
+                    const month = parts[1];
+                    const year = parts[0].slice(-2);
+                    return `${month}/${year}`;
+                  }}
+                />
+                <YAxis 
+                  stroke="#666"
+                  fontSize={11}
+                  tick={{ fill: '#666' }}
+                  tickFormatter={(value) => `${value.toFixed(1)}%`}
+                  domain={[0, 100]}
+                  label={{ value: 'API Acumulado (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
+                />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      // Formatear fecha de YYYY-MM-DD a MM/YYYY
+                      const parts = label.split('-');
+                      const month = parts[1];
+                      const year = parts[0];
+                      const periodoFormateado = `${month}/${year}`;
+                      
+                      return (
+                        <div style={{
+                          background: '#fff',
+                          border: '1px solid #ddd',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          padding: '12px',
+                          fontSize: '12px',
+                          fontFamily: 'Arial, sans-serif'
+                        }}>
+                          <div style={{
+                            borderBottom: '1px solid #eee',
+                            paddingBottom: '8px',
+                            marginBottom: '8px',
+                            fontWeight: 'bold',
+                            color: '#333',
+                            fontSize: '13px'
+                          }}>
+                            Período: {periodoFormateado}
+                          </div>
+                          
+                          {payload.map((entry, index) => (
+                            <div key={index} style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: '4px',
+                              padding: '2px 4px',
+                              borderRadius: '3px',
+                              backgroundColor: `${entry.color}10`
+                            }}>
+                              <span style={{ 
+                                color: entry.color, 
+                                fontWeight: '600',
+                                fontSize: '11px'
+                              }}>
+                                {entry.name.toUpperCase()}:
+                              </span>
+                              <span style={{ 
+                                fontWeight: 'bold',
+                                color: '#333',
+                                fontSize: '11px',
+                                backgroundColor: `${entry.color}20`,
+                                padding: '1px 4px',
+                                borderRadius: '2px'
+                              }}>
+                                {entry.value.toFixed(2)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend 
+                  wrapperStyle={{ paddingTop: '10px' }}
+                />
+                
+                {/* Líneas de cada vector */}
+                <Line 
+                  type="monotone" 
+                  dataKey="real" 
+                  stroke="#28a745" 
+                  strokeWidth={1.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={false}
+                  name="REAL"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="v0" 
+                  stroke="#17a2b8" 
+                  strokeWidth={1.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={false}
+                  name="V0"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="npc" 
+                  stroke="#007bff" 
+                  strokeWidth={1.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={false}
+                  name="NPC"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="api" 
+                  stroke="#dc3545" 
+                  strokeWidth={1.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={false}
+                  name="API"
+                />
+                
+                {/* Línea vertical de corte - fecha actual */}
+                {obtenerPosicionLineaCorte() && (
+                  <ReferenceLine 
+                    x={obtenerPosicionLineaCorte()} 
+                    stroke="#ff6b35" 
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    label={{
+                      value: "HOY",
+                      position: "top",
+                      fill: "#ff6b35",
+                      fontSize: 10,
+                      fontWeight: "bold"
+                    }}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px',
+            color: '#6c757d',
+            background: '#f8f9fa',
+            borderRadius: '8px'
+          }}>
+            <p>No hay datos suficientes para mostrar la Curva S.</p>
+            <p>Importa datos de Real, V0, NPC y API para visualizar la gráfica de API Acumulado.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla de datos */}
+      <div style={{ 
+        background: '#fff', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        border: '1px solid #dee2e6',
+        overflowX: 'auto'
+      }}>
+        <h4 style={{ color: '#16355D', marginBottom: '15px' }}>
+          Datos de {tablaVisualizar === 'todas' ? 'Todas las Tablas' : 
+                     tablaVisualizar === 'real' ? 'Real' :
+                     tablaVisualizar === 'npc' ? 'NPC' :
+                     tablaVisualizar === 'poa' ? 'POA' :
+                     tablaVisualizar === 'v0' ? 'V0' : 'API'}
+          ({obtenerDatosTablaSeleccionada().length} registros)
+        </h4>
+        
+        {obtenerDatosTablaSeleccionada().length > 0 ? (
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            fontSize: '12px'
+          }}>
+            <thead>
+              <tr style={{ 
+                background: '#16355D', 
+                color: 'white',
+                position: 'sticky',
+                top: 0
+              }}>
+                {tablaVisualizar === 'todas' && (
+                  <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #dee2e6' }}>
+                    Tipo
+                  </th>
+                )}
+
+                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #dee2e6' }}>
+                  Vector
+                </th>
+                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #dee2e6' }}>
+                  Período
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  IE Parcial
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  IE Acumulado
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  EM Parcial
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  EM Acumulado
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  MO Parcial
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  MO Acumulado
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  API Parcial
+                </th>
+                <th style={{ padding: '10px', textAlign: 'center', border: '1px solid #dee2e6' }}>
+                  API Acumulado
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {obtenerDatosTablaSeleccionada().map((row, index) => (
+                <tr key={index} style={{ 
+                  background: index % 2 === 0 ? '#f8f9fa' : '#fff',
+                  borderBottom: '1px solid #dee2e6'
+                }}>
+                  {tablaVisualizar === 'todas' && (
+                    <td style={{ 
+                      padding: '8px', 
+                      border: '1px solid #dee2e6',
+                      fontWeight: 'bold',
+                      color: row.tipo === 'REAL' ? '#28a745' :
+                             row.tipo === 'V0' ? '#17a2b8' :
+                             row.tipo === 'NPC' ? '#007bff' : '#dc3545'
+                    }}>
+                      {row.tipo}
+                    </td>
+                  )}
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6' }}>
+                    {row.vector || '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6' }}>
+                    {row.periodo ? new Date(row.periodo).toLocaleDateString('es-ES') : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.ie_parcial ? `${(parseFloat(row.ie_parcial) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.ie_acumulado ? `${(parseFloat(row.ie_acumulado) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.em_parcial ? `${(parseFloat(row.em_parcial) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.em_acumulado ? `${(parseFloat(row.em_acumulado) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.mo_parcial ? `${(parseFloat(row.mo_parcial) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.mo_acumulado ? `${(parseFloat(row.mo_acumulado) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.api_parcial ? `${(parseFloat(row.api_parcial) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                    {row.api_acum ? `${(parseFloat(row.api_acum) * 100).toFixed(2)}%` : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '40px',
+            color: '#6c757d',
+            background: '#f8f9fa',
+            borderRadius: '8px'
+          }}>
+            <p>No hay datos disponibles para mostrar.</p>
+            <p>Importa archivos Excel o selecciona otra tabla para visualizar datos.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

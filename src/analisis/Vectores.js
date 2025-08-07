@@ -23,8 +23,10 @@ const tablas = [
 ];
 
 const reportes = [
+  { value: 'av_fisico_c9', label: 'Project 9C' },
   { value: 'reporte9', label: 'Flujo Financiero SAP' },
-      { value: 'reporte1', label: 'Curva S - Parcial / Acum' },
+  { value: 'reporte1', label: 'Curva S - Parcial / Acum' },
+  
   // Agrega más reportes si los necesitas
 ];
 
@@ -160,6 +162,7 @@ const Vectores = ({ proyectoId }) => {
   const [tablaNpcAcumulado, setTablaNpcAcumulado] = useState([]); // NUEVO
   const [tablaApiParcial, setTablaApiParcial] = useState([]); // NUEVO
   const [tablaApiAcumulada, setTablaApiAcumulada] = useState([]); // NUEVO
+  const [tablaAvFisicoC9, setTablaAvFisicoC9] = useState([]); // NUEVO: Tabla av_fisico_c9
   const [tablaFinancieroSap, setTablaFinancieroSap] = useState([]); // NUEVO: Tabla financiero_sap
   const [cargandoTabla, setCargandoTabla] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -334,6 +337,8 @@ const Vectores = ({ proyectoId }) => {
       cargarDatosTabla('api_parcial', setTablaApiParcial);
     } else if (seleccion === 'api_acumulada') {
       cargarDatosTabla('api_acumulada', setTablaApiAcumulada);
+    } else if (seleccion === 'av_fisico_c9') {
+      cargarDatosTabla('vc_project_9c', setTablaAvFisicoC9);
     } else if (seleccion === 'reporte9') {
       cargarDatosTabla('financiero_sap', setTablaFinancieroSap);
     }
@@ -473,11 +478,44 @@ const Vectores = ({ proyectoId }) => {
     if (typeof monto === 'number') return monto;
     if (typeof monto === 'string') {
       if (monto.trim() === '-' || monto.trim() === '') return 0;
-      // Quita puntos de miles y cambia coma decimal por punto
-      // Ejemplo: "2.441.480,50" => "2441480.50"
-      let limpio = monto.replace(/\./g, '').replace(',', '.');
-      // Si después de limpiar sigue sin ser número, retorna 0
-      return parseFloat(limpio) || 0;
+      
+      // Remover espacios
+      let limpio = monto.trim();
+      
+      // Si no hay números, retornar 0
+      if (!/\d/.test(limpio)) return 0;
+      
+      // Contar puntos para determinar si son separadores de miles o decimales
+      const dotCount = (limpio.match(/\./g) || []).length;
+      
+      if (dotCount > 1) {
+        // Hay múltiples puntos - asumir que el último es decimal y los otros son separadores de miles
+        const parts = limpio.split('.');
+        const decimalPart = parts.pop(); // Última parte como decimal
+        const integerPart = parts.join(''); // Resto como parte entera
+        
+        // Si la parte decimal tiene más de 2 dígitos, truncar
+        const finalDecimalPart = decimalPart.length > 2 ? decimalPart.substring(0, 2) : decimalPart;
+        
+        limpio = integerPart + '.' + finalDecimalPart;
+      } else if (dotCount === 1) {
+        // Solo un punto - verificar si es decimal o separador de miles
+        const parts = limpio.split('.');
+        if (parts[1].length <= 2) {
+          // Probablemente es decimal (máximo 2 dígitos después del punto)
+          limpio = limpio;
+        } else {
+          // Probablemente es separador de miles, remover el punto
+          limpio = parts.join('');
+        }
+      }
+      
+      // Convertir coma decimal a punto si existe
+      limpio = limpio.replace(',', '.');
+      
+      // Verificar que sea numérico
+      const result = parseFloat(limpio);
+      return isNaN(result) ? 0 : result;
     }
     return 0;
   };
@@ -513,6 +551,26 @@ const Vectores = ({ proyectoId }) => {
       };
     }
     
+    // Si es av_fisico_c9 (Project 9C), mapear campos específicos
+    if (seleccion === 'av_fisico_c9') {
+      return {
+        id_c9: r['id_vcp'] || r['ID_VCP'] || r['ID VCP'] || r['ID_C9'] || r['ID C9'] || '',
+        periodo: excelDateToMysql(r['periodo'] || r['PERIODO']),
+        cat_vp: r['cat_vp'] || r['CAT_VP'] || r['CAT VP'] || '',
+        moneda_base: parseInt(r['moneda_base'] || r['MONEDA_BASE'] || r['MONEDA BASE'] || '2025'),
+        proyecto_id: proyectoId || 1,
+        base: cleanMonto(r['base'] || r['BASE']),
+        cambio: cleanMonto(r['cambio'] || r['CAMBIO']),
+        control: cleanMonto(r['control'] || r['CONTROL']),
+        tendencia: cleanMonto(r['tendencia'] || r['TENDENCIA']),
+        eat: cleanMonto(r['eat'] || r['EAT']),
+        compromiso: cleanMonto(r['compromiso'] || r['COMPROMISO']),
+        incurrido: cleanMonto(r['incurrido'] || r['INCURRIDO']),
+        financiero: cleanMonto(r['financiero'] || r['FINANCIERO']),
+        por_comprometer: cleanMonto(r['por_comprometer'] || r['POR_COMPROMETER'] || r['POR COMPROMETER'])
+      };
+    }
+    
     // Mapeo estándar para otras tablas
     return {
       proyecto_id: proyectoId || 1,
@@ -539,19 +597,55 @@ const Vectores = ({ proyectoId }) => {
       if (seleccion === 'npc_acumulado') endpoint = '/api/importaciones/importar_npc_acumulado.php';
       if (seleccion === 'api_parcial') endpoint = '/api/importaciones/importar_api_parcial.php';
       if (seleccion === 'api_acumulada') endpoint = '/api/importaciones/importar_api_acumulado.php';
+      if (seleccion === 'av_fisico_c9') endpoint = '/api/importaciones/importar_av_project_c9.php';
+      
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: datosMapeados })
+        body: JSON.stringify({ 
+          rows: datosMapeados,
+          proyecto_id: proyectoId || 1
+        })
       });
+      
       const result = await res.json();
+      
       if (result.success) {
-        alert('¡Importación exitosa!');
+        // Mensaje de éxito con detalles
+        let successMessage = `✅ ¡Importación exitosa!\n\n`;
+        successMessage += `📊 Registros importados: ${result.inserted_count || datosMapeados.length}\n`;
+        successMessage += `📁 Archivo procesado correctamente`;
+        
+        if (result.errors && result.errors.length > 0) {
+          successMessage += `\n\n⚠️ Advertencias:\n${result.errors.slice(0, 3).join('\n')}`;
+          if (result.errors.length > 3) {
+            successMessage += `\n... y ${result.errors.length - 3} errores más`;
+          }
+        }
+        
+        alert(successMessage);
+        
+        // Recargar datos después de importación exitosa
+        if (seleccion === 'av_fisico_c9') {
+          cargarDatosTabla('vc_project_9c', setTablaAvFisicoC9);
+        }
       } else {
-        alert('Error al importar: ' + (result.error || ''));
+        // Mensaje de error detallado
+        let errorMessage = `❌ Error al importar:\n\n`;
+        errorMessage += `${result.error || 'Error desconocido'}\n\n`;
+        
+        if (result.errors && result.errors.length > 0) {
+          errorMessage += `📋 Errores específicos:\n`;
+          errorMessage += result.errors.slice(0, 5).join('\n');
+          if (result.errors.length > 5) {
+            errorMessage += `\n... y ${result.errors.length - 5} errores más`;
+          }
+        }
+        
+        alert(errorMessage);
       }
     } catch (e) {
-      alert('Error de red o servidor');
+      alert(`❌ Error de conexión:\n\nNo se pudo conectar con el servidor.\n\nDetalles: ${e.message}`);
     }
     setImportando(false);
   };
@@ -570,6 +664,7 @@ const Vectores = ({ proyectoId }) => {
       if (seleccion === 'npc_acumulado') endpoint = '/api/importaciones/importar_npc_acumulado.php';
       if (seleccion === 'api_parcial') endpoint = '/api/importaciones/importar_api_parcial.php';
       if (seleccion === 'api_acumulada') endpoint = '/api/importaciones/importar_api_acumulado.php';
+      if (seleccion === 'av_fisico_c9') endpoint = '/api/importaciones/importar_av_project_c9.php';
       if (seleccion === 'reporte9') endpoint = '/api/importaciones/importar_financiero_sap.php';
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -581,19 +676,44 @@ const Vectores = ({ proyectoId }) => {
       });
       const result = await res.json();
       if (result.success) {
-        setImportMessage('¡Importación exitosa!');
+        // Mensaje de éxito con detalles
+        let successMessage = `✅ ¡Importación exitosa!\n\n`;
+        successMessage += `📊 Registros importados: ${result.inserted_count || datosMapeados.length}\n`;
+        successMessage += `📁 Archivo procesado correctamente`;
+        
+        if (result.errors && result.errors.length > 0) {
+          successMessage += `\n\n⚠️ Advertencias:\n${result.errors.slice(0, 3).join('\n')}`;
+          if (result.errors.length > 3) {
+            successMessage += `\n... y ${result.errors.length - 3} errores más`;
+          }
+        }
+        
+        setImportMessage(successMessage);
         setShowImportModal(false);
         setSelectedFile(null);
         setExcelData([]);
-      } else {
-        let errorMessage = 'Error al importar: ' + (result.error || '');
-        if (result.errors && result.errors.length > 0) {
-          errorMessage += '\n\nErrores específicos:\n' + result.errors.join('\n');
+        
+        // Recargar datos después de importación exitosa
+        if (seleccion === 'av_fisico_c9') {
+          cargarDatosTabla('vc_project_9c', setTablaAvFisicoC9);
         }
+      } else {
+        // Mensaje de error detallado
+        let errorMessage = `❌ Error al importar:\n\n`;
+        errorMessage += `${result.error || 'Error desconocido'}\n\n`;
+        
+        if (result.errors && result.errors.length > 0) {
+          errorMessage += `📋 Errores específicos:\n`;
+          errorMessage += result.errors.slice(0, 5).join('\n');
+          if (result.errors.length > 5) {
+            errorMessage += `\n... y ${result.errors.length - 5} errores más`;
+          }
+        }
+        
         setImportMessage(errorMessage);
       }
     } catch (e) {
-      setImportMessage('Error de red o servidor');
+      setImportMessage(`❌ Error de conexión:\n\nNo se pudo conectar con el servidor.\n\nDetalles: ${e.message}`);
     }
     setImportando(false);
   };
@@ -608,13 +728,42 @@ const Vectores = ({ proyectoId }) => {
     if (seleccion === 'npc_acumulado') data = tablaNpcAcumulado;
     if (seleccion === 'api_parcial') data = tablaApiParcial;
     if (seleccion === 'api_acumulada') data = tablaApiAcumulada;
+    if (seleccion === 'av_fisico_c9') data = tablaAvFisicoC9;
+    
+    // Asegurar que data sea siempre un array
+    if (!Array.isArray(data)) {
+      data = [];
+    }
+    
     if (fechaDesde) {
       data = data.filter(row => row.periodo >= fechaDesde);
     }
     if (fechaHasta) {
       data = data.filter(row => row.periodo <= fechaHasta);
     }
-    // Agrupa y suma por detalle_factorial usando mayúsculas y trim
+    
+    // Si es av_fisico_c9, usar las columnas específicas de vc_project_9c
+    if (seleccion === 'av_fisico_c9') {
+      const kpi = {};
+      // Definir las columnas de vc_project_9c en el orden específico
+      const columnas = ['base', 'cambio', 'control', 'tendencia', 'eat', 'compromiso', 'incurrido', 'financiero', 'por_comprometer'];
+      
+      // Inicializar todas las columnas en 0
+      columnas.forEach(col => {
+        kpi[col.toUpperCase()] = 0;
+      });
+      
+      // Sumar valores de cada columna
+      data.forEach(row => {
+        columnas.forEach(col => {
+          kpi[col.toUpperCase()] += Number(row[col]) || 0;
+        });
+      });
+      
+      return kpi;
+    }
+    
+    // Para otras tablas, usar la lógica original
     const kpi = {};
     data.forEach(row => {
       let key = normalizar(row.detalle_factorial || 'Sin Detalle');
@@ -640,12 +789,46 @@ const Vectores = ({ proyectoId }) => {
     if (seleccion === 'npc_acumulado') data = tablaNpcAcumulado;
     if (seleccion === 'api_parcial') data = tablaApiParcial;
     if (seleccion === 'api_acumulada') data = tablaApiAcumulada;
+    if (seleccion === 'av_fisico_c9') data = tablaAvFisicoC9;
+    
+    // Asegurar que data sea siempre un array
+    if (!Array.isArray(data)) {
+      data = [];
+    }
+    
     if (fechaDesde) {
       data = data.filter(row => row.periodo >= fechaDesde);
     }
     if (fechaHasta) {
       data = data.filter(row => row.periodo <= fechaHasta);
     }
+    
+    // Ordenamiento específico para av_fisico_c9
+    if (seleccion === 'av_fisico_c9') {
+      // Definir el orden específico de Cat VP
+      const ordenCatVp = ['IE', 'AD', 'EM', 'MO', 'IC', 'CT', 'CL', 'SC'];
+      
+      // Crear un mapa para el orden
+      const ordenMap = {};
+      ordenCatVp.forEach((cat, index) => {
+        ordenMap[cat] = index;
+      });
+      
+      // Ordenar por periodo primero, luego por Cat VP según el orden específico
+      data.sort((a, b) => {
+        // Primero ordenar por periodo
+        if (a.periodo !== b.periodo) {
+          return new Date(a.periodo) - new Date(b.periodo);
+        }
+        
+        // Luego ordenar por Cat VP según el orden específico
+        const ordenA = ordenMap[a.cat_vp] !== undefined ? ordenMap[a.cat_vp] : 999;
+        const ordenB = ordenMap[b.cat_vp] !== undefined ? ordenMap[b.cat_vp] : 999;
+        
+        return ordenA - ordenB;
+      });
+    }
+    
     return data;
   };
 
@@ -1353,6 +1536,7 @@ const Vectores = ({ proyectoId }) => {
     if (vectorTranspuesta === 'v0_acumulada') tabla = tablaV0Acumulada;
     if (vectorTranspuesta === 'npc_acumulado') tabla = tablaNpcAcumulado;
     if (vectorTranspuesta === 'api_acumulada') tabla = tablaApiAcumulada;
+    if (vectorTranspuesta === 'av_fisico_c9') tabla = tablaAvFisicoC9;
     // Filtrar por periodo si hay filtro de fechas
     if (fechaDesde) {
       tabla = tabla.filter(row => row.periodo >= fechaDesde);
@@ -1414,6 +1598,7 @@ const Vectores = ({ proyectoId }) => {
     { value: 'v0_parcial', label: 'V0 Parcial' },
     { value: 'npc_parcial', label: 'NPC Parcial' },
     { value: 'api_parcial', label: 'API Parcial' },
+    { value: 'av_fisico_c9', label: 'Project 9C' },
   ];
 
   // --- NUEVO: Funciones para análisis EVM ---
@@ -5415,7 +5600,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
       zIndex: 1,
     }}>
       {/* Tarjetas KPI SIEMPRE debajo de la barra de navegación */}
-      {(seleccion === 'real_parcial' || seleccion === 'real_acumulado' || seleccion === 'v0_parcial' || seleccion === 'v0_acumulada' || seleccion === 'npc_parcial' || seleccion === 'npc_acumulado' || seleccion === 'api_parcial' || seleccion === 'api_acumulada') && getTablaFiltrada().length > 0 && (
+      {(seleccion === 'real_parcial' || seleccion === 'real_acumulado' || seleccion === 'v0_parcial' || seleccion === 'v0_acumulada' || seleccion === 'npc_parcial' || seleccion === 'npc_acumulado' || seleccion === 'api_parcial' || seleccion === 'api_acumulada' || seleccion === 'av_fisico_c9') && getTablaFiltrada().length > 0 && (
         <div style={{
           width: '100%',
           margin: 0,
@@ -5603,7 +5788,9 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             alignItems: 'center',
           }}>
             <h3 style={{ color: '#16355D', marginBottom: 18, fontWeight: 700 }}>
-              {seleccion === 'reporte9' ? 'Importar datos de Flujo Financiero SAP' : 'Importar datos de Real Parcial'}
+              {seleccion === 'reporte9' ? 'Importar datos de Flujo Financiero SAP' : 
+             seleccion === 'av_fisico_c9' ? 'Importar datos de Project 9C' : 
+             'Importar datos de Real Parcial'}
             </h3>
             {/* Botón moderno para elegir archivo */}
             <label htmlFor="file-upload" style={{
@@ -6322,8 +6509,8 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
               </div>
             </div>
           </div>
-        ) : (seleccion === 'reporte6' || seleccion === 'reporte9') ? null : (
-          seleccion !== 'reporte9' && (
+        ) : (seleccion === 'reporte6' || seleccion === 'reporte9' || seleccion === 'av_fisico_c9') ? null : (
+          seleccion !== 'reporte9' && seleccion !== 'av_fisico_c9' && (
             <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
               <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Datos importados en la base de datos:</h4>
               <div
@@ -7378,6 +7565,155 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                           <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.AD || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                           <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.CL || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                           <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.CT || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {seleccion === 'av_fisico_c9' && (
+        <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
+          <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Project 9- Columnas</h4>
+          
+          {/* Filtros y botón de importación */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
+            {/* Columna izquierda: Filtros de fecha */}
+            <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={e => setFechaDesde(e.target.value)}
+                  style={{
+                    border: '2px solid rgb(29, 105, 219)',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    fontSize: 10,
+                    color: '#222',
+                    fontWeight: 500,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={e => setFechaHasta(e.target.value)}
+                  style={{
+                    border: '2px solid rgb(51, 153, 255)',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    fontSize: 10,
+                    color: '#222',
+                    fontWeight: 500,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+              <button
+                onClick={() => { 
+                  setFechaDesde(''); 
+                  setFechaHasta(''); 
+                }}
+                title="Limpiar filtros de fecha"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6c2eb6',
+                  fontSize: 22,
+                  marginLeft: 4,
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <span role="img" aria-label="barrer">🧹</span>
+              </button>
+            </div>
+            
+            {/* Columna derecha: Botón de importación */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <button
+                onClick={() => setShowImportModal(true)}
+                style={{
+                  background: '#FFD000',
+                  color: '#16355D',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '8px 18px',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px #0001',
+                  marginBottom: 0
+                }}
+                disabled={importando}
+              >
+                Importar Project 9C
+              </button>
+            </div>
+          </div>
+          
+          {/* Tabla de datos de Project 9C */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              background: '#fff',
+              borderRadius: 8,
+              boxShadow: '0 2px 8px #0001',
+              overflow: 'hidden',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead style={{ background: '#16355D', position: 'sticky', top: 0 }}>
+                    <tr>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>ID C9</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Período</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Cat VP</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Moneda Base</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Base</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Cambio</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Control</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Tendencia</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>EAT</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Compromiso</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Incurrido</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Financiero</th>
+                      <th style={{ padding: '10px 8px', textAlign: 'right', borderBottom: '1px solid #ddd', fontSize: 11, fontWeight: 700, color: '#fff' }}>Por Comprometer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      let data = Array.isArray(tablaAvFisicoC9) ? tablaAvFisicoC9 : [];
+                      if (fechaDesde) {
+                        data = data.filter(row => row.periodo >= fechaDesde);
+                      }
+                      if (fechaHasta) {
+                        data = data.filter(row => row.periodo <= fechaHasta);
+                      }
+                      return data.map((row, index) => (
+                        <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.id_c9}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.periodo}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.cat_vp}</td>
+                          <td style={{ padding: '8px', fontSize: 11 }}>{row.moneda_base}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.base || 0) === 0 ? '0' : Number(row.base || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.cambio || 0) === 0 ? '0' : Number(row.cambio || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.control || 0) === 0 ? '0' : Number(row.control || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.tendencia || 0) === 0 ? '0' : Number(row.tendencia || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.eat || 0) === 0 ? '0' : Number(row.eat || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.compromiso || 0) === 0 ? '0' : Number(row.compromiso || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.incurrido || 0) === 0 ? '0' : Number(row.incurrido || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.financiero || 0) === 0 ? '0' : Number(row.financiero || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                          <td style={{ padding: '8px', fontSize: 11, textAlign: 'right' }}>{Number(row.por_comprometer || 0) === 0 ? '0' : Number(row.por_comprometer || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                         </tr>
                       ));
                     })()}
