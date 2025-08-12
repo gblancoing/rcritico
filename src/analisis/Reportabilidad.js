@@ -1802,6 +1802,99 @@ const Reportabilidad = ({ proyectoId }) => {
         }}>
           <h3 style={{ color: '#16355D', margin: 0 }}>PREDICTIVIDAD</h3>
           
+          {/* Filtros compactos */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: '15px',
+            justifyContent: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Desde:</label>
+              <input
+                type="month"
+                value={fechaDesde}
+                onChange={e => setFechaDesde(e.target.value)}
+                style={{
+                  border: '1px solid #1d69db',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  outline: 'none',
+                  width: '120px'
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Hasta:</label>
+              <input
+                type="month"
+                value={fechaHasta}
+                onChange={e => setFechaHasta(e.target.value)}
+                style={{
+                  border: '1px solid #1d69db',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  outline: 'none',
+                  width: '120px'
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Descripción:</label>
+              <select
+                value={filtroDescripcion}
+                onChange={e => setFiltroDescripcion(e.target.value)}
+                style={{
+                  border: '1px solid #1d69db',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  outline: 'none',
+                  width: '160px',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="">Todas</option>
+                {descripcionesDisponibles.map((descripcion, index) => (
+                  <option key={index} value={descripcion}>
+                    {descripcion}
+                  </option>
+              ))}
+              </select>
+            </div>
+            
+            {(fechaDesde || fechaHasta || filtroDescripcion) && (
+              <button
+                onClick={() => {
+                  setFechaDesde('');
+                  setFechaHasta('');
+                  setFiltroDescripcion('');
+                }}
+                style={{
+                  background: '#FF8C00',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                title="Limpiar filtros"
+              >
+                🧹
+              </button>
+            )}
+          </div>
+          
           {/* Sección de importación - Funcionalidad completa */}
           <div style={{ 
             display: 'flex', 
@@ -3884,7 +3977,98 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
           EFICIENCIA DEL GASTO FÍSICO - FINANCIERO
         </h3>
         
-
+        {/* Filtros compactos */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: '20px',
+          justifyContent: 'center',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Desde:</label>
+            <input
+              type="month"
+              value={fechaDesde}
+              onChange={e => setFechaDesde(e.target.value)}
+              style={{
+                border: '1px solid #1d69db',
+                borderRadius: 4,
+                padding: '4px 8px',
+                fontSize: 12,
+                outline: 'none',
+                width: '120px'
+              }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Hasta:</label>
+            <input
+              type="month"
+              value={fechaHasta}
+              onChange={e => setFechaHasta(e.target.value)}
+              style={{
+                border: '1px solid #1d69db',
+                borderRadius: 4,
+                padding: '4px 8px',
+                fontSize: 12,
+                outline: 'none',
+                width: '120px'
+              }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Descripción:</label>
+            <select
+              value={filtroDescripcion}
+              onChange={e => setFiltroDescripcion(e.target.value)}
+              style={{
+                border: '1px solid #1d69db',
+                borderRadius: 4,
+                padding: '4px 8px',
+                fontSize: 12,
+                outline: 'none',
+                width: '160px',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value="">Todas</option>
+              {descripcionesDisponibles.map((descripcion, index) => (
+                <option key={index} value={descripcion}>
+                  {descripcion}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {(fechaDesde || fechaHasta || filtroDescripcion) && (
+            <button
+              onClick={() => {
+                setFechaDesde('');
+                setFechaHasta('');
+                setFiltroDescripcion('');
+              }}
+              style={{
+                background: '#FF8C00',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontSize: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4
+              }}
+              title="Limpiar filtros"
+            >
+              🧹
+            </button>
+          )}
+        </div>
         
         {/* Mensaje informativo */}
         {filtroDescripcion && (
@@ -4570,6 +4754,8 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
 
 
       
+
+
 
       {/* Contenido del reporte */}
       <div style={{ padding: '0 20px' }}>
