@@ -9,6 +9,7 @@ import EficienciaGasto from './analisis/EficienciaGasto';
 import VectoresRealProyectado from './analisis/VectoresRealProyectado';
 import Vectores from './analisis/Vectores';
 import Reportabilidad from './analisis/Reportabilidad';
+import GestionProyecto from './analisis/GestionProyecto';
 import EstructuraCuentas from './analisis/estructura_cuentas';
 import { API_BASE } from './config';
 
@@ -93,6 +94,8 @@ const ProyectoPage = () => {
         return <Vectores proyectoId={proyectoId} />;
       case 'reportabilidad':
         return <Reportabilidad proyectoId={proyectoId} />;
+      case 'gestion':
+        return <GestionProyecto proyectoId={proyectoId} />;
       case 'estructura':
         return <EstructuraCuentas />;
       default:

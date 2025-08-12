@@ -17,6 +17,7 @@ const opciones = [
   { clave: 'vectores_rp', texto: 'Vectores Real - Pro...', icono: <i className="fa fa-random"></i> },
   { clave: 'vectores', texto: 'Vectores', icono: <i className="fa fa-project-diagram"></i> },
   { clave: 'reportabilidad', texto: 'Reportabilidad', icono: <i className="fa fa-chart-bar"></i> },
+  { clave: 'gestion', texto: 'Gestión Proyecto', icono: <i className="fa fa-tasks"></i> },
   // Agrega esta línea:
   { clave: 'estructura', texto: 'Estructura de Cuentas', icono: <FaListAlt /> }
 ];

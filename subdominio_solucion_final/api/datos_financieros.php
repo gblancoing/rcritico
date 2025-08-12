@@ -41,7 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'npc_acumulado',
         'api_parcial',
         'api_acumulada',
-        'financiero_sap'
+        'financiero_sap',
+        'vc_project_9c'
     ];
     
     try {

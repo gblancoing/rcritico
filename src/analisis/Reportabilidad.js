@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -84,7 +85,7 @@ const reportes = [
   
   
   { value: 'eficiencia_gasto', label: 'Eficiencia del Gasto' },
-  { value: 'cumplimiento_fisico', label: 'Cumplimiento Físico' },
+
   { value: 'predictividad', label: 'Predictividad' },
   { value: 'lineas_bases', label: 'Líneas Bases - Real/Proyectado' },
   
@@ -93,6 +94,257 @@ const reportes = [
 
 const ALTURA_BARRA_SUPERIOR = 56;
 const ANCHO_SIDEBAR = 240;
+
+// Componente de Tooltip Profesional (Global)
+const CustomTooltip = ({ children, content, position = 'top' }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  
+  const tooltipStyle = {
+    position: 'fixed',
+    backgroundColor: '#1a1a2e',
+    color: '#ffffff',
+    padding: '24px 28px',
+    borderRadius: '16px',
+    fontSize: '15px',
+    maxWidth: '450px',
+    minWidth: '350px',
+    zIndex: 2147483647,
+    whiteSpace: 'normal',
+    lineHeight: '1.7',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 6px 20px rgba(0,0,0,0.3)',
+    border: '3px solid #4a90e2',
+    opacity: showTooltip ? 1 : 0,
+    visibility: showTooltip ? 'visible' : 'hidden',
+    transform: showTooltip ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.95)',
+    transition: 'all 0.3s ease',
+    pointerEvents: showTooltip ? 'auto' : 'none',
+    backdropFilter: 'blur(10px)',
+    wordWrap: 'break-word',
+    overflowWrap: 'break-word',
+    left: tooltipPosition.x,
+    top: tooltipPosition.y,
+    isolation: 'isolate',
+    willChange: 'transform, opacity'
+  };
+
+  const arrowStyle = {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    ...(position === 'top' && {
+      top: '100%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      borderLeft: '12px solid transparent',
+      borderRight: '12px solid transparent',
+      borderTop: '12px solid #4a90e2',
+      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
+    }),
+    ...(position === 'bottom' && {
+      bottom: '100%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      borderLeft: '12px solid transparent',
+      borderRight: '12px solid transparent',
+      borderBottom: '12px solid #4a90e2',
+      filter: 'drop-shadow(0 -2px 4px rgba(0,0,0,0.2))'
+    })
+  };
+
+  const contentStyle = {
+    fontWeight: '600',
+    textAlign: 'left',
+    color: '#ffffff',
+    fontSize: '15px',
+    lineHeight: '1.7',
+    position: 'relative',
+    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+  };
+
+  const closeButtonStyle = {
+    position: 'absolute',
+    top: '12px',
+    right: '12px',
+    width: '24px',
+    height: '24px',
+    backgroundColor: '#dc3545',
+    borderRadius: '50%',
+    border: '2px solid #ffffff',
+    color: '#ffffff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 8px rgba(220, 69, 53, 0.4)',
+    zIndex: 2147483647
+  };
+
+  const lupaStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '24px',
+    height: '24px',
+    backgroundColor: '#4a90e2',
+    borderRadius: '50%',
+    marginLeft: '10px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    border: '2px solid #ffffff',
+    boxShadow: '0 2px 8px rgba(74, 144, 226, 0.3)',
+    color: '#ffffff',
+    fontSize: '12px',
+    fontWeight: 'bold'
+  };
+
+  const handleClick = (event) => {
+    try {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const tooltipHeight = 200; // Altura aproximada del tooltip
+      const margin = 30;
+      
+      // Calcular posición para que el tooltip aparezca arriba del elemento
+      let newY = rect.top - tooltipHeight - margin;
+      
+      // Si no hay espacio arriba, mostrar abajo
+      if (newY < 20) {
+        newY = rect.bottom + margin;
+      }
+      
+      // Asegurar que la posición X esté dentro de los límites de la ventana
+      let newX = rect.left + rect.width / 2;
+      const tooltipWidth = 400; // Ancho aproximado del tooltip
+      
+      if (newX - tooltipWidth / 2 < 20) {
+        newX = tooltipWidth / 2 + 20;
+      } else if (newX + tooltipWidth / 2 > window.innerWidth - 20) {
+        newX = window.innerWidth - tooltipWidth / 2 - 20;
+      }
+      
+      const newPosition = {
+        x: newX,
+        y: newY
+      };
+      
+      setTooltipPosition(newPosition);
+      setShowTooltip(!showTooltip);
+    } catch (error) {
+      console.error('Error al posicionar tooltip:', error);
+      // Posición de respaldo en el centro de la pantalla
+      setTooltipPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      setShowTooltip(!showTooltip);
+    }
+  };
+
+  const handleClickOutside = (event) => {
+    if (showTooltip && !event.target.closest('.tooltip-container')) {
+      setShowTooltip(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showTooltip) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showTooltip]);
+
+  // Manejar redimensionamiento de ventana
+  useEffect(() => {
+    const handleResize = () => {
+      if (showTooltip) {
+        // Reposicionar el tooltip si la ventana cambia de tamaño
+        setTooltipPosition(prev => ({
+          x: Math.min(prev.x, window.innerWidth - 200),
+          y: Math.min(prev.y, window.innerHeight - 200)
+        }));
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [showTooltip]);
+
+  // Asegurar que el tooltip esté en el DOM correcto
+  useEffect(() => {
+    if (showTooltip) {
+      // Forzar un re-render del tooltip
+      const timer = setTimeout(() => {
+        setShowTooltip(true);
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [showTooltip]);
+
+  return (
+    <>
+      <div className="tooltip-container" style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        {children}
+        <div 
+          style={lupaStyle} 
+          onClick={handleClick}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = '#357abd';
+            e.target.style.transform = 'scale(1.1)';
+            e.target.style.boxShadow = '0 4px 12px rgba(74, 144, 226, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = '#4a90e2';
+            e.target.style.transform = 'scale(1)';
+            e.target.style.boxShadow = '0 2px 8px rgba(74, 144, 226, 0.3)';
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </div>
+      </div>
+      
+      {/* Tooltip renderizado en el body para evitar problemas de overflow */}
+      {showTooltip && createPortal(
+        <>
+          {/* Overlay de fondo para asegurar que esté por encima de todo */}
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 2147483646,
+              pointerEvents: 'none'
+            }}
+          />
+          <div style={tooltipStyle}>
+            <button 
+              style={closeButtonStyle}
+              onClick={() => setShowTooltip(false)}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#c82333';
+                e.target.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#dc3545';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              ×
+            </button>
+            <div style={contentStyle}>{content}</div>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  );
+};
 
 const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVisible }) => (
   <>
@@ -194,7 +446,7 @@ const Reportabilidad = ({ proyectoId }) => {
   const [filtroVector, setFiltroVector] = useState('');
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [datosReporte, setDatosReporte] = useState([]);
-  const [datosCumplimientoFisico, setDatosCumplimientoFisico] = useState([]);
+
   const [usandoDatosReales, setUsandoDatosReales] = useState(false);
   const [autorizado, setAutorizado] = useState(false);
   
@@ -272,47 +524,7 @@ const Reportabilidad = ({ proyectoId }) => {
       let datos = [];
       
       switch (seleccion) {
-        case 'cumplimiento_fisico':
-          // Cargar datos reales de cumplimiento físico desde la API
-          if (proyectoId) {
-            // Construir URL con filtros de fecha
-            let url = `${API_BASE}/cumplimiento_fisico/cumplimiento_fisico.php?proyecto_id=${proyectoId}`;
-            
-            if (fechaDesde) {
-              // Convertir formato YYYY-MM a YYYY-MM-01 para el inicio del mes
-              const fechaDesdeCompleta = `${fechaDesde}-01`;
-              url += `&periodo_desde=${fechaDesdeCompleta}`;
-            }
-            if (fechaHasta) {
-              // Obtener el último día del mes seleccionado
-              const [year, month] = fechaHasta.split('-');
-              const ultimoDia = new Date(parseInt(year), parseInt(month), 0).getDate();
-              const fechaHastaCompleta = `${fechaHasta}-${ultimoDia.toString().padStart(2, '0')}`;
-              url += `&periodo_hasta=${fechaHastaCompleta}`;
-            }
-            
 
-            
-            const response = await fetch(url);
-            const result = await response.json();
-            
-            if (result.success && result.data.length > 0) {
-              // Guardar datos crudos para la tabla dinámica
-              setDatosCumplimientoFisico(result.data);
-              // Procesar datos para el formato requerido por el componente
-              datos = procesarDatosCumplimientoFisico(result.data);
-              setUsandoDatosReales(true);
-            } else {
-              // Si no hay datos reales, usar datos de ejemplo
-              setDatosCumplimientoFisico([]);
-              datos = generarDatosEjemplo(seleccion);
-              setUsandoDatosReales(false);
-            }
-          } else {
-            setDatosCumplimientoFisico([]);
-            datos = generarDatosEjemplo(seleccion);
-          }
-          break;
           
         case 'predictividad':
           // Para predictividad, usar datos de ejemplo por ahora
@@ -322,6 +534,16 @@ const Reportabilidad = ({ proyectoId }) => {
           break;
           
         case 'eficiencia_gasto':
+          // Para eficiencia del gasto, usar datos reales
+          if (proyectoId) {
+            // Los datos se cargarán dinámicamente en el componente
+            datos = [];
+            setUsandoDatosReales(true);
+          } else {
+            datos = generarDatosEjemplo(seleccion);
+            setUsandoDatosReales(false);
+          }
+          break;
         default:
           // Para otros reportes, usar datos de ejemplo por ahora
           datos = generarDatosEjemplo(seleccion);
@@ -338,65 +560,6 @@ const Reportabilidad = ({ proyectoId }) => {
     } finally {
       setCargandoDatos(false);
     }
-  };
-
-  // Función para procesar datos de cumplimiento físico desde la API
-  const procesarDatosCumplimientoFisico = (datosAPI) => {
-    if (!datosAPI || datosAPI.length === 0) {
-      return generarDatosEjemplo('cumplimiento_fisico');
-    }
-
-    // Agrupar datos por centro de costo y vector
-    const datosAgrupados = {};
-    
-    datosAPI.forEach(registro => {
-      const key = `${registro.nombre}_${registro.vector}`;
-      if (!datosAgrupados[key]) {
-        datosAgrupados[key] = {
-          actividad: `${registro.nombre} - ${registro.vector}`,
-          planificado: 0,
-          real: 0,
-          cumplimiento: 0,
-          datos: [],
-          porcentajes: []
-        };
-      }
-      datosAgrupados[key].datos.push(registro);
-      datosAgrupados[key].porcentajes.push(parseFloat(registro.porcentaje_periodo) || 0);
-    });
-    
-    // Calcular promedios y cumplimiento
-    const resultado = Object.values(datosAgrupados).map(item => {
-      const porcentajesValidos = item.porcentajes.filter(p => !isNaN(p) && p >= 0);
-      
-      if (porcentajesValidos.length === 0) {
-        return {
-          actividad: item.actividad,
-          planificado: 0,
-          real: 0,
-          cumplimiento: 0
-        };
-      }
-      
-      const promedioReal = porcentajesValidos.reduce((sum, p) => sum + p, 0) / porcentajesValidos.length;
-      const maximo = Math.max(...porcentajesValidos);
-      const planificado = maximo * 1.02; // Planificado como 2% más que el máximo real
-      const cumplimiento = planificado > 0 ? (promedioReal / planificado) * 100 : 0;
-      
-      return {
-        actividad: item.actividad,
-        planificado: Math.round(planificado * 10) / 10,
-        real: Math.round(promedioReal * 10) / 10,
-        cumplimiento: Math.round(cumplimiento * 10) / 10
-      };
-    });
-    
-    // Si no hay datos procesados, usar datos de ejemplo
-    if (resultado.length === 0) {
-      return generarDatosEjemplo('cumplimiento_fisico');
-    }
-    
-    return resultado;
   };
 
   // Función para procesar datos de predictividad parcial desde la API
@@ -475,13 +638,7 @@ const Reportabilidad = ({ proyectoId }) => {
           { categoria: 'Equipos', presupuesto: 3200000, ejecutado: 3080000, eficiencia: 96.3 },
           { categoria: 'Indirectos', presupuesto: 1200000, ejecutado: 1180000, eficiencia: 98.3 },
         ];
-      case 'cumplimiento_fisico':
-        return [
-          { actividad: 'Excavación', planificado: 85, real: 82, cumplimiento: 96.5 },
-          { actividad: 'Fundaciones', planificado: 65, real: 63, cumplimiento: 96.9 },
-          { actividad: 'Estructura', planificado: 45, real: 43, cumplimiento: 95.6 },
-          { actividad: 'Instalaciones', planificado: 25, real: 24, cumplimiento: 96.0 },
-        ];
+
       default:
         return [];
     }
@@ -492,12 +649,7 @@ const Reportabilidad = ({ proyectoId }) => {
     cargarDatosReporte();
   }, [seleccion]);
 
-  // Recargar datos cuando cambien los filtros de fecha (solo para cumplimiento_fisico)
-  useEffect(() => {
-    if (seleccion === 'cumplimiento_fisico' && proyectoId) {
-      cargarDatosReporte();
-    }
-  }, [fechaDesde, fechaHasta]);
+
 
   // Resetear autorización cuando cambie el proyecto
   useEffect(() => {
@@ -535,10 +687,9 @@ const Reportabilidad = ({ proyectoId }) => {
           fechaHasta={fechaHasta}
           filtroDescripcion={filtroDescripcion}
         />;
-      case 'eficiencia_gasto':
-        return <ReporteEficienciaGasto data={datosReporte} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} />;
-      case 'cumplimiento_fisico':
-        return <ReporteCumplimientoFisico data={datosReporte} autorizado={autorizado} setAutorizado={setAutorizado} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} datosCumplimientoFisico={datosCumplimientoFisico} filtroVector={filtroVector} setFiltroVector={setFiltroVector} />;
+              case 'eficiencia_gasto':
+          return <ReporteEficienciaGasto data={datosReporte} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} filtroDescripcion={filtroDescripcion} />;
+
       case 'lineas_bases':
         return <ReporteLineasBases proyectoId={proyectoId} />;
       default:
@@ -704,19 +855,16 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
-    // Función para obtener datos de real físico (valor parcial) desde cumplimiento_fisico
+    // Función para obtener datos de real físico desde av_fisico_real
     const obtenerRealFisica = async () => {
       try {
-        // Construir URL con filtros
-        let url = `${API_BASE}/cumplimiento_fisico/cumplimiento_fisico.php`;
+        // Construir URL con filtros - usar av_fisico_real.php
+        let url = `${API_BASE}/eficiencia_gasto/avance_fisico_real.php`;
         const params = new URLSearchParams();
         
         if (proyectoId) {
           params.append('proyecto_id', proyectoId);
         }
-        
-        // Filtrar específicamente por vector "REAL"
-        params.append('vector', 'REAL');
         
         if (fechaDesde) {
           // Convertir formato YYYY-MM a YYYY-MM-01 para el inicio del mes
@@ -735,33 +883,33 @@ const Reportabilidad = ({ proyectoId }) => {
           url += '?' + params.toString();
         }
         
-        console.log('🔍 Consultando real físico (vector REAL):', url);
+        console.log('🔍 Consultando real físico desde av_fisico_real:', url);
         
         const response = await fetch(url);
         const data = await response.json();
         
-        console.log('📊 Respuesta real físico:', data);
+        console.log('📊 Respuesta real físico desde av_fisico_real:', data);
         
-        if (data.success && data.data.length > 0) {
-          // Obtener el valor más reciente del parcial_periodo (no acumulado)
-          const datosOrdenados = data.data.sort((a, b) => new Date(b.periodo) - new Date(a.periodo));
-          const valorMasReciente = parseFloat(datosOrdenados[0].parcial_periodo) || 0;
+        if (data.success && data.datos && data.datos.length > 0) {
+          // Obtener el valor más reciente del api_parcial
+          const datosOrdenados = data.datos.sort((a, b) => new Date(b.periodo) - new Date(a.periodo));
+          const valorMasReciente = parseFloat(datosOrdenados[0].api_parcial) || 0;
           
-          setRealFisica(valorMasReciente);
+          // Convertir a porcentaje: el valor ya está en decimal (0.0071 = 0.71%)
+          const valorPorcentaje = valorMasReciente * 100;
           
-          console.log('✅ Real físico actualizado (parcial):', valorMasReciente);
+          setRealFisica(valorPorcentaje);
+          
+          console.log('✅ Real físico actualizado desde av_fisico_real:', valorPorcentaje);
           console.log('📅 Periodo más reciente:', datosOrdenados[0].periodo);
-          console.log('📋 Total registros encontrados:', data.data.length);
-          console.log('🔍 Valor parcial vs acumulado:', {
-            parcial: datosOrdenados[0].parcial_periodo,
-            acumulado: datosOrdenados[0].porcentaje_periodo
-          });
+          console.log('📋 Total registros encontrados:', data.datos.length);
+          console.log('🔍 Valor api_parcial convertido a porcentaje:', valorPorcentaje);
         } else {
-          console.log('⚠️ No se encontraron datos de cumplimiento físico para vector REAL');
+          console.log('⚠️ No se encontraron datos en av_fisico_real para el proyecto');
           setRealFisica(0);
         }
       } catch (error) {
-        console.error('❌ Error de conexión real físico:', error);
+        console.error('❌ Error de conexión real físico desde av_fisico_real:', error);
         setRealFisica(0);
       }
     };
@@ -2503,6 +2651,209 @@ const Reportabilidad = ({ proyectoId }) => {
         </table>
           </div>
 
+          {/* Glosario Técnico - Predictividad */}
+          <div style={{ 
+            marginTop: '20px', 
+            padding: '15px', 
+            backgroundColor: '#f8f9fa', 
+            borderRadius: '8px',
+            border: '1px solid #dee2e6'
+          }}>
+            <h4 style={{ color: '#16355D', marginBottom: '15px', fontSize: '16px', fontWeight: 'bold' }}>
+              📚 GLOSARIO TÉCNICO - PREDICTIVIDAD
+            </h4>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px' }}>
+              <div>
+                <h5 style={{ color: '#16355D', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                  💰 PREDICCIÓN FINANCIERA
+                </h5>
+                <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
+                  <li><strong>Proyección:</strong> Valor planificado según proyecciones financieras (USD). Representa la expectativa de gasto para el período.</li>
+                  <li><strong>Real:</strong> Ejecución financiera real desde la tabla real_parcial (USD). Refleja el desembolso efectivo.</li>
+                  <li><strong>Desviación:</strong> Diferencia porcentual entre Real y Proyección = ((Real - Proyección) / Proyección) × 100.</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h5 style={{ color: '#16355D', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                  📈 PREDICCIÓN FÍSICA
+                </h5>
+                <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
+                  <li><strong>Proyección:</strong> Meta de avance físico planificada según tabla predictividad (%). Objetivo operacional esperado.</li>
+                  <li><strong>Real:</strong> Avance físico real desde la tabla av_fisico_real.api_parcial (%). Progreso efectivo alcanzado.</li>
+                  <li><strong>Desviación:</strong> Diferencia porcentual entre Real y Proyección = ((Real - Proyección) / Proyección) × 100.</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div style={{
+              backgroundColor: '#e3f2fd', 
+              padding: '12px', 
+              borderRadius: '6px', 
+              border: '1px solid #2196f3',
+              marginBottom: '15px'
+            }}>
+              <h5 style={{ color: '#1565c0', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                🎯 MÉTRICAS DE PREDICTIVIDAD
+              </h5>
+              <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
+                <li><strong>Precisión:</strong> Indicador de exactitud de las proyecciones = 100% - |Desviación|. Valores {'>'}95% indican excelente predictibilidad.</li>
+                <li><strong>Nota:</strong> Calificación basada en la precisión de las predicciones.</li>
+              </ul>
+            </div>
+            
+            {/* Layout de Mitad y Mitad: Reglas de Ponderación + Fuentes de Datos */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr', 
+              gap: '20px',
+              marginBottom: '15px'
+            }}>
+              {/* Reglas de Ponderación de Notas - Predictividad */}
+              <div style={{
+                backgroundColor: '#fff3e0', 
+                padding: '16px', 
+                borderRadius: '8px', 
+                border: '1px solid #ffb74d',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <h5 style={{ color: '#e65100', marginBottom: '12px', fontSize: '15px', fontWeight: 'bold' }}>
+                    📋 REGLAS DE PONDERACIÓN DE NOTAS - PREDICTIVIDAD
+                  </h5>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr', 
+                    gap: '15px',
+                    marginBottom: '12px'
+                  }}>
+                    <div>
+                      <h6 style={{ color: '#bf360c', marginBottom: '8px', fontSize: '13px', fontWeight: 'bold' }}>
+                        🟢 NOTAS EXCELENTES (4.0 - 5.0)
+                      </h6>
+                      <ul style={{ margin: 0, paddingLeft: '15px', color: '#bf360c', fontSize: '12px', lineHeight: '1.3' }}>
+                        <li><strong>5.0 (Excelente):</strong> Precisión ≥ 95%</li>
+                        <li><strong>4.0 (Bueno):</strong> Precisión 90% - 95%</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h6 style={{ color: '#f57c00', marginBottom: '8px', fontSize: '13px', fontWeight: 'bold' }}>
+                        🟡 NOTAS REGULARES (2.0 - 3.0)
+                      </h6>
+                      <ul style={{ margin: 0, paddingLeft: '15px', color: '#f57c00', fontSize: '12px', lineHeight: '1.3' }}>
+                        <li><strong>3.0 (Regular):</strong> Precisión 75% - 90%</li>
+                        <li><strong>2.0 (Deficiente):</strong> Precisión 60% - 75%</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    backgroundColor: '#ffebee', 
+                    padding: '10px', 
+                    borderRadius: '6px', 
+                    border: '1px solid #ef5350',
+                    marginBottom: '12px'
+                  }}>
+                    <h6 style={{ color: '#c62828', marginBottom: '6px', fontSize: '13px', fontWeight: 'bold' }}>
+                      🔴 NOTA CRÍTICA (1.0)
+                    </h6>
+                    <ul style={{ margin: 0, paddingLeft: '15px', color: '#c62828', fontSize: '12px', lineHeight: '1.3' }}>
+                      <li><strong>1.0 (Crítico):</strong> Precisión {'<'} 60%</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  padding: '8px 12px', 
+                  backgroundColor: '#f1f8e9', 
+                  borderRadius: '6px', 
+                  border: '1px solid #8bc34a',
+                  fontSize: '12px',
+                  color: '#33691e'
+                }}>
+                  <strong>💡 Interpretación:</strong> La precisión mide qué tan acertadas fueron las proyecciones. Una precisión {'>'}95% significa que las predicciones fueron muy cercanas a la realidad, mientras que {'<'}60% indica que las proyecciones requieren revisión inmediata.
+                </div>
+              </div>
+              
+              {/* Períodos de Análisis */}
+              <div style={{ 
+                backgroundColor: '#e8f5e8', 
+                padding: '16px', 
+                borderRadius: '8px', 
+                border: '1px solid #4caf50',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <h5 style={{ color: '#2e7d32', marginBottom: '12px', fontSize: '15px', fontWeight: 'bold' }}>
+                  📅 PERÍODOS DE ANÁLISIS
+                </h5>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '12px'
+                }}>
+                  {/* Período del Mes */}
+                  <div style={{
+                    backgroundColor: '#f8f9fa',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid #28a745'
+                  }}>
+                    <h6 style={{ color: '#155724', marginBottom: '6px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                      📊 Período del Mes
+                    </h6>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#6c757d', lineHeight: '1.3' }}>
+                      Análisis mensual específico (actual o filtrado por fechas)
+                    </p>
+                  </div>
+                  
+                  {/* Período Acumulado */}
+                  <div style={{
+                    backgroundColor: '#f8f9fa',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid #28a745'
+                  }}>
+                    <h6 style={{ color: '#155724', marginBottom: '6px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                      📈 Período Acumulado
+                    </h6>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#6c757d', lineHeight: '1.3' }}>
+                      Sumatoria desde enero hasta el mes de análisis
+                    </p>
+                  </div>
+                  
+                  {/* Período Anual */}
+                  <div style={{
+                    backgroundColor: '#f8f9fa',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid #28a745'
+                  }}>
+                    <h6 style={{ color: '#155724', marginBottom: '6px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                      📅 Período Anual
+                    </h6>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#6c757d', lineHeight: '1.3' }}>
+                      Análisis completo del año (actual o filtrado)
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Espaciador para igualar altura con el panel izquierdo */}
+                <div style={{ 
+                  padding: '8px 12px', 
+                  backgroundColor: 'transparent',
+                  fontSize: '12px',
+                  color: 'transparent'
+                }}>
+                  Espaciador para igualar altura
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Análisis Dinámico - Predictividad */}
           {proyeccionFinanciera > 0 && realFinanciera > 0 && proyeccionFisica > 0 && realFisica > 0 && (
             <div style={{ 
@@ -2563,7 +2914,11 @@ const Reportabilidad = ({ proyectoId }) => {
                       border: `1px solid ${estadoPredictividad.color}`
                     }}>
                       <strong style={{ color: estadoPredictividad.color }}>
-                        {estadoPredictividad.icono} PRECISIÓN DE PREDICCIONES: {estadoPredictividad.texto}
+                        {estadoPredictividad.icono} 
+                        <CustomTooltip content="Fórmula: (Precisión Financiera + Precisión Física) ÷ 2">
+                          PRECISIÓN DE PREDICCIONES:
+                        </CustomTooltip> 
+                        {estadoPredictividad.texto}
                       </strong>
                     </div>
                     
@@ -2571,12 +2926,19 @@ const Reportabilidad = ({ proyectoId }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px' }}>
                       <div>
                         <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                          💰 PREDICCIÓN FINANCIERA
+                          <CustomTooltip content="Análisis de la precisión de las proyecciones financieras del proyecto">
+                            💰 PREDICCIÓN FINANCIERA
+                          </CustomTooltip>
                         </h6>
                         <div style={{ fontSize: '12px', color: '#666' }}>
                           <div><strong>Proyectado:</strong> USD {proyeccionFinanciera.toLocaleString()}</div>
                           <div><strong>Ejecutado:</strong> USD {realFinanciera.toLocaleString()}</div>
-                          <div><strong>Desviación:</strong> 
+                          <div>
+                            <strong>
+                              <CustomTooltip content="Fórmula: ((Real - Proyectado) / Proyectado) × 100">
+                                Desviación:
+                              </CustomTooltip>
+                            </strong> 
                             <span style={{ 
                               color: desviacionFinanciera.esPositiva ? '#dc3545' : desviacionFinanciera.esNegativa ? '#28a745' : '#666',
                               fontWeight: 'bold'
@@ -2584,7 +2946,12 @@ const Reportabilidad = ({ proyectoId }) => {
                               {desviacionFinanciera.esPositiva ? '+' : ''}{desviacionFinanciera.porcentaje}%
                             </span>
                           </div>
-                          <div><strong>Precisión:</strong> 
+                          <div>
+                            <strong>
+                              <CustomTooltip content="Fórmula: 100% - |Desviación|">
+                                Precisión:
+                              </CustomTooltip>
+                            </strong> 
                             <span style={{ 
                               color: precisionFinanciera >= 95 ? '#28a745' : precisionFinanciera >= 85 ? '#17a2b8' : precisionFinanciera >= 75 ? '#ffc107' : '#dc3545',
                               fontWeight: 'bold'
@@ -2597,12 +2964,19 @@ const Reportabilidad = ({ proyectoId }) => {
                       
                       <div>
                         <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                          📈 PREDICCIÓN FÍSICA
+                          <CustomTooltip content="Análisis de la precisión de las proyecciones físicas del proyecto">
+                            📈 PREDICCIÓN FÍSICA
+                          </CustomTooltip>
                         </h6>
                         <div style={{ fontSize: '12px', color: '#666' }}>
                           <div><strong>Proyectado:</strong> {proyeccionFisica.toFixed(2)}%</div>
                           <div><strong>Ejecutado:</strong> {realFisica.toFixed(2)}%</div>
-                          <div><strong>Desviación:</strong> 
+                          <div>
+                            <strong>
+                                                          <CustomTooltip content="Fórmula: ((Real - Proyectado) / Proyectado) × 100">
+                              Desviación:
+                            </CustomTooltip>
+                            </strong> 
                             <span style={{ 
                               color: desviacionFisica.esPositiva ? '#dc3545' : desviacionFisica.esNegativa ? '#28a745' : '#666',
                               fontWeight: 'bold'
@@ -2610,7 +2984,12 @@ const Reportabilidad = ({ proyectoId }) => {
                               {desviacionFisica.esPositiva ? '+' : ''}{desviacionFisica.porcentaje}%
                             </span>
                           </div>
-                          <div><strong>Precisión:</strong> 
+                          <div>
+                            <strong>
+                                                          <CustomTooltip content="Fórmula: 100% - |Desviación|">
+                              Precisión:
+                            </CustomTooltip>
+                            </strong> 
                             <span style={{ 
                               color: precisionFisica >= 95 ? '#28a745' : precisionFisica >= 85 ? '#17a2b8' : precisionFisica >= 75 ? '#ffc107' : '#dc3545',
                               fontWeight: 'bold'
@@ -2747,14 +3126,18 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
   );
   };
 
+
+
   // Componente para el reporte de Eficiencia del Gasto
-  const ReporteEficienciaGasto = ({ data, proyectoId, fechaDesde, fechaHasta }) => {
+  const ReporteEficienciaGasto = ({ data, proyectoId, fechaDesde, fechaHasta, filtroDescripcion }) => {
     const [datosEficiencia, setDatosEficiencia] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
 
+
+
     // Función para obtener datos financieros (V0 y Real) - PARCIALES
-    const obtenerDatosFinancieros = async (periodo, fechaInicio = null, fechaFin = null) => {
+    const obtenerDatosFinancieros = async (periodo, fechaInicio = null, fechaFin = null, filtroDescripcion = null) => {
       try {
         // Determinar el período a consultar
         let periodoAConsultar;
@@ -2762,14 +3145,14 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         
         if (periodo === 'mes') {
           // Determinar el período a consultar para el mes
-          if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
-            // Caso 2: Filtros del mismo mes - usar el mes del filtro
-            const [año, mes] = fechaDesde.split('-');
+          if (fechaInicio) {
+            // Usar la fecha de inicio pasada como parámetro
+            const [año, mes] = fechaInicio.split('-');
             const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
             periodoAConsultar = fechaFiltro.toISOString().slice(0, 7) + '-01';
             nombrePeriodo = fechaFiltro.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
           } else {
-            // Caso 1: Sin filtros o filtros de rango - usar el mes actual
+            // Sin fecha de inicio - usar el mes actual
             const mesActual = new Date().toISOString().slice(0, 7);
             periodoAConsultar = mesActual + '-01';
             nombrePeriodo = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
@@ -2786,11 +3169,16 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         }
         
         let urlV0 = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=v0_parcial`;
-        let urlReal = `${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=real_parcial`;
+        let urlReal = `${API_BASE}/datos_financieros_sap.php?proyecto_id=${proyectoId}`;
+        
+        // Agregar filtro de descripción si está disponible
+        if (filtroDescripcion && filtroDescripcion.trim() !== '') {
+          urlReal += `&descripcion=${encodeURIComponent(filtroDescripcion)}`;
+        }
         
         if (periodoAConsultar) {
           urlV0 += `&periodo=${periodoAConsultar}`;
-          urlReal += `&periodo=${periodoAConsultar}`;
+          urlReal += `&periodo_desde=${periodoAConsultar}&periodo_hasta=${periodoAConsultar}`;
         } else if (periodo === 'acumulado') {
           // Para acumulado, traer todos los datos y filtrar en el frontend
           console.log('🔍 Acumulado: trayendo todos los datos para filtrar en frontend');
@@ -2805,8 +3193,9 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         console.log('🔍 Consultando datos financieros:', periodoAConsultar || 'sin filtro de período');
         console.log('📅 Período a consultar:', periodoAConsultar);
         console.log('📅 Nombre del período:', nombrePeriodo);
+        console.log('📝 Descripción filtrada:', filtroDescripcion);
         console.log('URL V0:', urlV0);
-        console.log('URL Real:', urlReal);
+        console.log('URL Real SAP:', urlReal);
 
         const [responseV0, responseReal] = await Promise.all([
           fetch(urlV0),
@@ -2817,9 +3206,9 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         const dataReal = await responseReal.json();
 
         console.log('📊 Datos V0 Parcial:', dataV0);
-        console.log('📊 Datos Real Parcial:', dataReal);
+        console.log('📊 Datos Real SAP:', dataReal);
         console.log('📊 Cantidad de registros V0:', dataV0.success ? dataV0.datos.length : 0);
-        console.log('📊 Cantidad de registros Real:', dataReal.success ? dataReal.datos.length : 0);
+        console.log('📊 Datos Real SAP:', dataReal.success ? dataReal.data : 'Sin datos');
 
         // Obtener PLAN V. O. 2025 (KUSD) y GASTO REAL (KUSD)
         let planV0 = 0;
@@ -2830,13 +3219,13 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
             // Filtrar datos desde enero hasta el mes actual
             const añoActual = new Date().getFullYear();
             const mesActual = new Date().getMonth() + 1;
-            const fechaInicio = `${añoActual}-01-01`;
-            const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+            const fechaInicioAcumulado = `${añoActual}-01-01`;
+            const fechaFinAcumulado = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
             
             const datosFiltrados = dataV0.datos.filter(item => {
               const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicio);
-              const fin = new Date(fechaFin);
+              const inicio = new Date(fechaInicioAcumulado);
+              const fin = new Date(fechaFinAcumulado);
               return itemFecha >= inicio && itemFecha <= fin;
             });
             
@@ -2858,19 +3247,14 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
             planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
             console.log('💰 Plan V0 (acumulado filtrado):', planV0);
           } else if (periodo === 'anual') {
-            // Filtrar datos del año completo
+            // Filtrar datos del año completo usando las fechas pasadas como parámetros
             let añoAConsultar;
-            if (fechaDesde && fechaHasta) {
-              // Si hay filtros, usar el año del filtro
-              if (fechaDesde === fechaHasta) {
-                const [año] = fechaDesde.split('-');
-                añoAConsultar = parseInt(año);
-              } else {
-                const [añoFin] = fechaHasta.split('-');
-                añoAConsultar = parseInt(añoFin);
-              }
+            if (fechaInicio && fechaFin) {
+              // Usar las fechas pasadas como parámetros
+              const [año] = fechaInicio.split('-');
+              añoAConsultar = parseInt(año);
             } else {
-              // Sin filtros, usar el año actual
+              // Sin fechas, usar el año actual
               añoAConsultar = new Date().getFullYear();
             }
             
@@ -2893,71 +3277,79 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
           }
         }
 
-        if (dataReal.success && dataReal.datos.length > 0) {
+        // Obtener gasto real desde la tabla financiero_sap
+        if (dataReal.success && dataReal.data) {
           if (periodo === 'acumulado') {
-            // Filtrar datos desde enero hasta el mes actual
+            // Para acumulado, construir URL con fechas desde enero hasta mes actual
             const añoActual = new Date().getFullYear();
             const mesActual = new Date().getMonth() + 1;
-            const fechaInicio = `${añoActual}-01-01`;
-            const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+            const fechaInicioAcumulado = `${añoActual}-01-01`;
+            const fechaFinAcumulado = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
             
-            const datosFiltrados = dataReal.datos.filter(item => {
-              const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicio);
-              const fin = new Date(fechaFin);
-              return itemFecha >= inicio && itemFecha <= fin;
-            });
+            let urlRealAcumulado = `${API_BASE}/datos_financieros_sap.php?proyecto_id=${proyectoId}`;
+            if (filtroDescripcion && filtroDescripcion.trim() !== '') {
+              urlRealAcumulado += `&descripcion=${encodeURIComponent(filtroDescripcion)}`;
+            }
+            urlRealAcumulado += `&periodo_desde=${fechaInicioAcumulado}&periodo_hasta=${fechaFinAcumulado}`;
             
-            gastoReal = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Gasto Real (acumulado desde enero hasta mes actual):', gastoReal);
+            const responseRealAcumulado = await fetch(urlRealAcumulado);
+            const dataRealAcumulado = await responseRealAcumulado.json();
+            
+            if (dataRealAcumulado.success && dataRealAcumulado.data) {
+              gastoReal = parseFloat(dataRealAcumulado.data.monto_total) || 0;
+            }
+            console.log('💰 Gasto Real SAP (acumulado desde enero hasta mes actual):', gastoReal);
           } else if (periodo === 'filtrado' && fechaInicio && fechaFin) {
-            // Filtrar datos desde enero hasta el mes final del filtro
+            // Para acumulado filtrado, construir URL con fechas desde enero hasta mes final del filtro
             const [añoFin, mesFin] = fechaFin.split('-');
             const fechaInicioAcumulado = `${añoFin}-01-01`;
             const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
             
-            const datosFiltrados = dataReal.datos.filter(item => {
-              const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicioAcumulado);
-              const fin = new Date(fechaFinAcumulado);
-              return itemFecha >= inicio && itemFecha <= fin;
-            });
+            let urlRealFiltrado = `${API_BASE}/datos_financieros_sap.php?proyecto_id=${proyectoId}`;
+            if (filtroDescripcion && filtroDescripcion.trim() !== '') {
+              urlRealFiltrado += `&descripcion=${encodeURIComponent(filtroDescripcion)}`;
+            }
+            urlRealFiltrado += `&periodo_desde=${fechaInicioAcumulado}&periodo_hasta=${fechaFinAcumulado}`;
             
-            gastoReal = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Gasto Real (acumulado filtrado):', gastoReal);
+            const responseRealFiltrado = await fetch(urlRealFiltrado);
+            const dataRealFiltrado = await responseRealFiltrado.json();
+            
+            if (dataRealFiltrado.success && dataRealFiltrado.data) {
+              gastoReal = parseFloat(dataRealFiltrado.data.monto_total) || 0;
+            }
+            console.log('💰 Gasto Real SAP (acumulado filtrado):', gastoReal);
           } else if (periodo === 'anual') {
-            // Filtrar datos del año completo
+            // Para anual, construir URL con fechas del año completo
             let añoAConsultar;
-            if (fechaDesde && fechaHasta) {
-              // Si hay filtros, usar el año del filtro
-              if (fechaDesde === fechaHasta) {
-                const [año] = fechaDesde.split('-');
-                añoAConsultar = parseInt(año);
-              } else {
-                const [añoFin] = fechaHasta.split('-');
-                añoAConsultar = parseInt(añoFin);
-              }
+            if (fechaInicio && fechaFin) {
+              // Usar las fechas pasadas como parámetros
+              const [año] = fechaInicio.split('-');
+              añoAConsultar = parseInt(año);
             } else {
-              // Sin filtros, usar el año actual
+              // Sin fechas, usar el año actual
               añoAConsultar = new Date().getFullYear();
             }
             
             const fechaInicioAnual = `${añoAConsultar}-01-01`;
             const fechaFinAnual = `${añoAConsultar}-12-31`;
             
-            const datosFiltrados = dataReal.datos.filter(item => {
-              const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicioAnual);
-              const fin = new Date(fechaFinAnual);
-              return itemFecha >= inicio && itemFecha <= fin;
-            });
+            let urlRealAnual = `${API_BASE}/datos_financieros_sap.php?proyecto_id=${proyectoId}`;
+            if (filtroDescripcion && filtroDescripcion.trim() !== '') {
+              urlRealAnual += `&descripcion=${encodeURIComponent(filtroDescripcion)}`;
+            }
+            urlRealAnual += `&periodo_desde=${fechaInicioAnual}&periodo_hasta=${fechaFinAnual}`;
             
-            gastoReal = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Gasto Real (anual):', gastoReal, 'para año', añoAConsultar);
+            const responseRealAnual = await fetch(urlRealAnual);
+            const dataRealAnual = await responseRealAnual.json();
+            
+            if (dataRealAnual.success && dataRealAnual.data) {
+              gastoReal = parseFloat(dataRealAnual.data.monto_total) || 0;
+            }
+            console.log('💰 Gasto Real SAP (anual):', gastoReal, 'para año', añoAConsultar);
           } else {
-            // Mes específico - sumar todos los montos
-            gastoReal = dataReal.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Gasto Real (mes específico):', gastoReal);
+            // Mes específico - usar los datos ya obtenidos
+            gastoReal = parseFloat(dataReal.data.monto_total) || 0;
+            console.log('💰 Gasto Real SAP (mes específico):', gastoReal);
           }
         }
 
@@ -2971,29 +3363,30 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
           cumplimientoA: cumplimientoA
         };
       } catch (error) {
-        console.error('❌ Error obteniendo PLAN V. O. 2025 (KUSD):', error);
+        console.error('❌ Error obteniendo datos financieros:', error);
         return { planV0: 0, gastoReal: 0, cumplimientoA: 0 };
       }
     };
 
-    // Función para obtener datos de cumplimiento físico - PARCIALES
+    // Función para obtener datos de PROG. V0 desde av_fisico_v0
     const obtenerDatosCumplimientoFisico = async (periodo, fechaInicio = null, fechaFin = null) => {
       try {
         console.log('🔍 Debug - obtenerDatosCumplimientoFisico:', { periodo, fechaInicio, fechaFin });
         
-        let url = `${API_BASE}/cumplimiento_fisico/cumplimiento_fisico.php?proyecto_id=${proyectoId}`;
+        // Construir la URL para consultar la tabla av_fisico_v0
+        let url = `${API_BASE}/eficiencia_gasto/avance_fisico_v0.php?proyecto_id=${proyectoId}`;
         
         // Aplicar filtros de fecha según el período
         if (periodo === 'mes') {
           // Determinar el período a consultar para el mes
-          if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
-            // Caso 2: Filtros del mismo mes - usar el mes del filtro
-            const [año, mes] = fechaDesde.split('-');
+          if (fechaInicio) {
+            // Usar la fecha de inicio pasada como parámetro
+            const [año, mes] = fechaInicio.split('-');
             const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
             const mesFiltro = fechaFiltro.toISOString().slice(0, 7);
             url += `&periodo_desde=${mesFiltro}-01&periodo_hasta=${mesFiltro}-31`;
           } else {
-            // Caso 1: Sin filtros o filtros de rango - usar el mes actual
+            // Sin fecha de inicio - usar el mes actual
             const mesActual = new Date().toISOString().slice(0, 7);
             url += `&periodo_desde=${mesActual}-01&periodo_hasta=${mesActual}-31`;
           }
@@ -3001,10 +3394,10 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
           // Acumulado estándar: desde enero hasta el mes actual
           const añoActual = new Date().getFullYear();
           const mesActual = new Date().getMonth() + 1;
-          const fechaInicio = `${añoActual}-01-01`;
-          const fechaFin = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
-          url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
-          console.log('🔍 Acumulado físico: desde', fechaInicio, 'hasta', fechaFin);
+          const fechaInicioAcumulado = `${añoActual}-01-01`;
+          const fechaFinAcumulado = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+          url += `&periodo_desde=${fechaInicioAcumulado}&periodo_hasta=${fechaFinAcumulado}`;
+          console.log('🔍 Acumulado físico: desde', fechaInicioAcumulado, 'hasta', fechaFinAcumulado);
         } else if (periodo === 'filtrado') {
           // Acumulado con filtros: desde enero hasta el mes final del filtro
           if (fechaInicio && fechaFin) {
@@ -3015,76 +3408,163 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
             console.log('🔍 Filtrado físico: desde', fechaInicioAcumulado, 'hasta', fechaFinAcumulado);
           }
         } else if (periodo === 'anual') {
-          // Determinar el año a consultar
+          // Determinar el año a consultar usando las fechas pasadas como parámetros
           let añoAConsultar;
-          if (fechaDesde && fechaHasta) {
-            // Si hay filtros, usar el año del filtro
-            if (fechaDesde === fechaHasta) {
-              const [año] = fechaDesde.split('-');
-              añoAConsultar = parseInt(año);
-            } else {
-              const [añoFin] = fechaHasta.split('-');
-              añoAConsultar = parseInt(añoFin);
-            }
+          if (fechaInicio && fechaFin) {
+            // Usar las fechas pasadas como parámetros
+            const [año] = fechaInicio.split('-');
+            añoAConsultar = parseInt(año);
           } else {
-            // Sin filtros, usar el año actual
+            // Sin fechas, usar el año actual
             añoAConsultar = new Date().getFullYear();
           }
           
-          const fechaInicio = `${añoAConsultar}-01-01`;
-          const fechaFin = `${añoAConsultar}-12-31`;
-          url += `&periodo_desde=${fechaInicio}&periodo_hasta=${fechaFin}`;
-          console.log('🔍 Anual físico: desde', fechaInicio, 'hasta', fechaFin, 'para año', añoAConsultar);
+          const fechaInicioAnual = `${añoAConsultar}-01-01`;
+          const fechaFinAnual = `${añoAConsultar}-12-31`;
+          url += `&periodo_desde=${fechaInicioAnual}&periodo_hasta=${fechaFinAnual}`;
+          console.log('🔍 Anual físico: desde', fechaInicioAnual, 'hasta', fechaFinAnual, 'para año', añoAConsultar);
         }
 
-        console.log('🔍 Consultando datos de cumplimiento físico PARCIALES:');
+        console.log('🔍 Consultando datos de PROG. V0 desde av_fisico_v0:');
         console.log('URL:', url);
 
         const response = await fetch(url);
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response ok:', response.ok);
+        
         const data = await response.json();
+        console.log('📊 Datos PROG. V0:', data);
+        console.log('📊 Estructura de respuesta:', {
+          success: data.success,
+          datos: data.datos,
+          total: data.total,
+          hasData: data.datos && data.datos.length > 0
+        });
 
-        console.log('📊 Datos cumplimiento físico:', data);
-
-        if (data.success && data.data.length > 0) {
-          // Filtrar datos por vector V0 y REAL
-          const datosV0 = data.data.filter(item => item.vector === 'V0');
-          const datosReal = data.data.filter(item => item.vector === 'REAL');
+        if (data.success && data.datos && data.datos.length > 0) {
+          console.log('🔍 Procesando datos encontrados...');
+          console.log('📊 Primeros 3 registros:', data.datos.slice(0, 3));
           
-          console.log('📊 Datos V0:', datosV0);
-          console.log('📊 Datos REAL:', datosReal);
-          
-          // Obtener valores de parcial_periodo
+          // Obtener valores de api_parcial de la tabla av_fisico_v0
           let proyeccionV0 = 0;
+          
+          // PROG. V. O. 2025 (%) = sumar todos los valores api_parcial del período
+          proyeccionV0 = data.datos.reduce((sum, item) => {
+            const valor = parseFloat(item.api_parcial) || 0;
+            console.log(`📊 Item ${item.periodo}: api_parcial = ${item.api_parcial} -> parseFloat = ${valor}`);
+            return sum + valor;
+          }, 0);
+          
+          // Convertir a porcentaje: el valor ya está en decimal (0.0071 = 0.71%)
+          // Solo multiplicamos por 100 para mostrarlo como porcentaje
+          proyeccionV0 = proyeccionV0 * 100;
+          
+          console.log('📈 Proyección V0 (suma de api_parcial):', proyeccionV0);
+          console.log('📈 Proyección V0 convertida a porcentaje: %', proyeccionV0.toFixed(2));
+
+          // Ahora consultar av_fisico_real para obtener el Avance Fisico
+          console.log('🔍 Consultando av_fisico_real para Avance Fisico...');
           let avanceFisico = 0;
           
-          if (datosV0.length > 0) {
-            // PROG. V. O. 2025 (%) = sumar todos los valores parcial_periodo del vector V0
-            proyeccionV0 = datosV0.reduce((sum, item) => sum + (parseFloat(item.parcial_periodo) || 0), 0);
-            console.log('📈 Proyección V0 (suma de parcial_periodo):', proyeccionV0);
-          }
-          
-          if (datosReal.length > 0) {
-            // AVANC. FÍSICO (%) = sumar todos los valores parcial_periodo del vector REAL
-            avanceFisico = datosReal.reduce((sum, item) => sum + (parseFloat(item.parcial_periodo) || 0), 0);
-            console.log('📈 Avance Físico (suma de parcial_periodo):', avanceFisico);
-          }
-          
-          // CUMPLI. (B)(%) = (AVANC. FÍSICO / PROG. V. O.) * 100
-          const cumplimientoB = proyeccionV0 > 0 ? (avanceFisico / proyeccionV0) * 100 : 0;
-          console.log('📈 Cumplimiento B:', cumplimientoB);
+          try {
+            // Construir URL para av_fisico_real con los mismos filtros
+            let urlReal = `${API_BASE}/eficiencia_gasto/avance_fisico_real.php?proyecto_id=${proyectoId}`;
+            
+            // Aplicar los mismos filtros de fecha
+            if (periodo === 'mes') {
+              if (fechaInicio) {
+                const [año, mes] = fechaInicio.split('-');
+                const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
+                const mesFiltro = fechaFiltro.toISOString().slice(0, 7);
+                urlReal += `&periodo_desde=${mesFiltro}-01&periodo_hasta=${mesFiltro}-31`;
+              } else {
+                const mesActual = new Date().toISOString().slice(0, 7);
+                urlReal += `&periodo_desde=${mesActual}-01&periodo_hasta=${mesActual}-31`;
+              }
+            } else if (periodo === 'acumulado') {
+              const añoActual = new Date().getFullYear();
+              const mesActual = new Date().getMonth() + 1;
+              const fechaInicioAcumulado = `${añoActual}-01-01`;
+              const fechaFinAcumulado = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+              urlReal += `&periodo_desde=${fechaInicioAcumulado}&periodo_hasta=${fechaFinAcumulado}`;
+            } else if (periodo === 'filtrado') {
+              if (fechaInicio && fechaFin) {
+                const [añoFin, mesFin] = fechaFin.split('-');
+                const fechaInicioAcumulado = `${añoFin}-01-01`;
+                const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
+                urlReal += `&periodo_desde=${fechaInicioAcumulado}&periodo_hasta=${fechaFinAcumulado}`;
+              }
+            } else if (periodo === 'anual') {
+              let añoAConsultar;
+              if (fechaInicio && fechaFin) {
+                const [año] = fechaInicio.split('-');
+                añoAConsultar = parseInt(año);
+              } else {
+                añoAConsultar = new Date().getFullYear();
+              }
+              
+              const fechaInicioAnual = `${añoAConsultar}-01-01`;
+              const fechaFinAnual = `${añoAConsultar}-12-31`;
+              urlReal += `&periodo_desde=${fechaInicioAnual}&periodo_hasta=${fechaFinAnual}`;
+            }
 
+            console.log('🔍 URL av_fisico_real:', urlReal);
+            
+            const responseReal = await fetch(urlReal);
+            const dataReal = await responseReal.json();
+            
+            console.log('📊 Datos av_fisico_real:', dataReal);
+            
+            if (dataReal.success && dataReal.datos && dataReal.datos.length > 0) {
+              // Sumar todos los valores api_parcial del período
+              avanceFisico = dataReal.datos.reduce((sum, item) => {
+                const valor = parseFloat(item.api_parcial) || 0;
+                console.log(`📊 Item Real ${item.periodo}: api_parcial = ${item.api_parcial} -> parseFloat = ${valor}`);
+                return sum + valor;
+              }, 0);
+              
+              // Convertir a porcentaje
+              avanceFisico = avanceFisico * 100;
+              
+              console.log('📈 Avance Fisico (suma de api_parcial):', avanceFisico);
+              console.log('📈 Avance Fisico convertido a porcentaje: %', avanceFisico.toFixed(2));
+            } else {
+              console.log('⚠️ No se encontraron datos en av_fisico_real');
+              avanceFisico = 0;
+            }
+          } catch (error) {
+            console.error('❌ Error consultando av_fisico_real:', error);
+            avanceFisico = 0;
+          }
+
+          // Calcular cumplimiento B: (AVANC. FÍSICO / PROG. V. O.) * 100
+          let cumplimientoB = 0;
+          if (proyeccionV0 > 0) {
+            cumplimientoB = (avanceFisico / proyeccionV0) * 100;
+          }
+          console.log('📈 Cumplimiento B calculado: %', cumplimientoB.toFixed(2));
+          
           return {
-            proyeccionV0: proyeccionV0,
-            avanceFisico: avanceFisico,
-            cumplimientoB: cumplimientoB
+            proyeccionV0: proyeccionV0,    // Valor real de av_fisico_v0
+            avanceFisico: avanceFisico,    // Valor real de av_fisico_real
+            cumplimientoB: cumplimientoB   // Cálculo correcto
+          };
+        } else {
+          console.log('❌ No se encontraron datos o respuesta inválida');
+          console.log('❌ data.success:', data.success);
+          console.log('❌ data.datos:', data.datos);
+          console.log('❌ data.total:', data.total);
+          
+          return {
+            proyeccionV0: 0,      // Sin datos (ya está en porcentaje)
+            avanceFisico: 0,      // Sin datos (ya está en porcentaje)
+            cumplimientoB: 0      // Sin cálculo
           };
         }
-
-        return { proyeccionV0: 0, avanceFisico: 0, cumplimientoB: 0 };
-      } catch (error) {
-        console.error('❌ Error obteniendo datos de cumplimiento físico PARCIALES:', error);
-        return { proyeccionV0: 0, avanceFisico: 0, cumplimientoB: 0 };
-      }
+              } catch (error) {
+          console.error('❌ Error en obtenerDatosCumplimientoFisico:', error);
+          return { proyeccionV0: 0, avanceFisico: null, cumplimientoB: 0 };
+        }
     };
 
     // Función para calcular la eficiencia del gasto
@@ -3130,37 +3610,53 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
           // Determinar el período del mes (siempre el primer período)
           let nombrePeriodoMes;
           let tipoPeriodoMes = 'mes';
+          let fechaMesFiltro = null;
           
           if (fechaDesde && fechaHasta) {
             // Si hay filtros, verificar si es el mismo mes
             if (fechaDesde === fechaHasta) {
-              // Caso 2: Filtros del mismo mes (ej: Mayo 2025, Mayo 2025)
+              // Caso 1: Filtros del mismo mes (ej: Julio 2025, Julio 2025)
               const [año, mes] = fechaDesde.split('-');
               const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
               const mesNombre = fechaFiltro.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
               const añoNumero = fechaFiltro.getFullYear();
               nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
               tipoPeriodoMes = 'mes';
+              fechaMesFiltro = fechaDesde; // Usar la fecha del filtro
             } else {
-              // Caso 3: Filtros de rango - mantener mes actual para el primer período
-              const mesActual = new Date();
-              const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
-              const añoNumero = mesActual.getFullYear();
+              // Caso 2: Filtros de rango - usar el mes final del filtro
+              const [añoFin, mesFin] = fechaHasta.split('-');
+              const fechaFin = new Date(parseInt(añoFin), parseInt(mesFin) - 1, 1);
+              const mesNombre = fechaFin.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+              const añoNumero = fechaFin.getFullYear();
               nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
               tipoPeriodoMes = 'mes';
+              fechaMesFiltro = fechaHasta; // Usar la fecha final del filtro
             }
+          } else if (fechaHasta) {
+            // Caso 3: Solo fecha hasta (ej: -----------, Julio 2025)
+            const [año, mes] = fechaHasta.split('-');
+            const fechaFiltro = new Date(parseInt(año), parseInt(mes) - 1, 1);
+            const mesNombre = fechaFiltro.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+            const añoNumero = fechaFiltro.getFullYear();
+            nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
+            tipoPeriodoMes = 'mes';
+            fechaMesFiltro = fechaHasta; // Usar la fecha hasta
           } else {
-            // Caso 1: Sin filtros - mes actual
+            // Caso 4: Sin filtros - mes actual
             const mesActual = new Date();
             const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
             const añoNumero = mesActual.getFullYear();
             nombrePeriodoMes = `PERIODO ${mesNombre}-${añoNumero}`;
             tipoPeriodoMes = 'mes';
+            fechaMesFiltro = mesActual.toISOString().slice(0, 7); // Usar mes actual
           }
           
           // Determinar el período acumulado (segundo período)
           let nombrePeriodoAcumulado;
           let tipoPeriodoAcumulado = 'acumulado';
+          let fechaAcumuladoInicio = null;
+          let fechaAcumuladoFin = null;
           
           console.log('🔍 Debug - Fechas para acumulado:', { fechaDesde, fechaHasta });
           
@@ -3169,71 +3665,107 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
             
             // Si hay filtros, verificar si es el mismo mes o rango
             if (fechaDesde === fechaHasta) {
-              // Mismo mes - no afecta al acumulado, mantener mes actual
-              const mesActual = new Date();
-              const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
-              const añoNumero = mesActual.getFullYear();
+              // Caso 1: Mismo mes (ej: Julio 2025, Julio 2025) - acumulado desde enero hasta julio
+              const [año] = fechaDesde.split('-');
+              const mesNombre = new Date(parseInt(año), 6, 1).toLocaleDateString('es-ES', { month: 'long' }).toUpperCase(); // Julio
+              const añoNumero = parseInt(año);
               nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesNombre}. ${añoNumero}`;
-              console.log('🔍 Debug - Mismo mes detectado, usando mes actual:', nombrePeriodoAcumulado);
+              fechaAcumuladoInicio = `${año}-01-01`;
+              fechaAcumuladoFin = fechaDesde;
+              tipoPeriodoAcumulado = 'filtrado';
+              console.log('🔍 Debug - Mismo mes detectado, acumulado desde enero hasta el mes del filtro:', nombrePeriodoAcumulado);
             } else {
-              // Rango de fechas - usar el mes inicial y final del rango para el acumulado
-              const [añoInicio, mesInicio] = fechaDesde.split('-');
+              // Caso 2: Rango de fechas (ej: Enero 2025, Julio 2025) - acumulado desde enero hasta julio
               const [añoFin, mesFin] = fechaHasta.split('-');
-              
-              const fechaInicio = new Date(parseInt(añoInicio), parseInt(mesInicio) - 1, 1);
               const fechaFin = new Date(parseInt(añoFin), parseInt(mesFin) - 1, 1);
-              
-              const mesInicioNombre = fechaInicio.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
               const mesFinNombre = fechaFin.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
-              const añoNumero = fechaFin.getFullYear();
+              const añoNumero = parseInt(añoFin);
               
-              nombrePeriodoAcumulado = `PERIODO DESDE ${mesInicioNombre}. - ${mesFinNombre}. ${añoNumero}`;
-              tipoPeriodoAcumulado = 'filtrado'; // Marcar como filtrado para usar fechas específicas
-              console.log('🔍 Debug - Rango de fechas detectado:', { 
+              nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesFinNombre}. ${añoNumero}`;
+              fechaAcumuladoInicio = `${añoFin}-01-01`;
+              fechaAcumuladoFin = fechaHasta;
+              tipoPeriodoAcumulado = 'filtrado';
+              console.log('🔍 Debug - Rango de fechas detectado, acumulado desde enero hasta el mes final:', { 
                 nombrePeriodoAcumulado, 
                 tipoPeriodoAcumulado,
-                añoInicio,
-                mesInicio,
-                mesInicioNombre,
-                añoFin,
-                mesFin,
-                mesFinNombre
+                fechaAcumuladoInicio,
+                fechaAcumuladoFin
               });
             }
+          } else if (fechaHasta) {
+            // Caso 3: Solo fecha hasta (ej: -----------, Julio 2025) - acumulado desde enero hasta julio
+            const [año, mes] = fechaHasta.split('-');
+            const fechaFin = new Date(parseInt(año), parseInt(mes) - 1, 1);
+            const mesFinNombre = fechaFin.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
+            const añoNumero = parseInt(año);
+            
+            nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesFinNombre}. ${añoNumero}`;
+            fechaAcumuladoInicio = `${año}-01-01`;
+            fechaAcumuladoFin = fechaHasta;
+            tipoPeriodoAcumulado = 'filtrado';
+            console.log('🔍 Debug - Solo fecha hasta, acumulado desde enero hasta el mes especificado:', nombrePeriodoAcumulado);
           } else {
-            // Sin filtros - usar el mes actual
+            // Caso 4: Sin filtros - acumulado desde enero hasta mes actual
             const mesActual = new Date();
             const mesNombre = mesActual.toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
             const añoNumero = mesActual.getFullYear();
             nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesNombre}. ${añoNumero}`;
+            fechaAcumuladoInicio = `${añoNumero}-01-01`;
+            fechaAcumuladoFin = mesActual.toISOString().slice(0, 7);
           }
           
           // Determinar el período anual (tercer período)
           let nombrePeriodoAnual = 'PERIODO AÑO 2025';
+          let añoAnual = null;
           
           if (fechaDesde && fechaHasta) {
             // Si hay filtros, usar el año del filtro
             if (fechaDesde === fechaHasta) {
-              // Mismo mes - usar el año del filtro
+              // Caso 1: Mismo mes - usar el año del filtro
               const [año] = fechaDesde.split('-');
               nombrePeriodoAnual = `PERIODO AÑO ${año}`;
+              añoAnual = parseInt(año);
             } else {
-              // Rango de fechas - usar el año del filtro final
+              // Caso 2: Rango de fechas - usar el año del filtro final
               const [añoFin] = fechaHasta.split('-');
               nombrePeriodoAnual = `PERIODO AÑO ${añoFin}`;
+              añoAnual = parseInt(añoFin);
             }
+          } else if (fechaHasta) {
+            // Caso 3: Solo fecha hasta - usar el año de la fecha hasta
+            const [año] = fechaHasta.split('-');
+            nombrePeriodoAnual = `PERIODO AÑO ${año}`;
+            añoAnual = parseInt(año);
           } else {
-            // Sin filtros - usar el año actual
+            // Caso 4: Sin filtros - usar el año actual
             const añoActual = new Date().getFullYear();
             nombrePeriodoAnual = `PERIODO AÑO ${añoActual}`;
+            añoAnual = añoActual;
           }
           
           // Construir los períodos
           periodos = [
-            { nombre: nombrePeriodoMes, tipo: tipoPeriodoMes },
-            { nombre: nombrePeriodoAcumulado, tipo: tipoPeriodoAcumulado, fechaInicio: fechaDesde, fechaFin: fechaHasta },
-            { nombre: nombrePeriodoAnual, tipo: 'anual' }
+            { 
+              nombre: nombrePeriodoMes, 
+              tipo: tipoPeriodoMes, 
+              fechaInicio: fechaMesFiltro, 
+              fechaFin: fechaMesFiltro 
+            },
+            { 
+              nombre: nombrePeriodoAcumulado, 
+              tipo: tipoPeriodoAcumulado, 
+              fechaInicio: fechaAcumuladoInicio, 
+              fechaFin: fechaAcumuladoFin 
+            },
+            { 
+              nombre: nombrePeriodoAnual, 
+              tipo: 'anual',
+              fechaInicio: `${añoAnual}-01-01`,
+              fechaFin: `${añoAnual}-12-31`
+            }
           ];
+
+          console.log('🔍 Debug - Períodos construidos:', periodos);
 
           const datosCompletos = [];
 
@@ -3246,7 +3778,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
             });
             
             // Obtener datos financieros
-            const datosFinancieros = await obtenerDatosFinancieros(periodo.tipo, periodo.fechaInicio, periodo.fechaFin);
+            const datosFinancieros = await obtenerDatosFinancieros(periodo.tipo, periodo.fechaInicio, periodo.fechaFin, filtroDescripcion);
             
             // Obtener datos de cumplimiento físico
             const datosFisicos = await obtenerDatosCumplimientoFisico(periodo.tipo, periodo.fechaInicio, periodo.fechaFin);
@@ -3290,7 +3822,9 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       if (proyectoId) {
         cargarDatosEficiencia();
       }
-    }, [proyectoId, fechaDesde, fechaHasta]);
+    }, [proyectoId, fechaDesde, fechaHasta, filtroDescripcion]);
+
+
 
     if (cargando) {
       return (
@@ -3349,6 +3883,24 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         <h3 style={{ color: '#16355D', marginBottom: '20px', textAlign: 'center' }}>
           EFICIENCIA DEL GASTO FÍSICO - FINANCIERO
         </h3>
+        
+
+        
+        {/* Mensaje informativo */}
+        {filtroDescripcion && (
+          <div style={{
+            marginBottom: '15px',
+            padding: '10px 15px',
+            backgroundColor: '#e3f2fd',
+            border: '1px solid #2196f3',
+            borderRadius: '6px',
+            color: '#1565c0',
+            fontSize: '14px',
+            textAlign: 'center'
+          }}>
+            📊 Mostrando datos filtrados por: <strong>{filtroDescripcion}</strong>
+          </div>
+        )}
         
         <div style={{ overflowX: 'auto' }}>
           <table style={{ 
@@ -3414,7 +3966,22 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
-                  Cumpli (%)
+                  <CustomTooltip 
+                    content="📊 CUMPLIMIENTO FINANCIERO - Fórmula: (Gasto Real ÷ Plan V0) × 100. Eficiencia presupuestaria: >100% = sobre ejecución, <100% = sub ejecución."
+                    position="top"
+                  >
+                    <span style={{ 
+                      cursor: 'help', 
+                      borderBottom: '2px dotted rgba(255,255,255,0.7)',
+                      paddingBottom: '2px',
+                      transition: 'all 0.2s ease',
+                      ':hover': {
+                        borderBottomColor: 'rgba(255,255,255,1)'
+                      }
+                    }}>
+                      Cumpli. Financiero (%)
+                    </span>
+                  </CustomTooltip>
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -3444,7 +4011,19 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
-                  Cumpli (%)
+                  <CustomTooltip 
+                    content="📋 CUMPLIMIENTO FÍSICO - Fórmula: (Avance Físico ÷ Prog. V0) × 100. Eficiencia operacional: >100% = adelanto físico, <100% = retraso físico."
+                    position="top"
+                  >
+                    <span style={{ 
+                      cursor: 'help', 
+                      borderBottom: '2px dotted rgba(255,255,255,0.7)',
+                      paddingBottom: '2px',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      Cumpli. Físico (%)
+                    </span>
+                  </CustomTooltip>
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -3454,7 +4033,19 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
-                  EFICIEN. GASTO (%)
+                  <CustomTooltip 
+                    content="🎯 EFICIENCIA DEL GASTO - Fórmula: (Cumpli. Físico ÷ Cumpli. Financiero) × 100. Índice clave: >100% = mayor eficiencia física, <100% = menor eficiencia física."
+                    position="top"
+                  >
+                    <span style={{ 
+                      cursor: 'help', 
+                      borderBottom: '2px dotted rgba(255,255,255,0.7)',
+                      paddingBottom: '2px',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      EFICIEN. GASTO (%)
+                    </span>
+                  </CustomTooltip>
                 </th>
                 <th style={{ 
                   padding: '12px', 
@@ -3464,7 +4055,19 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
-                  NOTA
+                  <CustomTooltip 
+                    content="⭐ CALIFICACIÓN - Sistema de evaluación: 5.0 (>110% Excelente), 4.0 (105-110% Bueno), 3.0 (100-105% Regular), 2.0 (90-100% Deficiente), 1.0 (<90% Crítico)."
+                    position="top"
+                  >
+                    <span style={{ 
+                      cursor: 'help', 
+                      borderBottom: '2px dotted rgba(255,255,255,0.7)',
+                      paddingBottom: '2px',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      NOTA
+                    </span>
+                  </CustomTooltip>
                 </th>
               </tr>
             </thead>
@@ -3511,7 +4114,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     border: '1px solid #ddd',
                     fontSize: '14px'
                   }}>
-                    {fila.proyeccionV0.toFixed(2)}%
+                    {fila.proyeccionV0 !== null ? `${fila.proyeccionV0.toFixed(2)}%` : ''}
                   </td>
                   <td style={{ 
                     padding: '12px', 
@@ -3519,7 +4122,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     border: '1px solid #ddd',
                     fontSize: '14px'
                   }}>
-                    {fila.avanceFisico.toFixed(2)}%
+                    {fila.avanceFisico !== null ? `${fila.avanceFisico.toFixed(2)}%` : ''}
                   </td>
                   <td style={{ 
                     padding: '12px', 
@@ -3528,7 +4131,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     fontSize: '14px',
                     fontWeight: 'bold'
                   }}>
-                    {fila.cumplimientoB.toFixed(2)}%
+                    {fila.cumplimientoB !== null ? `${fila.cumplimientoB.toFixed(2)}%` : ''}
                   </td>
                   <td style={{ 
                     padding: '12px', 
@@ -3603,25 +4206,135 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
               🎯 MÉTRICAS DE EFICIENCIA
             </h5>
             <ul style={{ margin: 0, paddingLeft: '15px', color: '#555', fontSize: '13px', lineHeight: '1.4' }}>
-                              <li><strong>Eficien. Gasto (%):</strong> Índice de eficiencia del gasto = (Cumpli. Físico / Cumpli. Financiero) × 100. Valores {'>'}100% indican mayor eficiencia física vs financiera.</li>
+              <li><strong>Eficien. Gasto (%):</strong> Índice de eficiencia del gasto = (Cumpli. Físico / Cumpli. Financiero) × 100. Valores {'>'}100% indican mayor eficiencia física vs financiera.</li>
               <li><strong>Nota:</strong> Calificación basada en la eficiencia del gasto: 5.0 (Excelente), 4.0 (Bueno), 3.0 (Regular), 2.0 (Deficiente), 1.0 (Crítico).</li>
             </ul>
           </div>
           
-          <div style={{ 
-            backgroundColor: '#e8f5e8', 
-            padding: '10px', 
-            borderRadius: '6px', 
-            border: '1px solid #28a745',
-            fontSize: '12px',
-            color: '#155724'
+          {/* Layout de Dos Columnas: Reglas de Notas + Períodos de Análisis */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '20px',
+            marginBottom: '15px'
           }}>
-            <strong>📋 PERÍODOS DE ANÁLISIS:</strong>
-            <ul style={{ margin: '5px 0 0 15px', padding: 0, fontSize: '12px' }}>
-              <li><strong>Período del Mes:</strong> Análisis mensual específico (actual o filtrado)</li>
-              <li><strong>Período Acumulado:</strong> Sumatoria desde enero hasta el mes de análisis</li>
-              <li><strong>Período Anual:</strong> Análisis completo del año (actual o filtrado)</li>
-            </ul>
+            {/* Columna Izquierda: Reglas de Ponderación de Notas */}
+            <div style={{
+              backgroundColor: '#e3f2fd', 
+              padding: '16px', 
+              borderRadius: '8px', 
+              border: '1px solid #2196f3'
+            }}>
+              <h5 style={{ color: '#1565c0', marginBottom: '12px', fontSize: '15px', fontWeight: 'bold' }}>
+                📋 REGLAS DE PONDERACIÓN DE NOTAS
+              </h5>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '15px',
+                marginBottom: '12px'
+              }}>
+                <div>
+                  <h6 style={{ color: '#1976d2', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                    🟢 EXCELENTES (4.0-5.0)
+                  </h6>
+                  <ul style={{ margin: 0, paddingLeft: '12px', color: '#1565c0', fontSize: '11px', lineHeight: '1.3' }}>
+                    <li><strong>5.0:</strong> {'>'} 110%</li>
+                    <li><strong>4.0:</strong> 105% - 110%</li>
+                  </ul>
+                </div>
+                <div>
+                  <h6 style={{ color: '#ff9800', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                    🟡 REGULARES (2.0-3.0)
+                  </h6>
+                  <ul style={{ margin: 0, paddingLeft: '12px', color: '#f57c00', fontSize: '11px', lineHeight: '1.3' }}>
+                    <li><strong>3.0:</strong> 100% - 105%</li>
+                    <li><strong>2.0:</strong> 90% - 100%</li>
+                  </ul>
+                </div>
+              </div>
+              <div style={{ 
+                backgroundColor: '#fff3e0', 
+                padding: '8px', 
+                borderRadius: '6px', 
+                border: '1px solid #ffb74d',
+                marginBottom: '8px'
+              }}>
+                <h6 style={{ color: '#e65100', marginBottom: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                  🔴 CRÍTICO (1.0)
+                </h6>
+                <ul style={{ margin: 0, paddingLeft: '12px', color: '#bf360c', fontSize: '11px', lineHeight: '1.3' }}>
+                  <li><strong>1.0:</strong> {'<'} 90%</li>
+                </ul>
+              </div>
+              <div style={{ 
+                padding: '6px 10px', 
+                backgroundColor: '#f1f8e9', 
+                borderRadius: '6px', 
+                border: '1px solid #8bc34a',
+                fontSize: '11px',
+                color: '#33691e'
+              }}>
+                <strong>💡</strong> {'>'}100% = Buena gestión, {'<'}100% = Requiere atención
+              </div>
+            </div>
+
+            {/* Columna Derecha: Períodos de Análisis */}
+            <div style={{
+              backgroundColor: '#e8f5e8', 
+              padding: '16px', 
+              borderRadius: '8px', 
+              border: '1px solid #28a745'
+            }}>
+              <h5 style={{ color: '#155724', marginBottom: '12px', fontSize: '15px', fontWeight: 'bold' }}>
+                📅 PERÍODOS DE ANÁLISIS
+              </h5>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr', 
+                gap: '8px'
+              }}>
+                <div style={{
+                  backgroundColor: '#f1f8e9',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #66bb6a'
+                }}>
+                  <h6 style={{ color: '#2e7d32', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                    📊 Período del Mes
+                  </h6>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#388e3c', lineHeight: '1.3' }}>
+                    Análisis mensual específico (actual o filtrado por fechas)
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#f1f8e9',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #66bb6a'
+                }}>
+                  <h6 style={{ color: '#2e7d32', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                    📈 Período Acumulado
+                  </h6>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#388e3c', lineHeight: '1.3' }}>
+                    Sumatoria desde enero hasta el mes de análisis
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#f1f8e9',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #66bb6a'
+                }}>
+                  <h6 style={{ color: '#2e7d32', marginBottom: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                    🗓️ Período Anual
+                  </h6>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#388e3c', lineHeight: '1.3' }}>
+                    Análisis completo del año (actual o filtrado)
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
           
           {/* Análisis Dinámico */}
@@ -3717,14 +4430,14 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                           📈 EFICIENCIA FÍSICA
                         </h6>
                         <div style={{ fontSize: '11px', color: '#666' }}>
-                          <div><strong>Planificado:</strong> {periodoActual.proyeccionV0.toFixed(2)}%</div>
-                          <div><strong>Ejecutado:</strong> {periodoActual.avanceFisico.toFixed(2)}%</div>
+                          <div><strong>Planificado:</strong> {periodoActual.proyeccionV0 !== null ? `${periodoActual.proyeccionV0.toFixed(2)}%` : 'N/A'}</div>
+                          <div><strong>Ejecutado:</strong> {periodoActual.avanceFisico !== null ? `${periodoActual.avanceFisico.toFixed(2)}%` : 'N/A'}</div>
                           <div><strong>Cumplimiento:</strong> 
                             <span style={{ 
                               color: eficienciaFisica >= 100 ? '#28a745' : eficienciaFisica >= 90 ? '#ffc107' : '#dc3545',
                               fontWeight: 'bold'
                             }}>
-                              {eficienciaFisica.toFixed(1)}%
+                              {eficienciaFisica !== null ? `${eficienciaFisica.toFixed(1)}%` : 'N/A'}
                             </span>
                           </div>
                         </div>
@@ -3807,78 +4520,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
              </div>
            )}
            
-           {/* Resumen de Períodos */}
-           {datosEficiencia.length > 0 && (
-             <div style={{ 
-               backgroundColor: '#f8f9fa', 
-               padding: '15px', 
-               borderRadius: '8px', 
-               border: '1px solid #dee2e6',
-               marginTop: '15px'
-             }}>
-               <h5 style={{ 
-                 color: '#495057', 
-                 marginBottom: '12px', 
-                 fontSize: '14px', 
-                 fontWeight: 'bold',
-                 display: 'flex',
-                 alignItems: 'center',
-                 gap: '8px'
-               }}>
-                 📅 RESUMEN DE PERÍODOS
-               </h5>
-               
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', fontSize: '12px' }}>
-                 {datosEficiencia.map((periodo, index) => (
-                   <div key={index} style={{ 
-                     padding: '10px', 
-                     backgroundColor: 'white', 
-                     borderRadius: '6px',
-                     border: '1px solid #ced4da'
-                   }}>
-                     <h6 style={{ 
-                       color: '#16355D', 
-                       marginBottom: '8px', 
-                       fontSize: '11px', 
-                       fontWeight: 'bold',
-                       textAlign: 'center'
-                     }}>
-                       {periodo.periodo}
-                     </h6>
-                     
-                     <div style={{ fontSize: '10px', color: '#666', lineHeight: '1.3' }}>
-                       <div style={{ marginBottom: '4px' }}>
-                         <strong>Eficiencia:</strong> 
-                         <span style={{ 
-                           color: periodo.eficienciaGasto >= 150 ? '#28a745' : periodo.eficienciaGasto >= 100 ? '#17a2b8' : '#dc3545',
-                           fontWeight: 'bold'
-                         }}>
-                           {periodo.eficienciaGasto.toFixed(1)}%
-                         </span>
-                       </div>
-                       <div style={{ marginBottom: '4px' }}>
-                         <strong>Financiero:</strong> {periodo.cumplimientoA.toFixed(1)}%
-                       </div>
-                       <div style={{ marginBottom: '4px' }}>
-                         <strong>Físico:</strong> {periodo.cumplimientoB.toFixed(1)}%
-                       </div>
-                       <div>
-                         <strong>Nota:</strong> 
-                         <span style={{ 
-                           color: periodo.nota >= 4 ? '#28a745' : periodo.nota >= 3 ? '#ffc107' : '#dc3545',
-                           fontWeight: 'bold'
-                         }}>
-                           {periodo.nota.toFixed(1)}
-                         </span>
-                       </div>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-               
-               
-             </div>
-           )}
+
           
           {/* Indicador de filtros aplicados */}
           {(fechaDesde || fechaHasta) && (
@@ -3901,1958 +4543,12 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
   );
   };
 
-  // Componente para el reporte de Cumplimiento Físico
-  const ReporteCumplimientoFisico = ({ data, autorizado, setAutorizado, proyectoId, fechaDesde, fechaHasta, datosCumplimientoFisico, filtroVector, setFiltroVector }) => {
-    const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
-    const [excelData, setExcelData] = useState([]);
-    const [importando, setImportando] = useState(false);
-    const [mensajeImportacion, setMensajeImportacion] = useState('');
-    const [tipoMensaje, setTipoMensaje] = useState(''); // 'success' o 'error'
-      const [showFormatInfo, setShowFormatInfo] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [codigoAutorizacion, setCodigoAutorizacion] = useState('');
-  const [errorCodigo, setErrorCodigo] = useState('');
-  const fileInputRef = useRef(null);
-
-    // Función para calcular resúmenes de parciales por vector
-    const calcularResumenes = () => {
-      const datosFiltrados = getDatosFiltrados();
-      const resumenes = {};
-      
-      // Obtener el mes actual y el mes anterior (mes vencido)
-      const mesActual = new Date().getMonth() + 1; // getMonth() retorna 0-11, sumamos 1
-      const mesVencido = mesActual === 1 ? 12 : mesActual - 1; // Mes anterior, si es enero va a diciembre
-      const mesVencidoStr = mesVencido.toString().padStart(2, '0');
-      const mesActualStr = mesActual.toString().padStart(2, '0');
-      
-      // Obtener el año actual y el año del mes vencido
-      const añoActual = fechaDesde ? fechaDesde.split('-')[0] : 
-                       fechaHasta ? fechaHasta.split('-')[0] : 
-                       new Date().getFullYear().toString();
-      
-      // Si el mes vencido es diciembre, el año es el anterior
-      const añoMesVencido = mesVencido === 12 ? (parseInt(añoActual) - 1).toString() : añoActual;
-      
-      // Obtener el mes del filtro (si es un solo mes)
-      const mesFiltro = fechaDesde && fechaHasta && fechaDesde === fechaHasta ? 
-                       fechaDesde.split('-')[1] : null;
-      
-      // Inicializar resúmenes para todos los vectores
-      ['REAL', 'V0', 'NPC', 'API'].forEach(vector => {
-        resumenes[vector] = {
-          vector: vector,
-          parcialPeriodo: 0,
-          sumatoriaParciales: 0,
-          proyeccionAno: 0
-        };
-      });
-      
-      // CASO 1: Sin filtro aplicado
-      if (!fechaDesde && !fechaHasta) {
-        // Columna 2: Período Actual (%) - valor del mes vencido
-        datosCumplimientoFisico.forEach(item => {
-          const itemAno = item.periodo.split('-')[0];
-          const itemMes = item.periodo.split('-')[1];
-          if (itemAno === añoMesVencido && itemMes === mesVencidoStr) {
-            resumenes[item.vector].parcialPeriodo = parseFloat(item.parcial_periodo || 0);
-          }
-        });
-        
-        // Columna 3: Sumatoria Parciales (%) - desde enero hasta mes vencido
-        datosCumplimientoFisico.forEach(item => {
-          const itemAno = item.periodo.split('-')[0];
-          const itemMes = parseInt(item.periodo.split('-')[1]);
-          if (itemAno === añoMesVencido && itemMes >= 1 && itemMes <= mesVencido) {
-            resumenes[item.vector].sumatoriaParciales += parseFloat(item.parcial_periodo || 0);
-          }
-        });
-        
-        // Columna 4: Proyección (%) - todo el año del mes vencido
-        datosCumplimientoFisico.forEach(item => {
-          const itemAno = item.periodo.split('-')[0];
-          if (itemAno === añoMesVencido) {
-            resumenes[item.vector].proyeccionAno += parseFloat(item.parcial_periodo || 0);
-          }
-        });
-      }
-      // CASO 2: Con filtro aplicado
-      else {
-        // COLUMNA 2: Período Actual (%) - SIEMPRE mes vencido (independiente del filtro)
-        datosCumplimientoFisico.forEach(item => {
-          const itemAno = item.periodo.split('-')[0];
-          const itemMes = item.periodo.split('-')[1];
-          if (itemAno === añoMesVencido && itemMes === mesVencidoStr) {
-            resumenes[item.vector].parcialPeriodo = parseFloat(item.parcial_periodo || 0);
-          }
-        });
-        
-        // COLUMNA 3: Sumatoria Parciales (%) - Solo afectada por el filtro
-        datosFiltrados.forEach(item => {
-          const vector = item.vector;
-          resumenes[vector].sumatoriaParciales += parseFloat(item.parcial_periodo || 0);
-        });
-        
-        // COLUMNA 4: Proyección (%) - SIEMPRE año actual (independiente del filtro)
-        datosCumplimientoFisico.forEach(item => {
-          const itemAno = item.periodo.split('-')[0];
-          if (itemAno === añoActual) {
-            const vector = item.vector;
-            if (resumenes[vector]) {
-              resumenes[vector].proyeccionAno += parseFloat(item.parcial_periodo || 0);
-            }
-          }
-        });
-      }
-      
-      return Object.values(resumenes).sort((a, b) => {
-        const ordenVector = { 'REAL': 1, 'V0': 2, 'NPC': 3, 'API': 4 };
-        return (ordenVector[a.vector] || 5) - (ordenVector[b.vector] || 5);
-      });
-    };
-
-    // Función para filtrar datos según las fechas y vector
-    const getDatosFiltrados = () => {
-      if (!datosCumplimientoFisico || datosCumplimientoFisico.length === 0) {
-        console.log('No hay datos de cumplimiento físico disponibles');
-        return [];
-      }
-
-      console.log('Datos totales disponibles:', datosCumplimientoFisico.length);
-      console.log('Filtros aplicados - Desde:', fechaDesde, 'Hasta:', fechaHasta, 'Vector:', filtroVector);
-      
-      let datosFiltrados = [...datosCumplimientoFisico];
-
-      // Aplicar filtro de fecha desde
-      if (fechaDesde) {
-        const fechaDesdeCompleta = `${fechaDesde}-01`;
-        datosFiltrados = datosFiltrados.filter(item => item.periodo >= fechaDesdeCompleta);
-      }
-
-      // Aplicar filtro de fecha hasta
-      if (fechaHasta) {
-        const [year, month] = fechaHasta.split('-');
-        const ultimoDia = new Date(parseInt(year), parseInt(month), 0).getDate();
-        const fechaHastaCompleta = `${fechaHasta}-${ultimoDia.toString().padStart(2, '0')}`;
-        datosFiltrados = datosFiltrados.filter(item => item.periodo <= fechaHastaCompleta);
-      }
-
-      // Aplicar filtro de vector
-      if (filtroVector) {
-        datosFiltrados = datosFiltrados.filter(item => item.vector === filtroVector);
-      }
-
-      // Ordenar por fecha y luego por vector en el orden específico: REAL, V0, NPC, API
-      datosFiltrados.sort((a, b) => {
-        // Primero ordenar por fecha
-        if (a.periodo !== b.periodo) {
-          return a.periodo.localeCompare(b.periodo);
-        }
-        
-        // Luego ordenar por vector en el orden específico
-        const ordenVector = { 'REAL': 1, 'V0': 2, 'NPC': 3, 'API': 4 };
-        return (ordenVector[a.vector] || 5) - (ordenVector[b.vector] || 5);
-      });
-
-      console.log('Datos filtrados resultantes:', datosFiltrados.length);
-      if (datosFiltrados.length > 0) {
-        console.log('Ejemplo de datos filtrados:', datosFiltrados[0]);
-      }
-
-      return datosFiltrados;
-    };
-
-    const handleFileSelect = (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      const extension = file.name.split('.').pop().toLowerCase();
-      if (!['xlsx', 'xls'].includes(extension)) {
-        setMensajeImportacion('Solo se permiten archivos Excel (.xlsx, .xls)');
-        setTipoMensaje('error');
-        setArchivoSeleccionado(null);
-        return;
-      }
-
-      setArchivoSeleccionado(file);
-      setMensajeImportacion('');
-
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        setExcelData(data);
-        
-        if (data.length > 0) {
-          console.log('Nombres de columnas:', Object.keys(data[0]));
-          console.log('Primera fila:', data[0]);
-        }
-      };
-      reader.readAsBinaryString(file);
-    };
-
-    const excelDateToMysql = (excelDate) => {
-      // Si es string tipo fecha
-      if (typeof excelDate === 'string' && excelDate.includes('-')) {
-        const parts = excelDate.split('-');
-        if (parts.length === 3 && parts[2].length === 4) {
-          // DD-MM-YYYY a YYYY-MM-DD
-          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
-        return excelDate;
-      }
-      // Si es número (número de serie Excel)
-      if (typeof excelDate === 'number') {
-        const date = XLSX.SSF.parse_date_code(excelDate);
-        if (!date) return '';
-        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
-      }
-      return '';
-    };
-
-    const normalizeKeys = (row) => {
-      const newRow = {};
-      Object.keys(row).forEach(key => {
-        newRow[key.trim().toLowerCase()] = row[key];
-      });
-      return newRow;
-    };
-
-    // Función para convertir formato de porcentaje con coma decimal a número
-    const parsePorcentaje = (valor) => {
-      console.log('🔍 JS - PARSEPORCENTAJE (cumplimiento_fisico):');
-      console.log('  📊 Valor original:', valor);
-      console.log('  📊 Tipo:', typeof valor);
-      
-      if (!valor || valor === '' || valor === null || valor === undefined) {
-        console.log('❌ JS - Valor vacío, retornando 0');
-        return 0;
-      }
-      
-      // Convertir a string si no lo es
-      let strValor = String(valor).trim();
-      console.log('  📊 String inicial:', `"${strValor}"`);
-      
-      // Si está vacío después del trim, retornar 0
-      if (strValor === '') {
-        console.log('❌ JS - String vacío después de trim, retornando 0');
-        return 0;
-      }
-      
-      // Remover el símbolo % si existe
-      if (strValor.includes('%')) {
-        strValor = strValor.replace('%', '');
-        console.log('  📊 Sin %:', `"${strValor}"`);
-      }
-      
-      // Reemplazar coma por punto para parseFloat
-      if (strValor.includes(',')) {
-      strValor = strValor.replace(',', '.');
-        console.log('  📊 Coma reemplazada por punto:', `"${strValor}"`);
-      }
-      
-      // Convertir a número
-      let numero = parseFloat(strValor);
-      console.log('  📊 Número antes de corrección:', numero);
-      
-      if (isNaN(numero)) {
-        console.log('❌ JS - No es un número válido, retornando 0');
-        return 0;
-      }
-      
-      // CORRECCIÓN ESPECÍFICA PARA VALORES DE EXCEL
-      // Si el número es menor a 2 y el valor original era 100 o similar, multiplicar por 100
-      if (numero < 2 && numero > 0) {
-        // Verificar si el valor original podría haber sido un porcentaje
-        const valorOriginal = String(valor).trim();
-        if (valorOriginal.includes('100') || valorOriginal.includes('1.00') || valorOriginal.includes('1,00')) {
-          console.log('🔧 JS - Detectado posible valor de Excel como decimal, multiplicando por 100');
-          numero = numero * 100;
-        }
-      }
-      
-      // Verificación adicional: si el número está entre 0 y 1, probablemente es un decimal de Excel
-      if (numero > 0 && numero <= 1) {
-        console.log('🔧 JS - Valor detectado como decimal (0-1), multiplicando por 100');
-        numero = numero * 100;
-      }
-      
-      console.log('  📊 Número final corregido:', numero);
-      console.log('✅ JS - Porcentaje procesado (parsePorcentaje):', `${valor} -> ${numero}`);
-      return numero;
-    };
-
-    const mapExcelRow = (row) => {
-      const r = normalizeKeys(row);
-      
-      console.log('📊 ============ PROCESANDO FILA EXCEL CUMPLIMIENTO FÍSICO ============');
-      console.log('📊 Datos originales del Excel:', row);
-      console.log('📊 Datos normalizados:', r);
-      console.log('📊 Claves disponibles:', Object.keys(r));
-      
-      // Buscar las claves correspondientes a los campos del Excel
-      let vectorKey = null;
-      let periodoKey = null;
-      let parcialPeriodoKey = null;
-      let porcentajePeriodoKey = null;
-      
-      // Búsqueda exacta primero
-      Object.keys(r).forEach(key => {
-        if (key === 'vector') vectorKey = key;
-        if (key === 'periodo') periodoKey = key;
-        if (key === 'parcial_periodo') parcialPeriodoKey = key;
-        if (key === 'porcentaje_periodo') porcentajePeriodoKey = key;
-      });
-      
-      // Si no se encuentran las claves exactas, buscar alternativas
-      if (!vectorKey) {
-        Object.keys(r).forEach(key => {
-          if (key.includes('vector')) {
-            vectorKey = key;
-          }
-        });
-      }
-      
-      if (!periodoKey) {
-        Object.keys(r).forEach(key => {
-          if (key.includes('periodo') && !key.includes('parcial') && !key.includes('porcentaje')) {
-            periodoKey = key;
-          }
-        });
-      }
-      
-      if (!parcialPeriodoKey) {
-        Object.keys(r).forEach(key => {
-          if (key.includes('parcial') && key.includes('periodo')) {
-            parcialPeriodoKey = key;
-          }
-        });
-      }
-      
-      if (!porcentajePeriodoKey) {
-        Object.keys(r).forEach(key => {
-          if (key.includes('porcentaje') && key.includes('periodo')) {
-            porcentajePeriodoKey = key;
-          }
-        });
-      }
-      
-      console.log('🔍 CLAVES FINALES DETECTADAS:');
-      console.log('  - vector:', vectorKey);
-      console.log('  - periodo:', periodoKey);
-      console.log('  - parcial_periodo:', parcialPeriodoKey);
-      console.log('  - porcentaje_periodo:', porcentajePeriodoKey);
-      
-      // Procesar los valores
-      console.log('🔄 PROCESANDO VALORES:');
-      
-      const vector = vectorKey ? String(r[vectorKey]).trim().toUpperCase() : '';
-      console.log('📊 vector procesado:', vector, '← de:', r[vectorKey]);
-      
-      const periodo = periodoKey ? excelDateToMysql(r[periodoKey]) : '';
-      console.log('📅 periodo procesado:', periodo, '← de:', r[periodoKey]);
-      
-      // COMPARACIÓN ESPECÍFICA: parcial_periodo vs porcentaje_periodo
-      console.log('🔍 COMPARACIÓN PARCIAL vs PORCENTAJE:');
-      console.log('  📊 Valor original parcial_periodo:', r[parcialPeriodoKey], '(tipo:', typeof r[parcialPeriodoKey], ')');
-      console.log('  📊 Valor original porcentaje_periodo:', r[porcentajePeriodoKey], '(tipo:', typeof r[porcentajePeriodoKey], ')');
-      console.log('  📊 Clave parcial_periodo encontrada:', parcialPeriodoKey);
-      console.log('  📊 Clave porcentaje_periodo encontrada:', porcentajePeriodoKey);
-      
-      // VERIFICACIÓN ESPECÍFICA PARA DATOS PROBLEMÁTICOS
-      if (r[parcialPeriodoKey] === undefined || r[parcialPeriodoKey] === null || r[parcialPeriodoKey] === '') {
-        console.log('🚨 PROBLEMA DETECTADO: parcial_periodo está vacío o undefined');
-        console.log('  📊 Valor:', r[parcialPeriodoKey]);
-        console.log('  📊 Tipo:', typeof r[parcialPeriodoKey]);
-        console.log('  📊 Todas las claves disponibles:', Object.keys(r));
-      }
-      
-      const parcial_periodo = parcialPeriodoKey ? parsePorcentaje(r[parcialPeriodoKey]) : 0;
-      console.log('📊 parcial_periodo procesado:', parcial_periodo, '← de:', r[parcialPeriodoKey]);
-      
-      const porcentaje_periodo = porcentajePeriodoKey ? parsePorcentaje(r[porcentajePeriodoKey]) : 0;
-      console.log('📊 porcentaje_periodo procesado:', porcentaje_periodo, '← de:', r[porcentajePeriodoKey]);
-      
-      // DATOS FINALES QUE SE ENVIARÁN AL PHP
-      console.log('🚀 DATOS FINALES PARA ENVIAR AL PHP:');
-      console.log('  - vector:', vector);
-      console.log('  - periodo:', periodo);
-      console.log('  - parcial_periodo:', parcial_periodo, '(tipo:', typeof parcial_periodo, ')');
-      console.log('  - porcentaje_periodo:', porcentaje_periodo, '(tipo:', typeof porcentaje_periodo, ')');
-      
-      // VERIFICACIÓN FINAL
-      console.log('✅ VERIFICACIÓN FINAL:');
-      console.log('  - ¿parcial_periodo es igual a porcentaje_periodo?', parcial_periodo === porcentaje_periodo);
-      console.log('  - ¿parcial_periodo es 0?', parcial_periodo === 0);
-      console.log('  - ¿porcentaje_periodo es 0?', porcentaje_periodo === 0);
-      
-      return {
-        vector: vector,
-        periodo: periodo,
-        parcial_periodo: parcial_periodo,
-        porcentaje_periodo: porcentaje_periodo
-      };
-    };
-
-    const handleImportar = async () => {
-      // Verificar autorización antes de importar
-      if (!autorizado) {
-        setShowAuthModal(true);
-        return;
-      }
-
-      if (!archivoSeleccionado || excelData.length === 0) {
-        setMensajeImportacion('Por favor selecciona un archivo Excel válido');
-        setTipoMensaje('error');
-        return;
-      }
-
-      setImportando(true);
-      setMensajeImportacion('');
-
-      try {
-        // Mapear los datos antes de enviar
-        const datosMapeados = excelData.map(mapExcelRow);
-        
-        // Debug: mostrar datos que se van a enviar
-        console.log('Datos a enviar:', datosMapeados);
-        
-        // Verificar que proyectoId esté disponible
-        if (!proyectoId) {
-          setMensajeImportacion('Error: No hay proyecto seleccionado');
-          setTipoMensaje('error');
-          return;
-        }
-        
-        console.log('Proyecto ID:', proyectoId);
-        
-        const response = await fetch(`${API_BASE}/cumplimiento_fisico/importar_cumplimiento_fisico.php`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            rows: datosMapeados,
-            proyecto_id: proyectoId,
-            centro_costo_id: '1' // Valor por defecto
-          }),
-        });
-
-        const result = await response.json();
-        console.log('Respuesta del servidor:', result);
-
-        if (result.success) {
-          setMensajeImportacion(result.message);
-          setTipoMensaje('success');
-          setArchivoSeleccionado(null);
-          setExcelData([]);
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          // Recargar datos después de la importación
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        } else {
-          // Mostrar errores específicos si existen
-          if (result.errores && Array.isArray(result.errores)) {
-            setMensajeImportacion('Errores en la importación: ' + result.errores.join(', '));
-          } else {
-            setMensajeImportacion(result.error || 'Error en la importación');
-          }
-          setTipoMensaje('error');
-        }
-      } catch (error) {
-        console.error('Error completo:', error);
-        setMensajeImportacion('Error de conexión: ' + error.message);
-        setTipoMensaje('error');
-      } finally {
-        setImportando(false);
-      }
-    };
-
-    // Función para validar código de autorización
-    const validarCodigoAutorizacion = () => {
-      // Código secreto: codelco2025$
-      const codigoCorrecto = 'codelco2025$';
-      
-      if (codigoAutorizacion.trim() === codigoCorrecto) {
-        setAutorizado(true);
-        setErrorCodigo('');
-        setShowAuthModal(false);
-        setCodigoAutorizacion('');
-        return true;
-      } else {
-        setErrorCodigo('Código de autorización incorrecto');
-        return false;
-      }
-    };
-
-    const descargarPlantilla = async () => {
-      try {
-        let plantillaData = [];
-        
-        if (proyectoId) {
-          // Intentar obtener datos reales desde la base de datos
-          const response = await fetch(`${API_BASE}/cumplimiento_fisico/cumplimiento_fisico.php?proyecto_id=${proyectoId}`);
-          const result = await response.json();
-          
-          if (result.success && result.data.length > 0) {
-            // Usar datos reales de la base de datos
-            plantillaData = result.data.map(item => {
-              // Convertir fecha de YYYY-MM-DD a DD-MM-YYYY para la plantilla
-              const fechaParts = item.periodo.split('-');
-              const fechaFormateada = `${fechaParts[2]}-${fechaParts[1]}-${fechaParts[0]}`;
-              
-              // Formatear parcial_periodo con coma decimal y símbolo %
-              const parcialFormateado = parseFloat(item.parcial_periodo || 0).toFixed(2).replace('.', ',') + '%';
-              
-              // Formatear porcentaje_periodo con coma decimal y símbolo %
-              const porcentajeFormateado = parseFloat(item.porcentaje_periodo).toFixed(2).replace('.', ',') + '%';
-              
-              return {
-                vector: item.vector,
-                periodo: fechaFormateada,
-                parcial_periodo: parcialFormateado,
-                porcentaje_periodo: porcentajeFormateado
-              };
-            });
-          } else {
-            // Si no hay datos reales, usar datos de ejemplo basados en la imagen
-            plantillaData = [
-              {
-                vector: 'REAL',
-                periodo: '01-09-2021',
-                parcial_periodo: '0,23%',
-                porcentaje_periodo: '0,23%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-10-2021',
-                parcial_periodo: '0,24%',
-                porcentaje_periodo: '0,47%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-11-2021',
-                parcial_periodo: '0,30%',
-                porcentaje_periodo: '0,77%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-12-2021',
-                parcial_periodo: '0,45%',
-                porcentaje_periodo: '1,22%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-01-2022',
-                parcial_periodo: '0,27%',
-                porcentaje_periodo: '1,50%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-02-2022',
-                parcial_periodo: '0,83%',
-                porcentaje_periodo: '2,32%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-03-2022',
-                parcial_periodo: '0,30%',
-                porcentaje_periodo: '2,62%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-04-2022',
-                parcial_periodo: '0,36%',
-                porcentaje_periodo: '2,99%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-05-2022',
-                parcial_periodo: '0,29%',
-                porcentaje_periodo: '3,28%'
-              },
-              {
-                vector: 'REAL',
-                periodo: '01-06-2022',
-                parcial_periodo: '0,15%',
-                porcentaje_periodo: '3,43%'
-              }
-            ];
-          }
-        } else {
-          // Si no hay proyecto seleccionado, usar datos de ejemplo basados en la imagen
-          plantillaData = [
-            {
-              vector: 'REAL',
-              periodo: '01-09-2021',
-              porcentaje_periodo: '0,23%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-10-2021',
-              porcentaje_periodo: '0,47%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-11-2021',
-              porcentaje_periodo: '1,22%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-12-2021',
-              porcentaje_periodo: '2,32%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-01-2022',
-              porcentaje_periodo: '5,45%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-02-2022',
-              porcentaje_periodo: '8,67%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-03-2022',
-              porcentaje_periodo: '12,34%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-04-2022',
-              porcentaje_periodo: '15,78%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-05-2022',
-              porcentaje_periodo: '18,92%'
-            },
-            {
-              vector: 'REAL',
-              periodo: '01-06-2022',
-              porcentaje_periodo: '20,58%'
-            }
-          ];
-        }
-
-        // Crear workbook y worksheet
-        const ws = XLSX.utils.json_to_sheet(plantillaData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Cumplimiento Físico');
-
-        // Descargar archivo
-        const fileName = proyectoId ? `cumplimiento_fisico_proyecto_${proyectoId}.xlsx` : 'plantilla_cumplimiento_fisico.xlsx';
-        XLSX.writeFile(wb, fileName);
-        
-        // Mostrar mensaje de éxito
-        setMensajeImportacion(`Archivo descargado exitosamente: ${fileName}`);
-        setTipoMensaje('success');
-        
-      } catch (error) {
-        console.error('Error al descargar plantilla:', error);
-        setMensajeImportacion('Error al descargar la plantilla: ' + error.message);
-        setTipoMensaje('error');
-      }
-    };
-
-    // Función para calcular la nota basada en la desviación según la métrica
-    const calcularNota = (desviacion) => {
-      // Usar valor absoluto para manejar desviaciones positivas y negativas
-      const desviacionAbs = Math.abs(desviacion);
-      
-      // Según la métrica: |X| > 15% = Nota 1, 15% >= |X| > 10% = Nota 3, 10% >= |X| >= 0% = Nota 5
-      if (desviacionAbs > 15) {
-        return {
-          numero: '1',
-          color: '#dc3545',
-          descripcion: 'Cumplimiento crítico'
-        };
-      } else if (desviacionAbs > 10) {
-        return {
-          numero: '3',
-          color: '#ffc107',
-          descripcion: 'Cumplimiento 100%'
-        };
-      } else {
-        return {
-          numero: '5',
-          color: '#28a745',
-          descripcion: 'Excelente cumplimiento'
-        };
-      }
-    };
-
-    return (
-      <div style={{ width: '100%', padding: '20px' }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '10px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h3 style={{ color: '#16355D', margin: 0 }}>Análisis de Cumplimiento Físico</h3>
-            {usandoDatosReales ? (
-              <span style={{ 
-                background: '#d4edda', 
-                color: '#155724', 
-                padding: '4px 8px', 
-                borderRadius: '4px', 
-                fontSize: '12px',
-                fontWeight: 'bold',
-                border: '1px solid #c3e6cb'
-              }}>
-                📊 Datos Reales
-              </span>
-            ) : (
-              <span style={{ 
-                background: '#fff3cd', 
-                color: '#856404', 
-                padding: '4px 8px', 
-                borderRadius: '4px', 
-                fontSize: '12px',
-                fontWeight: 'bold',
-                border: '1px solid #ffeaa7'
-              }}>
-                📋 Datos de Ejemplo
-              </span>
-            )}
-          </div>
-          
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button
-              onClick={() => setShowFormatInfo(true)}
-              style={{
-                background: '#17a2b8',
-                color: 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-              title="Ver formato requerido del archivo Excel"
-            >
-              ℹ️ Formato Requerido
-            </button>
-            
-            <button
-              onClick={descargarPlantilla}
-              style={{
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-              title="Descargar plantilla Excel"
-            >
-              📥 Descargar Plantilla
-            </button>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
-            
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                background: '#007bff',
-                color: 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-              title="Seleccionar archivo Excel"
-            >
-              📁 Seleccionar Archivo
-            </button>
-            
-            <button
-              onClick={handleImportar}
-              disabled={!archivoSeleccionado || importando}
-              style={{
-                background: archivoSeleccionado && !importando ? 
-                  (autorizado ? '#28a745' : '#dc3545') : '#6c757d',
-                color: 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                cursor: archivoSeleccionado && !importando ? 'pointer' : 'not-allowed',
-                fontSize: '14px',
-                fontWeight: '500',
-                position: 'relative'
-              }}
-              title={autorizado ? "Importar datos a la base de datos" : "Requiere autorización"}
-            >
-              {importando ? '⏳ Importando...' : 
-               autorizado ? '🔓 Importar' : '🔐 Importar'}
-              {autorizado && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  background: '#28a745',
-                  color: 'white',
-                  borderRadius: '50%',
-                  width: '16px',
-                  height: '16px',
-                  fontSize: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '2px solid white'
-                }}>
-                  ✓
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mostrar archivo seleccionado */}
-        {archivoSeleccionado && (
-          <div style={{ 
-            background: '#e3f2fd', 
-            padding: '10px', 
-            borderRadius: '4px', 
-            marginBottom: '15px',
-            border: '1px solid #2196f3'
-          }}>
-            <strong>Archivo seleccionado:</strong> {archivoSeleccionado.name}
-          </div>
-        )}
-
-        {/* Mostrar mensaje de importación */}
-        {mensajeImportacion && (
-          <div style={{ 
-            background: tipoMensaje === 'success' ? '#d4edda' : '#f8d7da',
-            color: tipoMensaje === 'success' ? '#155724' : '#721c24',
-            padding: '10px', 
-            borderRadius: '4px', 
-            marginBottom: '15px',
-            border: `1px solid ${tipoMensaje === 'success' ? '#c3e6cb' : '#f5c6cb'}`
-          }}>
-            {mensajeImportacion}
-          </div>
-        )}
 
 
 
-        {/* Tabla Dinámica de Datos Crudos */}
-        <div style={{ marginTop: '40px' }}>
-          <h3 style={{ color: '#16355D', marginBottom: '20px' }}>
-            📊 Tabla de Datos Detallados
-            {fechaDesde || fechaHasta || filtroVector ? (
-              <span style={{ fontSize: '14px', color: '#666', fontWeight: 'normal', marginLeft: '10px' }}>
-                (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'} {filtroVector ? `| Vector: ${filtroVector}` : ''})
-              </span>
-            ) : null}
-          </h3>
-
-          {/* Filtro de Vector */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '10px', 
-            marginBottom: '15px',
-            flexWrap: 'wrap'
-          }}>
-            <label 
-              style={{ 
-                color: '#16355D', 
-                fontWeight: 'bold', 
-                fontSize: '14px',
-                marginRight: '5px',
-                cursor: 'help'
-              }}
-              title="Filtra los datos mostrados en la tabla principal y afecta la columna 'Sumatoria Parciales' de la tabla de resumen. La columna 'Período Actual' y 'Proyección' NO se ven afectadas por este filtro."
-            >
-              Filtrar por Vector:
-            </label>
-            <select
-              value={filtroVector}
-              onChange={(e) => setFiltroVector(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '4px',
-                border: '2px solid #16355D',
-                fontSize: '14px',
-                color: '#16355D',
-                fontWeight: '500',
-                background: 'white',
-                cursor: 'pointer',
-                minWidth: '120px'
-              }}
-            >
-              <option value="">Todos los vectores</option>
-              <option value="REAL">Real</option>
-              <option value="V0">V0</option>
-              <option value="NPC">NPC</option>
-              <option value="API">API</option>
-            </select>
-            
-            {filtroVector && (
-              <button
-                onClick={() => setFiltroVector('')}
-                style={{
-                  background: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-                title="Limpiar el filtro de vector y mostrar todos los vectores nuevamente"
-              >
-                ✕ Limpiar
-              </button>
-            )}
-          </div>
-          
-          {datosCumplimientoFisico.length > 0 ? (
-            <div style={{ 
-              maxHeight: '500px', 
-              overflowY: 'auto', 
-              border: '1px solid #ddd', 
-              borderRadius: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <div 
-                style={{ 
-                  background: '#f8f9fa', 
-                  padding: '8px 12px', 
-                  borderBottom: '1px solid #ddd',
-                  fontSize: '12px',
-                  color: '#666',
-                  fontWeight: '500',
-                  cursor: 'help'
-                }}
-                title="Esta tabla muestra los datos detallados de cumplimiento físico. Los filtros de fecha y vector afectan directamente los datos mostrados aquí. Los datos de esta tabla se utilizan para calcular la columna 'Sumatoria Parciales' en la tabla de resumen."
-              >
-                📋 Datos Detallados de Cumplimiento Físico
-                {fechaDesde || fechaHasta || filtroVector ? (
-                  <span style={{ marginLeft: '10px', color: '#16355D' }}>
-                    (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'} {filtroVector ? `| Vector: ${filtroVector}` : ''})
-                  </span>
-                ) : null}
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ position: 'sticky', top: 0, background: '#16355D', color: '#fff' }}>
-                  <tr>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>Periodo</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px' }}>Proyecto</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px' }}>Centro de Costo</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>Vector</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>Parcial (%)</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>Acumulado (%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getDatosFiltrados().map((item, index) => (
-                    <tr key={index} style={{ 
-                      borderBottom: '1px solid #eee',
-                      background: index % 2 === 0 ? '#fff' : '#f8f9fa'
-                    }}>
-                      <td style={{ padding: '8px', fontSize: '12px', textAlign: 'center' }}>
-                        {item.periodo ? (() => {
-                          const parts = item.periodo.split('-');
-                          const month = parts[1];
-                          const year = parts[0].slice(-2);
-                          return `${month}/${year}`;
-                        })() : ''}
-                      </td>
-                      <td style={{ padding: '8px', fontSize: '12px' }}>
-                        {item.proyecto_nombre || `Proyecto ${item.proyecto_id}`}
-                      </td>
-                      <td style={{ padding: '8px', fontSize: '12px', fontWeight: '500' }}>
-                        {item.nombre}
-                      </td>
-                      <td style={{ 
-                        padding: '8px', 
-                        fontSize: '12px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: item.vector === 'REAL' ? '#FF8C00' : 
-                               item.vector === 'V0' ? '#00BFFF' : 
-                               item.vector === 'NPC' ? '#0066CC' : '#32CD32'
-                      }}>
-                        {item.vector}
-                      </td>
-                      <td style={{ 
-                        padding: '8px', 
-                        fontSize: '12px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: '#16355D'
-                      }}>
-                        {(() => {
-                          const valor = parseFloat(item.parcial_periodo || 0);
-                          return valor.toFixed(2).replace('.', ',') + '%';
-                        })()}
-                      </td>
-                      <td style={{ 
-                        padding: '8px', 
-                        fontSize: '12px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: '#16355D'
-                      }}>
-                        {(() => {
-                          const valor = parseFloat(item.porcentaje_periodo || 0);
-                          return valor.toFixed(2).replace('.', ',') + '%';
-                        })()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '40px', 
-              color: '#666',
-              background: '#f8f9fa',
-              borderRadius: '8px',
-              border: '1px solid #ddd'
-            }}>
-              <p>No hay datos de cumplimiento físico disponibles.</p>
-              <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                Importa datos usando el botón "Importar" arriba.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Tabla de Resumen de Parciales */}
-        {getDatosFiltrados().length > 0 && (
-          <div style={{ marginTop: '30px', marginBottom: '30px' }}>
-            <h3 style={{ color: '#16355D', marginBottom: '20px' }}>
-              <span 
-                style={{ cursor: 'help' }}
-                title="Esta tabla muestra un resumen consolidado de los valores parciales por vector. Las columnas tienen diferentes comportamientos respecto a los filtros: Período Actual y Proyección NO se ven afectadas por filtros, mientras que Sumatoria Parciales SÍ responde a los filtros de fecha aplicados."
-              >
-                📊 Resumen de Parciales por Vector
-                {fechaDesde || fechaHasta ? (
-                  <span style={{ fontSize: '14px', color: '#666', fontWeight: 'normal', marginLeft: '10px' }}>
-                    (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'})
-                  </span>
-                ) : null}
-              </span>
-            </h3>
-            
-            <div style={{ 
-              background: 'white', 
-              padding: '20px', 
-              borderRadius: '8px', 
-              border: '1px solid #ddd',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ background: '#16355D', color: '#fff' }}>
-                  <tr>
-                    <th style={{ 
-                      padding: '12px 8px', 
-                      textAlign: 'center', 
-                      fontSize: '12px',
-                      background: '#FF8C00',
-                      color: '#fff'
-                    }}>
-                      <span 
-                        style={{ cursor: 'help' }}
-                        title="Tipos de vectores de cumplimiento físico disponibles en el sistema. Los vectores se muestran siempre en el orden: REAL, V0, NPC, API."
-                      >
-                        Vector
-                      </span>
-                    </th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
-                      <span 
-                        style={{ cursor: 'help' }}
-                        title="Muestra el valor del mes vencido (mes anterior al actual) para cada vector. Esta columna NO se ve afectada por los filtros de fecha aplicados - siempre muestra el mes vencido."
-                      >
-                        {(() => {
-                          // SIEMPRE mostrar mes vencido (independiente del filtro)
-                          const mesVencido = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
-                          const añoMesVencido = mesVencido === 12 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-                          const nombreMes = new Date(añoMesVencido, mesVencido - 1).toLocaleDateString('es-ES', { month: 'long' });
-                          return (
-                            <>
-                              <div>Período Actual (%)</div>
-                              <div>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
-                            </>
-                          );
-                        })()}
-                      </span>
-                    </th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
-                      <span 
-                        style={{ cursor: 'help' }}
-                        title="Suma de los valores parciales según el filtro aplicado. Sin filtro: desde enero hasta el mes vencido. Con filtro: solo los meses seleccionados en el filtro de fechas."
-                      >
-                        {(() => {
-                          if (!fechaDesde && !fechaHasta) {
-                            // Sin filtro: desde enero hasta mes vencido
-                            const mesVencido = new Date().getMonth() === 0 ? 12 : new Date().getMonth();
-                            const añoMesVencido = mesVencido === 12 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-                            const nombreMes = new Date(añoMesVencido, mesVencido - 1).toLocaleDateString('es-ES', { month: 'long' });
-                            return (
-                              <>
-                                <div>Sumatoria Parciales (%)</div>
-                                <div>Enero - {nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
-                              </>
-                            );
-                          } else if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
-                            // Filtro de un mes específico
-                            const [año, mes] = fechaDesde.split('-');
-                            const nombreMes = new Date(año, parseInt(mes) - 1).toLocaleDateString('es-ES', { month: 'long' });
-                            return (
-                              <>
-                                <div>Sumatoria Parciales (%)</div>
-                                <div>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</div>
-                              </>
-                            );
-                          } else {
-                            // Filtro de rango
-                            const [añoDesde, mesDesde] = fechaDesde ? fechaDesde.split('-') : ['', ''];
-                            const [añoHasta, mesHasta] = fechaHasta ? fechaHasta.split('-') : ['', ''];
-                            const nombreMesDesde = fechaDesde ? new Date(añoDesde, parseInt(mesDesde) - 1).toLocaleDateString('es-ES', { month: 'long' }) : '';
-                            const nombreMesHasta = fechaHasta ? new Date(añoHasta, parseInt(mesHasta) - 1).toLocaleDateString('es-ES', { month: 'long' }) : '';
-                            return (
-                              <>
-                                <div>Sumatoria Parciales (%)</div>
-                                <div>{nombreMesDesde.charAt(0).toUpperCase() + nombreMesDesde.slice(1)} - {nombreMesHasta.charAt(0).toUpperCase() + nombreMesHasta.slice(1)}</div>
-                              </>
-                            );
-                          }
-                        })()}
-                      </span>
-                    </th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '12px' }}>
-                      <span 
-                        style={{ cursor: 'help' }}
-                        title="Proyección anual completa para el año seleccionado. Esta columna NO se ve afectada por los filtros de fecha - siempre muestra la suma de todos los meses del año."
-                      >
-                        {(() => {
-                          const añoProyeccion = fechaDesde ? fechaDesde.split('-')[0] : 
-                                               fechaHasta ? fechaHasta.split('-')[0] : 
-                                               new Date().getFullYear();
-                          return `Proyección ${añoProyeccion} (%)`;
-                        })()}
-                      </span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calcularResumenes().map((resumen, index) => (
-                    <tr key={index} style={{ 
-                      borderBottom: '1px solid #eee',
-                      background: index % 2 === 0 ? '#fff' : '#f8f9fa'
-                    }}>
-                      <td style={{ 
-                        padding: '12px 8px', 
-                        fontSize: '14px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: resumen.vector === 'REAL' ? '#FF8C00' : 
-                               resumen.vector === 'V0' ? '#00BFFF' : 
-                               resumen.vector === 'NPC' ? '#0066CC' : '#32CD32'
-                      }}>
-                        <span 
-                          style={{ cursor: 'help' }}
-                          title={`Vector ${resumen.vector}: ${resumen.vector === 'REAL' ? 'Datos reales de ejecución física' : resumen.vector === 'V0' ? 'Versión 0 del presupuesto' : resumen.vector === 'NPC' ? 'Nuevo Presupuesto de Contrato' : 'Aprobación Presupuestaria Inicial'}`}
-                        >
-                          {resumen.vector}
-                        </span>
-                      </td>
-                      <td style={{ 
-                        padding: '12px 8px', 
-                        fontSize: '14px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: '#16355D'
-                      }}>
-                        <span 
-                          style={{ cursor: 'help' }}
-                          title={`Valor del mes vencido para ${resumen.vector}. Este valor NO cambia al aplicar filtros de fecha.`}
-                        >
-                          {resumen.parcialPeriodo.toFixed(2)}%
-                        </span>
-                      </td>
-                      <td style={{ 
-                        padding: '12px 8px', 
-                        fontSize: '14px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: '#16355D'
-                      }}>
-                        <span 
-                          style={{ cursor: 'help' }}
-                          title={`Suma acumulada de valores parciales para ${resumen.vector} ${!fechaDesde && !fechaHasta ? 'desde enero hasta el mes vencido' : 'en el período filtrado'}.`}
-                        >
-                          {resumen.sumatoriaParciales.toFixed(2)}%
-                        </span>
-                      </td>
-                      <td style={{ 
-                        padding: '12px 8px', 
-                        fontSize: '14px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        color: '#16355D'
-                      }}>
-                        <span 
-                          style={{ cursor: 'help' }}
-                          title={`Proyección anual completa para ${resumen.vector}. Este valor NO cambia al aplicar filtros de fecha - siempre muestra la suma de todos los meses del año.`}
-                        >
-                          {resumen.proyeccionAno.toFixed(2)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Curva S */}
-        <div style={{ marginTop: '40px', marginBottom: '40px' }}>
-          <h3 style={{ color: '#16355D', marginBottom: '20px' }}>
-            📈 Curva S - Evolución del Cumplimiento
-            {fechaDesde || fechaHasta || filtroVector ? (
-              <span style={{ fontSize: '14px', color: '#666', fontWeight: 'normal', marginLeft: '10px' }}>
-                (Filtrado: {fechaDesde || 'Inicio'} - {fechaHasta || 'Fin'} {filtroVector ? `| Vector: ${filtroVector}` : ''})
-              </span>
-            ) : null}
-          </h3>
-          
-          {getDatosFiltrados().length > 0 ? (
-            <div style={{ 
-              background: 'white', 
-              padding: '20px', 
-              borderRadius: '8px', 
-              border: '1px solid #ddd',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <CurvaS data={getDatosFiltrados()} />
-            </div>
-          ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '40px', 
-              color: '#666',
-              background: '#f8f9fa',
-              borderRadius: '8px',
-              border: '1px solid #ddd'
-            }}>
-              <p>No hay datos suficientes para generar la curva S.</p>
-              <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                Importa datos usando el botón "Importar" arriba.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Modal de Autorización */}
-        {showAuthModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0, 0, 0, 0.7)',
-            zIndex: 10001
-          }}>
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: 'white',
-              padding: '30px',
-              borderRadius: '12px',
-              maxWidth: '450px',
-              width: 'calc(100% - 40px)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-              border: '3px solid #16355D'
-            }}>
-              {/* Botón de cerrar */}
-              <button
-                onClick={() => {
-                  setShowAuthModal(false);
-                  setErrorCodigo('');
-                  setCodigoAutorizacion('');
-                }}
-                style={{
-                  position: 'absolute',
-                  top: '12px',
-                  right: '16px',
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#666',
-                  fontWeight: 'bold'
-                }}
-                title="Cancelar"
-              >
-                ×
-              </button>
-
-              {/* Contenido del modal */}
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ 
-                  background: '#16355D', 
-                  color: 'white', 
-                  padding: '15px', 
-                  borderRadius: '8px',
-                  marginBottom: '20px'
-                }}>
-                  <h3 style={{ 
-                    margin: '0 0 10px 0', 
-                    fontSize: '18px',
-                    color: '#FFD000'
-                  }}>
-                    🔐 Autorización Requerida
-                  </h3>
-                  <p style={{ 
-                    margin: 0, 
-                    fontSize: '14px',
-                    color: 'white'
-                  }}>
-                    Ingrese el código de autorización para importar datos
-                  </p>
-                </div>
-                
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ 
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: '#16355D',
-                    fontWeight: 'bold',
-                    fontSize: '14px'
-                  }}>
-                    Código de Autorización:
-                  </label>
-                  <input
-                    type="password"
-                    value={codigoAutorizacion}
-                    onChange={(e) => {
-                      setCodigoAutorizacion(e.target.value);
-                      setErrorCodigo('');
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        validarCodigoAutorizacion();
-                      }
-                    }}
-                    placeholder="Ingrese el código secreto"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      border: errorCodigo ? '2px solid #dc3545' : '2px solid #16355D',
-                      fontSize: '16px',
-                      textAlign: 'center',
-                      letterSpacing: '2px',
-                      fontWeight: 'bold',
-                      outline: 'none',
-                      boxSizing: 'border-box'
-                    }}
-                    autoFocus
-                  />
-                  {errorCodigo && (
-                    <p style={{ 
-                      color: '#dc3545', 
-                      fontSize: '12px', 
-                      margin: '8px 0 0 0',
-                      fontWeight: 'bold'
-                    }}>
-                      ❌ {errorCodigo}
-                    </p>
-                  )}
-                </div>
-
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '10px', 
-                  justifyContent: 'center',
-                  flexWrap: 'wrap'
-                }}>
-                  <button
-                    onClick={validarCodigoAutorizacion}
-                    style={{
-                      background: '#28a745',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px 24px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      minWidth: '120px'
-                    }}
-                  >
-                    🔓 Autorizar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAuthModal(false);
-                      setErrorCodigo('');
-                      setCodigoAutorizacion('');
-                    }}
-                    style={{
-                      background: '#6c757d',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px 24px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      minWidth: '120px'
-                    }}
-                  >
-                    ❌ Cancelar
-                  </button>
-                </div>
-
-                <div style={{ 
-                  marginTop: '20px',
-                  padding: '12px',
-                  background: '#fff3cd',
-                  borderRadius: '6px',
-                  border: '1px solid #ffeaa7'
-                }}>
-                  <p style={{ 
-                    margin: 0, 
-                    fontSize: '12px', 
-                    color: '#856404',
-                    fontWeight: 'bold'
-                  }}>
-                    ⚠️ Importante: Esta acción reemplazará todos los datos existentes del proyecto actual.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Popup Modal para Información del Formato */}
-        {showFormatInfo && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10000
-          }}>
-            <div style={{
-              background: 'white',
-              padding: '20px',
-              borderRadius: '8px',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-              position: 'relative'
-            }}>
-              {/* Botón de cerrar */}
-              <button
-                onClick={() => setShowFormatInfo(false)}
-                style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '12px',
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  color: '#666',
-                  fontWeight: 'bold'
-                }}
-                title="Cerrar"
-              >
-                ×
-              </button>
-
-              {/* Contenido del modal */}
-              <div>
-                <h3 style={{ 
-                  color: '#16355D', 
-                  marginBottom: '15px',
-                  fontSize: '16px',
-                  textAlign: 'center'
-                }}>
-                  📋 Formato Requerido
-                </h3>
-                
-                <div style={{ 
-                  background: '#fff3cd', 
-                  padding: '12px', 
-                  borderRadius: '6px', 
-                  border: '1px solid #ffeaa7',
-                  marginBottom: '12px'
-                }}>
-                  <h4 style={{ margin: '0 0 8px 0', color: '#856404', fontSize: '14px' }}>Columnas:</h4>
-                  <div style={{ fontSize: '13px', color: '#856404' }}>
-                    <p style={{ margin: '4px 0' }}><strong>vector:</strong> REAL, V0, NPC, API</p>
-                    <p style={{ margin: '4px 0' }}><strong>periodo:</strong> DD-MM-YYYY</p>
-                    <p style={{ margin: '4px 0' }}><strong>parcial_periodo:</strong> 12,25% (opcional, vacío = 0%)</p>
-                    <p style={{ margin: '4px 0' }}><strong>porcentaje_periodo:</strong> 12,25% (obligatorio)</p>
-                  </div>
-                </div>
-
-                <div style={{ 
-                  background: '#e3f2fd', 
-                  padding: '12px', 
-                  borderRadius: '6px', 
-                  border: '1px solid #2196f3',
-                  marginBottom: '12px'
-                }}>
-                  <h4 style={{ margin: '0 0 8px 0', color: '#1565c0', fontSize: '14px' }}>Notas:</h4>
-                  <div style={{ fontSize: '12px', color: '#1565c0' }}>
-                    <p style={{ margin: '4px 0' }}>• proyecto_id, id y nombre se obtienen automáticamente</p>
-                    <p style={{ margin: '4px 0' }}>• Primera fila = encabezados</p>
-                    <p style={{ margin: '4px 0' }}>• Formato fecha: 01-09-2021</p>
-                    <p style={{ margin: '4px 0' }}>• parcial_periodo: opcional (vacío = 0%)</p>
-                    <p style={{ margin: '4px 0' }}>• porcentaje_periodo: obligatorio (12,25%)</p>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                  <button
-                    onClick={() => setShowFormatInfo(false)}
-                    style={{
-                      background: '#16355D',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 20px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Entendido
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Componente para la Curva S
-  const CurvaS = ({ data }) => {
-    // Preparar datos para la gráfica - agrupar por período
-    const datosPorPeriodo = {};
-    const periodosUnicos = new Set();
-    
-    data.forEach(item => {
-      // Usar la fecha completa como período (YYYY-MM-DD)
-      const periodo = item.periodo;
-      periodosUnicos.add(periodo);
-      
-      if (!datosPorPeriodo[periodo]) {
-        datosPorPeriodo[periodo] = {
-          periodo: periodo,
-          fecha: new Date(item.periodo)
-        };
-      }
-      
-      // Agregar el vector al período (acumulados)
-      datosPorPeriodo[periodo][`${item.vector}_acumulado`] = parseFloat(item.porcentaje_periodo);
-      
-      // Agregar el vector al período (parciales) - usar el mismo valor por ahora
-      // En un caso real, esto vendría de un campo separado como 'parcial_periodo'
-      datosPorPeriodo[periodo][`${item.vector}_parcial`] = parseFloat(item.parcial_periodo || item.porcentaje_periodo * 0.1);
-    });
-    
-    // Crear lista ordenada de períodos (fechas completas)
-    const periodosOrdenados = Array.from(periodosUnicos).sort((a, b) => {
-      return a.localeCompare(b); // Ordenar fechas YYYY-MM-DD alfabéticamente
-    });
-    
-    // Crear array de datos para la gráfica
-    const datosGrafica = periodosOrdenados.map(periodo => {
-      return datosPorPeriodo[periodo] || { periodo: periodo };
-    });
-
-    // Calcular valores por vector (acumulados)
-    const datosPorVector = {};
-    data.forEach(item => {
-      if (!datosPorVector[item.vector]) {
-        datosPorVector[item.vector] = [];
-      }
-      datosPorVector[item.vector].push(parseFloat(item.porcentaje_periodo));
-    });
-    
-    // Obtener el valor más reciente/futuro de cada vector
-    const valorReal = datosPorVector['REAL'] && datosPorVector['REAL'].length > 0 
-      ? Math.max(...datosPorVector['REAL']) : 0;
-    const valorV0 = datosPorVector['V0'] && datosPorVector['V0'].length > 0 
-      ? Math.max(...datosPorVector['V0']) : 0;
-    const valorNPC = datosPorVector['NPC'] && datosPorVector['NPC'].length > 0 
-      ? Math.max(...datosPorVector['NPC']) : 0;
-    const valorAPI = datosPorVector['API'] && datosPorVector['API'].length > 0 
-      ? Math.max(...datosPorVector['API']) : 0;
-
-    // Calcular el máximo de parciales para establecer la escala del eje derecho
-    const maxParcial = Math.max(
-      ...datosGrafica.map(item => 
-        Math.max(
-          item.REAL_parcial || 0,
-          item.V0_parcial || 0,
-          item.NPC_parcial || 0,
-          item.API_parcial || 0
-        )
-      )
-    );
-    
-    // Agregar margen del 20% al máximo parcial
-    const maxParcialConMargen = maxParcial * 1.2;
-
-    // Colores por vector
-    const getColorByVector = (vector) => {
-      switch (vector) {
-        case 'REAL': return '#FF8C00'; // Naranja oscuro
-        case 'V0': return '#00BFFF';   // Celeste fuerte
-        case 'NPC': return '#0066CC';  // Azul
-        case 'API': return '#32CD32';  // Verde claro fuerte
-        default: return '#666';
-      }
-    };
-
-    return (
-      <div>
-        {/* Valores por Vector */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '15px', 
-          marginBottom: '20px' 
-        }}>
-          <div style={{ 
-            background: '#FFF3E0', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            border: '1px solid #FF8C00',
-            textAlign: 'center'
-          }}>
-            <h4 style={{ margin: '0 0 5px 0', color: '#FF8C00', fontSize: '14px' }}>REAL</h4>
-            <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#FF8C00' }}>
-              {valorReal.toFixed(2)}%
-            </p>
-          </div>
-          
-          <div style={{ 
-            background: '#E0F7FF', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            border: '1px solid #00BFFF',
-            textAlign: 'center'
-          }}>
-            <h4 style={{ margin: '0 0 5px 0', color: '#00BFFF', fontSize: '14px' }}>V0</h4>
-            <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#00BFFF' }}>
-              {valorV0.toFixed(2)}%
-            </p>
-            <p style={{ 
-              margin: '5px 0 0 0', 
-              fontSize: '12px', 
-              color: valorReal - valorV0 >= 0 ? '#4CAF50' : '#F44336',
-              fontWeight: 'bold'
-            }}>
-              Eficiencia: {valorReal - valorV0 >= 0 ? '+' : ''}{(valorReal - valorV0).toFixed(2)}%
-              {valorReal - valorV0 >= 0 ? ' (Eficiente)' : ' (Ineficiente)'}
-            </p>
-          </div>
-          
-          <div style={{ 
-            background: '#E0F0FF', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            border: '1px solid #0066CC',
-            textAlign: 'center'
-          }}>
-            <h4 style={{ margin: '0 0 5px 0', color: '#0066CC', fontSize: '14px' }}>NPC</h4>
-            <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0066CC' }}>
-              {valorNPC.toFixed(2)}%
-            </p>
-            <p style={{ 
-              margin: '5px 0 0 0', 
-              fontSize: '12px', 
-              color: valorReal - valorNPC >= 0 ? '#4CAF50' : '#F44336',
-              fontWeight: 'bold'
-            }}>
-              Eficiencia: {valorReal - valorNPC >= 0 ? '+' : ''}{(valorReal - valorNPC).toFixed(2)}%
-              {valorReal - valorNPC >= 0 ? ' (Eficiente)' : ' (Ineficiente)'}
-            </p>
-          </div>
-          
-          <div style={{ 
-            background: '#E8F5E8', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            border: '1px solid #32CD32',
-            textAlign: 'center'
-          }}>
-            <h4 style={{ margin: '0 0 5px 0', color: '#32CD32', fontSize: '14px' }}>API</h4>
-            <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#32CD32' }}>
-              {valorAPI.toFixed(2)}%
-            </p>
-            <p style={{ 
-              margin: '5px 0 0 0', 
-              fontSize: '12px', 
-              color: valorReal - valorAPI >= 0 ? '#4CAF50' : '#F44336',
-              fontWeight: 'bold'
-            }}>
-              Eficiencia: {valorReal - valorAPI >= 0 ? '+' : ''}{(valorReal - valorAPI).toFixed(2)}%
-              {valorReal - valorAPI >= 0 ? ' (Eficiente)' : ' (Ineficiente)'}
-            </p>
-          </div>
-        </div>
-
-        {/* Gráfica Curva S - Combinada (Acumulados + Parciales) */}
-        <div style={{ height: '400px', marginTop: '20px' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={datosGrafica} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="periodo" 
-                stroke="#666"
-                fontSize={8}
-                tick={{ fill: '#666' }}
-                type="category"
-                interval="preserveStartEnd"
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                tickMargin={8}
-                tickFormatter={(value) => {
-                  // Formatear fecha de YYYY-MM-DD a MM/YY
-                  const parts = value.split('-');
-                  const month = parts[1];
-                  const year = parts[0].slice(-2);
-                  return `${month}/${year}`;
-                }}
-              />
-              {/* Eje Y Izquierdo - Para Acumulados (0-110%) */}
-              <YAxis 
-                yAxisId="left"
-                stroke="#666"
-                fontSize={11}
-                tick={{ fill: '#666' }}
-                tickFormatter={(value) => `${value}%`}
-                domain={[0, 110]}
-                label={{ value: 'Acumulados (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
-              />
-              {/* Eje Y Derecho - Para Parciales */}
-              <YAxis 
-                yAxisId="right"
-                orientation="right"
-                stroke="#666"
-                fontSize={11}
-                tick={{ fill: '#666' }}
-                tickFormatter={(value) => `${value}%`}
-                domain={[0, maxParcialConMargen]}
-                label={{ value: 'Parciales (%)', angle: 90, position: 'insideRight', style: { textAnchor: 'middle' } }}
-              />
-              <Tooltip 
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                  // Formatear fecha de YYYY-MM-DD a MM/YYYY
-                  const parts = label.split('-');
-                  const month = parts[1];
-                  const year = parts[0];
-                    const periodoFormateado = `${month}/${year}`;
-                    
-                    // Separar acumulados y parciales
-                    const acumulados = payload.filter(item => item.name.includes('Acumulado'));
-                    const parciales = payload.filter(item => item.name.includes('Parcial'));
-                    
-                    return (
-                      <div style={{
-                        background: '#fff',
-                        border: '1px solid #ddd',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                        padding: '12px',
-                        fontSize: '12px',
-                        fontFamily: 'Arial, sans-serif'
-                      }}>
-                        {/* Header */}
-                        <div style={{
-                          borderBottom: '1px solid #eee',
-                          paddingBottom: '8px',
-                          marginBottom: '8px',
-                          fontWeight: 'bold',
-                          color: '#333',
-                          fontSize: '13px'
-                        }}>
-                          Período: {periodoFormateado}
-                        </div>
-                        
-                        {/* Acumulados */}
-                        {acumulados.length > 0 && (
-                          <div style={{ marginBottom: '8px' }}>
-                            <div style={{
-                              fontWeight: 'bold',
-                              color: '#333',
-                              marginBottom: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <span style={{ fontSize: '10px' }}>📈</span>
-                              Acumulados:
-                            </div>
-                            {acumulados.map((entry, index) => (
-                              <div key={index} style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '2px',
-                                padding: '2px 4px',
-                                borderRadius: '3px',
-                                backgroundColor: `${entry.color}10`
-                              }}>
-                                <span style={{ 
-                                  color: entry.color, 
-                                  fontWeight: '600',
-                                  fontSize: '11px'
-                                }}>
-                                  {entry.name.replace(' Acumulado', '')}:
-                                </span>
-                                <span style={{ 
-                                  fontWeight: 'bold',
-                                  color: '#333',
-                                  fontSize: '11px',
-                                  backgroundColor: `${entry.color}20`,
-                                  padding: '1px 4px',
-                                  borderRadius: '2px'
-                                }}>
-                                  {entry.value.toFixed(2)}%
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Parciales */}
-                        {parciales.length > 0 && (
-                          <div>
-                            <div style={{
-                              fontWeight: 'bold',
-                              color: '#333',
-                              marginBottom: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <span style={{ fontSize: '10px' }}>📊</span>
-                              Parciales:
-                            </div>
-                            {parciales.map((entry, index) => (
-                              <div key={index} style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '2px',
-                                padding: '2px 4px',
-                                borderRadius: '3px',
-                                backgroundColor: `${entry.color}10`
-                              }}>
-                                <span style={{ 
-                                  color: entry.color, 
-                                  fontWeight: '600',
-                                  fontSize: '11px'
-                                }}>
-                                  {entry.name.replace(' Parcial', '')}:
-                                </span>
-                                <span style={{ 
-                                  fontWeight: 'bold',
-                                  color: '#333',
-                                  fontSize: '11px',
-                                  backgroundColor: `${entry.color}20`,
-                                  padding: '1px 4px',
-                                  borderRadius: '2px'
-                                }}>
-                                  {entry.value.toFixed(2)}%
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Legend 
-                wrapperStyle={{ paddingTop: '10px' }}
-              />
-              
-              {/* Líneas de Acumulados (Eje Y Izquierdo) */}
-              {['REAL', 'V0', 'NPC', 'API'].map((vector) => (
-                <Line 
-                  key={`${vector}_acumulado`}
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey={`${vector}_acumulado`} 
-                  stroke={getColorByVector(vector)} 
-                  strokeWidth={2}
-                  connectNulls={false}
-                  dot={false}
-                  name={`${vector} Acumulado`}
-                />
-              ))}
-              
-              {/* Barras de Parciales (Eje Y Derecho) */}
-              {['REAL', 'V0', 'NPC', 'API'].map((vector) => (
-                <Bar 
-                  key={`${vector}_parcial`}
-                  yAxisId="right"
-                  dataKey={`${vector}_parcial`} 
-                  fill={getColorByVector(vector)}
-                  fillOpacity={0.6}
-                  name={`${vector} Parcial`}
-                />
-              ))}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
 
 
-      </div>
-    );
-  };
+
 
 
 
@@ -5873,105 +4569,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
     }}>
 
 
-      {/* Filtros de fecha */}
-      {seleccion !== 'lineas_bases' && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 18,
-          marginBottom: 12,
-          flexWrap: 'wrap',
-          width: '100%',
-          margin: 0,
-          padding: '20px 20px 0 20px',
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, alignItems: 'flex-end', margin: 0, padding: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
-              <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
-              <input
-                type="month"
-                value={fechaDesde}
-                onChange={e => setFechaDesde(e.target.value)}
-                style={{
-                  border: '2px solid #1d69db',
-                  borderRadius: 6,
-                  padding: '6px 10px',
-                  fontSize: 10,
-                  color: '#222',
-                  fontWeight: 500,
-                  outline: 'none',
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
-              <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
-              <input
-                type="month"
-                value={fechaHasta}
-                onChange={e => setFechaHasta(e.target.value)}
-                style={{
-                  border: '2px solid #3399ff',
-                  borderRadius: 6,
-                  padding: '6px 10px',
-                  fontSize: 10,
-                  color: '#222',
-                  fontWeight: 500,
-                  outline: 'none',
-                }}
-              />
-            </div>
-            {/* Filtro de descripción solo para predictividad */}
-            {seleccion === 'predictividad' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
-                <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Descripción</label>
-                <select
-                  value={filtroDescripcion}
-                  onChange={e => setFiltroDescripcion(e.target.value)}
-                  style={{
-                    border: '2px solid rgb(22, 53, 93)',
-                    borderRadius: 6,
-                    padding: '6px 10px',
-                    fontSize: 10,
-                    color: '#222',
-                    fontWeight: 500,
-                    outline: 'none',
-                    minWidth: '150px',
-                    backgroundColor: '#fff',
-                  }}
-                >
-                  <option value="">Todas las descripciones</option>
-                  {descripcionesDisponibles.map((descripcion, index) => (
-                    <option key={index} value={descripcion}>
-                      {descripcion}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <button
-              onClick={() => { 
-                setFechaDesde(''); 
-                setFechaHasta(''); 
-                setFiltroDescripcion('');
-              }}
-              title="Limpiar todos los filtros"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#6c2eb6',
-                fontSize: 22,
-                marginLeft: 4,
-                cursor: 'pointer',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <span role="img" aria-label="barrer">🧹</span>
-            </button>
-          </div>
-        </div>
-      )}
+      
 
       {/* Contenido del reporte */}
       <div style={{ padding: '0 20px' }}>
