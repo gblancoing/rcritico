@@ -687,7 +687,7 @@ const Reportabilidad = ({ proyectoId }) => {
           fechaHasta={fechaHasta}
           filtroDescripcion={filtroDescripcion}
         />;
-              case 'eficiencia_gasto':
+      case 'eficiencia_gasto':
           return <ReporteEficienciaGasto data={datosReporte} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} filtroDescripcion={filtroDescripcion} />;
 
       case 'lineas_bases':
@@ -1823,7 +1823,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   padding: '4px 8px',
                   fontSize: 12,
                   outline: 'none',
-                  width: '120px'
+                  width: '140px'
                 }}
               />
             </div>
@@ -1840,7 +1840,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   padding: '4px 8px',
                   fontSize: 12,
                   outline: 'none',
-                  width: '120px'
+                  width: '140px'
                 }}
               />
             </div>
@@ -3008,9 +3008,7 @@ const Reportabilidad = ({ proyectoId }) => {
                     }}>
                       <strong style={{ color: estadoPredictividad.color }}>
                         {estadoPredictividad.icono} 
-                        <CustomTooltip content="Fórmula: (Precisión Financiera + Precisión Física) ÷ 2">
                           PRECISIÓN DE PREDICCIONES:
-                        </CustomTooltip> 
                         {estadoPredictividad.texto}
                       </strong>
                     </div>
@@ -3019,9 +3017,7 @@ const Reportabilidad = ({ proyectoId }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px' }}>
                       <div>
                         <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                          <CustomTooltip content="Análisis de la precisión de las proyecciones financieras del proyecto">
                             💰 PREDICCIÓN FINANCIERA
-                          </CustomTooltip>
                         </h6>
                         <div style={{ fontSize: '12px', color: '#666' }}>
                           <div><strong>Proyectado:</strong> USD {proyeccionFinanciera.toLocaleString()}</div>
@@ -3057,9 +3053,7 @@ const Reportabilidad = ({ proyectoId }) => {
                       
                       <div>
                         <h6 style={{ color: '#856404', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                          <CustomTooltip content="Análisis de la precisión de las proyecciones físicas del proyecto">
                             📈 PREDICCIÓN FÍSICA
-                          </CustomTooltip>
                         </h6>
                         <div style={{ fontSize: '12px', color: '#666' }}>
                           <div><strong>Proyectado:</strong> {proyeccionFisica.toFixed(2)}%</div>
@@ -3307,68 +3301,68 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         let planV0 = 0;
         let gastoReal = 0;
         
-        if (dataV0.success && dataV0.datos.length > 0) {
-          if (periodo === 'acumulado') {
-            // Filtrar datos desde enero hasta el mes actual
-            const añoActual = new Date().getFullYear();
-            const mesActual = new Date().getMonth() + 1;
-            const fechaInicioAcumulado = `${añoActual}-01-01`;
-            const fechaFinAcumulado = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
-            
-            const datosFiltrados = dataV0.datos.filter(item => {
-              const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicioAcumulado);
-              const fin = new Date(fechaFinAcumulado);
-              return itemFecha >= inicio && itemFecha <= fin;
-            });
-            
-            planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Plan V0 (acumulado desde enero hasta mes actual):', planV0);
-          } else if (periodo === 'filtrado' && fechaInicio && fechaFin) {
-            // Filtrar datos desde enero hasta el mes final del filtro
-            const [añoFin, mesFin] = fechaFin.split('-');
-            const fechaInicioAcumulado = `${añoFin}-01-01`;
-            const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
-            
-            const datosFiltrados = dataV0.datos.filter(item => {
-              const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicioAcumulado);
-              const fin = new Date(fechaFinAcumulado);
-              return itemFecha >= inicio && itemFecha <= fin;
-            });
-            
-            planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Plan V0 (acumulado filtrado):', planV0);
-          } else if (periodo === 'anual') {
-            // Filtrar datos del año completo usando las fechas pasadas como parámetros
-            let añoAConsultar;
-            if (fechaInicio && fechaFin) {
-              // Usar las fechas pasadas como parámetros
-              const [año] = fechaInicio.split('-');
-              añoAConsultar = parseInt(año);
+                  if (dataV0.success && dataV0.datos.length > 0) {
+            if (periodo === 'acumulado') {
+              // Filtrar datos desde enero hasta el mes actual
+              const añoActual = new Date().getFullYear();
+              const mesActual = new Date().getMonth() + 1;
+              const fechaInicioAcumulado = `${añoActual}-01-01`;
+              const fechaFinAcumulado = `${añoActual}-${mesActual.toString().padStart(2, '0')}-31`;
+              
+              const datosFiltrados = dataV0.datos.filter(item => {
+                const itemFecha = new Date(item.periodo);
+                const inicio = new Date(fechaInicioAcumulado);
+                const fin = new Date(fechaFinAcumulado);
+                return itemFecha >= inicio && itemFecha <= fin;
+              });
+              
+              planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+              console.log('💰 Plan V0 (acumulado desde enero hasta mes actual):', planV0);
+            } else if (periodo === 'filtrado' && fechaInicio && fechaFin) {
+              // Filtrar datos desde enero hasta el mes final del filtro
+              const [añoFin, mesFin] = fechaFin.split('-');
+              const fechaInicioAcumulado = `${añoFin}-01-01`;
+              const fechaFinAcumulado = `${añoFin}-${mesFin}-31`;
+              
+              const datosFiltrados = dataV0.datos.filter(item => {
+                const itemFecha = new Date(item.periodo);
+                const inicio = new Date(fechaInicioAcumulado);
+                const fin = new Date(fechaFinAcumulado);
+                return itemFecha >= inicio && itemFecha <= fin;
+              });
+              
+              planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+              console.log('💰 Plan V0 (acumulado filtrado):', planV0);
+            } else if (periodo === 'anual') {
+              // Filtrar datos del año completo usando las fechas pasadas como parámetros
+              let añoAConsultar;
+              if (fechaInicio && fechaFin) {
+                // Usar las fechas pasadas como parámetros
+                const [año] = fechaInicio.split('-');
+                añoAConsultar = parseInt(año);
+              } else {
+                // Sin fechas, usar el año actual
+                añoAConsultar = new Date().getFullYear();
+              }
+              
+              const fechaInicioAnual = `${añoAConsultar}-01-01`;
+              const fechaFinAnual = `${añoAConsultar}-12-31`;
+              
+              const datosFiltrados = dataV0.datos.filter(item => {
+                const itemFecha = new Date(item.periodo);
+                const inicio = new Date(fechaInicioAnual);
+                const fin = new Date(fechaFinAnual);
+                return itemFecha >= inicio && itemFecha <= fin;
+              });
+              
+              planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+              console.log('💰 Plan V0 (anual):', planV0, 'para año', añoAConsultar);
             } else {
-              // Sin fechas, usar el año actual
-              añoAConsultar = new Date().getFullYear();
+              // Mes específico - sumar todos los montos
+              planV0 = dataV0.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
+              console.log('💰 Plan V0 (mes específico):', planV0);
             }
-            
-            const fechaInicioAnual = `${añoAConsultar}-01-01`;
-            const fechaFinAnual = `${añoAConsultar}-12-31`;
-            
-            const datosFiltrados = dataV0.datos.filter(item => {
-              const itemFecha = new Date(item.periodo);
-              const inicio = new Date(fechaInicioAnual);
-              const fin = new Date(fechaFinAnual);
-              return itemFecha >= inicio && itemFecha <= fin;
-            });
-            
-            planV0 = datosFiltrados.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Plan V0 (anual):', planV0, 'para año', añoAConsultar);
-          } else {
-            // Mes específico - sumar todos los montos
-            planV0 = dataV0.datos.reduce((sum, item) => sum + (parseFloat(item.monto) || 0), 0);
-            console.log('💰 Plan V0 (mes específico):', planV0);
           }
-        }
 
         // Obtener gasto real desde la tabla financiero_sap
         if (dataReal.success && dataReal.data) {
@@ -3998,7 +3992,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '4px 8px',
                 fontSize: 12,
                 outline: 'none',
-                width: '120px'
+                width: '140px'
               }}
             />
           </div>
@@ -4015,7 +4009,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '4px 8px',
                 fontSize: 12,
                 outline: 'none',
-                width: '120px'
+                width: '140px'
               }}
             />
           </div>
@@ -4736,7 +4730,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
 
 
 
-  return (
+    return (
     <div style={{
       position: 'absolute',
       left: anchoSidebarIzquierdo + 32,

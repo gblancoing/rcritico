@@ -712,7 +712,7 @@ import { API_BASE } from '../config';
           <div className="kpi-content">
             <h3>Total Ejecutado</h3>
             <div className="kpi-valor">{formatearMonedaUSD(kpis.totalEjecutado)}</div>
-            <div className="kpi-subtitle">{kpis.registrosReal} registros (Real Parcial)</div>
+            <div className="kpi-subtitle">(Real Parcial - Acumulado)</div>
           </div>
           
 
@@ -767,7 +767,7 @@ import { API_BASE } from '../config';
               </button>
             </div>
             <div className="kpi-valor">{formatearMonedaUSD(kpis.presupuesto)}</div>
-            <div className="kpi-subtitle">{kpis.nombrePresupuesto} ({kpis.registrosPresupuesto} registros)</div>
+            <div className="kpi-subtitle">{kpis.nombrePresupuesto}</div>
           </div>
           
 
@@ -1370,7 +1370,18 @@ import { API_BASE } from '../config';
         </div>
       </div>
 
-
+             {/* Gráfico de Línea - Evolución Mensual REAL PARCIAL */}
+       <div className="grafico-card">
+         <h3><i className="fa fa-chart-line"></i> Gráfico de Línea - Evolución Mensual REAL PARCIAL</h3>
+         <div style={{ width: '100%', height: '400px', textAlign: 'center', padding: '20px' }}>
+           <p style={{ color: '#666', fontSize: '16px' }}>
+             📊 Gráfico de línea para mostrar la evolución temporal de los datos REAL PARCIAL
+           </p>
+           <p style={{ color: '#999', fontSize: '14px', marginTop: '10px' }}>
+             (Aquí irá el gráfico de línea una vez resueltas las dependencias)
+           </p>
+         </div>
+       </div>
 
       {/* Panel de Ayuda */}
       {mostrarAyuda && (

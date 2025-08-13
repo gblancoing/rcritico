@@ -30,8 +30,8 @@ const MasterPage = ({ user, centros, onLogout }) => {
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('centros');
-    // Redirigir a la página de login en lugar de hacer reload
-    window.location.href = '/financiero/';
+    // Redirigir a la página principal donde se puede acceder al login
+    window.location.href = '/';
   };
 
   // Función para manejar la navegación a proyectos
