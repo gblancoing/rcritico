@@ -1,8 +1,16 @@
-<?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
+<?php// Configuración de errores solo para desarrollo
+if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || 
+    strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false) {
+    // Solo mostrar errores en desarrollo local
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+} else {
+    // En producción, ocultar errores
+    ini_set('display_errors', 0);
+    ini_set('display_startup_errors', 0);
+    error_reporting(0);
+}
 echo "<h2>Prueba de Conexión a Base de Datos</h2>";
 
 // Configuración de la base de datos

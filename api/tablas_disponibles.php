@@ -4,11 +4,19 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header('Content-Type: application/json');
 
-// SOLO PARA DESARROLLO: mostrar errores
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
+// SOLO PARA DESARROLLO: mostrar errores// Configuración de errores solo para desarrollo
+if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || 
+    strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false) {
+    // Solo mostrar errores en desarrollo local
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+} else {
+    // En producción, ocultar errores
+    ini_set('display_errors', 0);
+    ini_set('display_startup_errors', 0);
+    error_reporting(0);
+}
 require 'db.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {

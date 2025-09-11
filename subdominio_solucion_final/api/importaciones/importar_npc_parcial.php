@@ -14,6 +14,15 @@ if (!isset($data['rows']) || !is_array($data['rows'])) {
 
 $rows = $data['rows'];
 $inserted = 0;
+
+// Limpiar tabla antes de importar
+$proyecto_id = $data['proyecto_id'] ?? null;
+if ($proyecto_id) {
+    $deleteStmt = $pdo->prepare("DELETE FROM npc_parcial WHERE proyecto_id = ?");
+    $deleteStmt->execute([$proyecto_id]);
+    error_log("🧹 Tabla npc_parcial limpiada para proyecto_id: " . $proyecto_id);
+}
+
 foreach ($rows as $row) {
     // Ajusta los nombres de las columnas según tu Excel
     $proyecto_id = $row['proyecto_id'] ?? null;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './ResumenFinanciero.css';
 import PanelAyuda from './PanelAyuda';
 import { API_BASE } from '../config';
+import EstadoRevisionKPI from './EstadoRevisionKPI';
 
 
   const ResumenFinanciero = ({ proyectoId }) => {
@@ -729,50 +730,15 @@ import { API_BASE } from '../config';
           </button>
           
           <div className="kpi-icon">
-            <i className="fa fa-chart-bar"></i>
+            <i className="fa fa-dollar-sign"></i>
           </div>
           <div className="kpi-content">
             <h3>Presupuesto</h3>
-            {/* Mini tarjetas de selección */}
-            <div className="presupuesto-selector">
-              <button 
-                className={`presupuesto-btn ${presupuestoTipo === 'v0' ? 'activo' : ''}`}
-                onClick={() => {
-                  setPresupuestoTipo('v0');
-                  setTipoPresupuesto('V0');
-                }}
-                title="Seleccionar V0 Parcial como presupuesto"
-              >
-                V0
-              </button>
-              <button 
-                className={`presupuesto-btn ${presupuestoTipo === 'npc' ? 'activo' : ''}`}
-                onClick={() => {
-                  setPresupuestoTipo('npc');
-                  setTipoPresupuesto('NPC');
-                }}
-                title="Seleccionar NPC Parcial como presupuesto"
-              >
-                NPC
-              </button>
-              <button 
-                className={`presupuesto-btn ${presupuestoTipo === 'api' ? 'activo' : ''}`}
-                onClick={() => {
-                  setPresupuestoTipo('api');
-                  setTipoPresupuesto('API');
-                }}
-                title="Seleccionar API Parcial como presupuesto"
-              >
-                API
-              </button>
-            </div>
             <div className="kpi-valor">{formatearMonedaUSD(kpis.presupuesto)}</div>
-            <div className="kpi-subtitle">{kpis.nombrePresupuesto}</div>
+            <div className="kpi-subtitle">(Presupuesto Total)</div>
           </div>
-          
-
         </div>
-              
+
         <div className="kpi-card kpi-variacion">
           {/* Botón de información */}
           <button 
@@ -784,17 +750,15 @@ import { API_BASE } from '../config';
           </button>
           
           <div className="kpi-icon">
-            <i className="fa fa-percentage"></i>
+            <i className="fa fa-chart-line"></i>
           </div>
           <div className="kpi-content">
             <h3>Variación</h3>
             <div className={`kpi-valor ${kpis.variacion >= 0 ? 'positivo' : 'negativo'}`}>
-              {kpis.variacion >= 0 ? '+' : ''}{kpis.variacion.toFixed(1)}%
+              {kpis.variacion >= 0 ? '+' : ''}{formatearMonedaUSD(kpis.variacion)}
             </div>
-            <div className="kpi-subtitle">vs {kpis.nombrePresupuesto}</div>
+            <div className="kpi-subtitle">(Diferencia vs Presupuesto)</div>
           </div>
-          
-
         </div>
 
         <div className="kpi-card kpi-eficiencia">
@@ -808,16 +772,23 @@ import { API_BASE } from '../config';
           </button>
           
           <div className="kpi-icon">
-            <i className="fa fa-tachometer-alt"></i>
+            <i className="fa fa-percentage"></i>
           </div>
           <div className="kpi-content">
             <h3>Eficiencia</h3>
-            <div className="kpi-valor">{kpis.eficiencia.toFixed(1)}%</div>
-            <div className="kpi-subtitle">Rendimiento</div>
+            <div className="kpi-valor">{kpis.eficiencia}%</div>
+            <div className="kpi-subtitle">(Cumplimiento del Presupuesto)</div>
           </div>
-          
-
         </div>
+
+        {/* Tarjeta KPI de Estado de Revisión Optimizada */}
+        <EstadoRevisionKPI 
+          datos={{
+            revisado: 1327,
+            porRevisar: 119,
+            pendientes: 17
+          }}
+        />
       </div>
 
       {/* POPUPS FUERA DE LAS TARJETAS KPI - ESQUINA INFERIOR IZQUIERDA */}

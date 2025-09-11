@@ -586,6 +586,7 @@ const Vectores = ({ proyectoId }) => {
   // Función para enviar los datos al backend
   const handleImportar = async () => {
     setImportando(true);
+    setImportMessage('🧹 Limpiando datos existentes...');
     try {
       // Mapea los datos antes de enviar
       const datosMapeados = excelData.map(mapExcelRow);
@@ -608,11 +609,13 @@ const Vectores = ({ proyectoId }) => {
         })
       });
       
+      setImportMessage('📥 Importando nuevos datos...');
       const result = await res.json();
       
       if (result.success) {
         // Mensaje de éxito con detalles
-        let successMessage = `✅ ¡Importación exitosa!\n\n`;
+        let successMessage = `✅ ¡Importación completada exitosamente!\n\n`;
+        successMessage += `🧹 Datos anteriores eliminados\n`;
         successMessage += `📊 Registros importados: ${result.inserted_count || datosMapeados.length}\n`;
         successMessage += `📁 Archivo procesado correctamente`;
         
@@ -653,7 +656,7 @@ const Vectores = ({ proyectoId }) => {
   // Nueva función para importar desde el modal
   const handleModalImportar = async () => {
     setImportando(true);
-    setImportMessage('');
+    setImportMessage('🧹 Limpiando datos existentes...');
     try {
       const datosMapeados = excelData.map(mapExcelRow);
       let endpoint = '/api/importaciones/importar_real_parcial.php';
@@ -674,10 +677,12 @@ const Vectores = ({ proyectoId }) => {
           proyecto_id: proyectoId || 1
         })
       });
+      setImportMessage('📥 Importando nuevos datos...');
       const result = await res.json();
       if (result.success) {
         // Mensaje de éxito con detalles
-        let successMessage = `✅ ¡Importación exitosa!\n\n`;
+        let successMessage = `✅ ¡Importación completada exitosamente!\n\n`;
+        successMessage += `🧹 Datos anteriores eliminados\n`;
         successMessage += `📊 Registros importados: ${result.inserted_count || datosMapeados.length}\n`;
         successMessage += `📁 Archivo procesado correctamente`;
         
@@ -6265,68 +6270,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                 <PanelIndicadoresEVM indicadores={indicadoresEVM} />
               </div>
             )}
-            {/* Tarjetas KPI usando SOLO los vectores validados y sumando correctamente los detalles factoriales */}
-            <div style={{
-              width: '100%',
-              display: 'flex',
-              flexWrap: 'nowrap', // Para que no bajen de línea
-              gap: 10,
-              margin: '18px 0 0 0',
-              alignItems: 'stretch',
-              justifyContent: 'stretch',
-              boxSizing: 'border-box'
-            }}>
-              {['Real Parcial', 'V0 Parcial', 'NPC Parcial', 'API Parcial'].map((tipo, idx) => {
-                // Selecciona el arreglo correspondiente filtrado
-                let arr = [];
-                if (tipo === 'Real Parcial') arr = tablaRealParcial;
-                if (tipo === 'V0 Parcial') arr = tablaV0Parcial;
-                if (tipo === 'NPC Parcial') arr = tablaNpcParcial;
-                if (tipo === 'API Parcial') arr = tablaApiParcial;
-                arr = arr.filter(row => (!fechaDesde || row.periodo >= fechaDesde) && (!fechaHasta || row.periodo <= fechaHasta));
-                // Agrupa y suma por detalle_factorial (case-insensitive y sin espacios)
-                const kpi = {};
-                arr.forEach(row => {
-                  let key = normalizar(row.detalle_factorial || 'Sin Detalle');
-                  if (!kpi[key]) kpi[key] = 0;
-                  kpi[key] += Number(row.monto) || 0;
-                });
-                // Mostrar siempre todas las categorías aunque no existan en los datos
-                return (
-                  <div key={tipo} style={{
-                    flex: 1,
-                    background: '#fff',
-                    border: '1.5px solid #16355D',
-                    borderRadius: 8,
-                    boxShadow: '0 1px 4px #0001',
-                    padding: 14,
-                    marginBottom: 8,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                    minWidth: 0
-                  }}>
-                    <div style={{ color: '#16355D', fontWeight: 800, fontSize: 13, marginBottom: 6, letterSpacing: 0.5 }}>{tipo}</div>
-                    {categorias.map(cat => {
-                      const key = normalizar(cat);
-                      return (
-                        <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, borderBottom: '1px solid #f0f0f0', padding: '2px 0' }}>
-                          <span style={{ color: '#0177FF', fontWeight: 600 }}>{cat}</span>
-                          <span style={{ color: kpi[key] > 0 ? '#222' : '#bbb', fontWeight: 700, minWidth: 90, textAlign: 'right' }}>
-                            USD {Number(kpi[key] || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {Object.values(kpi).reduce((a, b) => a + b, 0) === 0 && (
-                      <div style={{ color: '#aaa', fontSize: 13, marginTop: 8, textAlign: 'center' }}>
-                        Sin datos en el periodo seleccionado
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+
             {/* TABLA RESUMEN DE PARCIALES */}
             <div style={{ width: '100%', margin: '32px 0 0 0', overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', fontSize: 13, minWidth: 900 }}>

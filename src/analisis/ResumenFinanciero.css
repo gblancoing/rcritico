@@ -1212,3 +1212,38 @@ div[class*="sidebar"] {
     padding: 2rem;
   }
 }
+
+/* Estilos específicos para la tarjeta de Estado de Revisión */
+.kpi-revision .kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem; /* Reducido aún más */
+  padding-right: 0.2rem; /* Reducido para dar más espacio */
+  overflow: hidden; /* Prevenir desbordamiento */
+  flex: 1; /* Tomar el espacio restante */
+}
+
+/* Contenedor de métricas de revisión - Optimizado para evitar desbordamiento */
+.revision-metrics {
+  display: flex;
+  gap: 0.15rem; /* Reducido aún más */
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem; /* Reducido */
+  justify-content: space-between; /* Distribuir mejor el espacio */
+  max-width: 100%; /* Asegurar que no se desborde */
+  overflow: hidden; /* Prevenir desbordamiento */
+}
+
+.revision-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.08rem 0.15rem; /* Reducido aún más */
+  border-radius: 3px;
+  min-width: 28px; /* Reducido aún más */
+  max-width: 42px; /* Límite máximo más estricto */
+  font-size: 0.5rem; /* Reducido aún más */
+  font-weight: 600;
+  flex: 1; /* Distribuir el espacio equitativamente */
+  overflow: hidden; /* Prevenir desbordamiento de texto */
+}

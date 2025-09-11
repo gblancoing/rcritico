@@ -443,7 +443,87 @@ const Reportabilidad = ({ proyectoId }) => {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [filtroDescripcion, setFiltroDescripcion] = useState(''); // NUEVO: Filtro por descripción
+  // Función para obtener el mes anterior en formato YYYY-MM
+  const obtenerMesAnterior = () => {
+    const fechaActual = new Date();
+    const mesAnterior = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - 1, 1);
+    const año = mesAnterior.getFullYear();
+    const mes = String(mesAnterior.getMonth() + 1).padStart(2, '0');
+    return `${año}-${mes}`;
+  };
+
+  const [hasta20, setHasta20] = useState(obtenerMesAnterior()); // NUEVO: Filtro principal con mes anterior por defecto
   const [filtroVector, setFiltroVector] = useState('');
+
+  // Función para mapear los valores según Hasta 2.0
+  const mapearValoresDesdeHasta20 = (hasta20Value) => {
+    if (!hasta20Value) {
+      setFechaDesde('');
+      setFechaHasta('');
+      setFiltroDescripcion('');
+      return;
+    }
+
+    // Extraer año y mes de Hasta 2.0
+    const [año, mes] = hasta20Value.split('-');
+    const añoNumero = parseInt(año);
+    const mesNumero = parseInt(mes);
+    
+    // Calcular año para la versión (mes anterior)
+    const añoVersion = mesNumero === 1 ? añoNumero - 1 : añoNumero;
+    
+    // Mapeo de meses a versiones (mes anterior) - Dinámico por año
+    const mapeoVersiones = {
+      1: { // Enero -> Version L Diciembre (año anterior)
+        descripcion: `Version L Diciembre ${añoVersion}`
+      },
+      2: { // Febrero -> Version A Enero
+        descripcion: `Version A Enero ${añoNumero}`
+      },
+      3: { // Marzo -> Version B Febrero
+        descripcion: `Version B Febrero ${añoNumero}`
+      },
+      4: { // Abril -> Version C Marzo
+        descripcion: `Version C Marzo ${añoNumero}`
+      },
+      5: { // Mayo -> Version D Abril
+        descripcion: `Version D Abril ${añoNumero}`
+      },
+      6: { // Junio -> Version E Mayo
+        descripcion: `Version E Mayo ${añoNumero}`
+      },
+      7: { // Julio -> Version F Junio  
+        descripcion: `Version F Junio ${añoNumero}`
+      },
+      8: { // Agosto -> Version G Julio
+        descripcion: `Version G Julio ${añoNumero}`
+      },
+      9: { // Septiembre -> Version H Agosto
+        descripcion: `Version H Agosto ${añoNumero}`
+      },
+      10: { // Octubre -> Version I Septiembre
+        descripcion: `Version I Septiembre ${añoNumero}`
+      },
+      11: { // Noviembre -> Version J Octubre
+        descripcion: `Version J Octubre ${añoNumero}`
+      },
+      12: { // Diciembre -> Version K Noviembre
+        descripcion: `Version K Noviembre ${añoNumero}`
+      }
+    };
+
+    // Establecer valores
+    setFechaDesde(hasta20Value); // Desde = mismo mes que Hasta 2.0
+    setFechaHasta(hasta20Value); // Hasta = mismo mes que Hasta 2.0
+    
+    // Descripción = versión del mes anterior
+    const configuracion = mapeoVersiones[mesNumero];
+    if (configuracion) {
+      setFiltroDescripcion(configuracion.descripcion);
+    } else {
+      setFiltroDescripcion('');
+    }
+  };
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [datosReporte, setDatosReporte] = useState([]);
 
@@ -858,8 +938,13 @@ const Reportabilidad = ({ proyectoId }) => {
     // Función para obtener datos de real físico desde av_fisico_real
     const obtenerRealFisica = async () => {
       try {
-        // Construir URL con filtros - usar av_fisico_real.php
-        let url = `${API_BASE}/eficiencia_gasto/avance_fisico_real.php`;
+        console.log('🔍 DEBUG - Iniciando obtenerRealFisica');
+        console.log('🔍 DEBUG - proyectoId:', proyectoId);
+        console.log('🔍 DEBUG - fechaDesde:', fechaDesde);
+        console.log('🔍 DEBUG - fechaHasta:', fechaHasta);
+        
+        // TEMPORAL: Usar endpoint de prueba
+        let url = `${API_BASE}/eficiencia_gasto/test_av_fisico_real.php`;
         const params = new URLSearchParams();
         
         if (proyectoId) {
@@ -870,6 +955,7 @@ const Reportabilidad = ({ proyectoId }) => {
           // Convertir formato YYYY-MM a YYYY-MM-01 para el inicio del mes
           const fechaDesdeCompleta = `${fechaDesde}-01`;
           params.append('periodo_desde', fechaDesdeCompleta);
+          console.log('🔍 DEBUG - fechaDesdeCompleta:', fechaDesdeCompleta);
         }
         if (fechaHasta) {
           // Obtener el último día del mes seleccionado
@@ -877,26 +963,39 @@ const Reportabilidad = ({ proyectoId }) => {
           const ultimoDia = new Date(parseInt(year), parseInt(month), 0).getDate();
           const fechaHastaCompleta = `${fechaHasta}-${ultimoDia.toString().padStart(2, '0')}`;
           params.append('periodo_hasta', fechaHastaCompleta);
+          console.log('🔍 DEBUG - fechaHastaCompleta:', fechaHastaCompleta);
         }
         
         if (params.toString()) {
           url += '?' + params.toString();
         }
         
+        console.log('🔍 DEBUG - URL final:', url);
         console.log('🔍 Consultando real físico desde av_fisico_real:', url);
         
         const response = await fetch(url);
-        const data = await response.json();
+        console.log('🔍 DEBUG - Response status:', response.status);
+        console.log('🔍 DEBUG - Response ok:', response.ok);
         
+        const data = await response.json();
         console.log('📊 Respuesta real físico desde av_fisico_real:', data);
         
         if (data.success && data.datos && data.datos.length > 0) {
+          console.log('🔍 DEBUG - Datos encontrados:', data.datos.length, 'registros');
+          console.log('🔍 DEBUG - Primeros 3 registros:', data.datos.slice(0, 3));
+          
           // Obtener el valor más reciente del api_parcial
           const datosOrdenados = data.datos.sort((a, b) => new Date(b.periodo) - new Date(a.periodo));
           const valorMasReciente = parseFloat(datosOrdenados[0].api_parcial) || 0;
           
+          console.log('🔍 DEBUG - Registro más reciente:', datosOrdenados[0]);
+          console.log('🔍 DEBUG - Valor api_parcial raw:', datosOrdenados[0].api_parcial);
+          console.log('🔍 DEBUG - Valor api_parcial parseFloat:', valorMasReciente);
+          
           // Convertir a porcentaje: el valor ya está en decimal (0.0071 = 0.71%)
           const valorPorcentaje = valorMasReciente * 100;
+          
+          console.log('🔍 DEBUG - Valor convertido a porcentaje:', valorPorcentaje);
           
           setRealFisica(valorPorcentaje);
           
@@ -906,6 +1005,9 @@ const Reportabilidad = ({ proyectoId }) => {
           console.log('🔍 Valor api_parcial convertido a porcentaje:', valorPorcentaje);
         } else {
           console.log('⚠️ No se encontraron datos en av_fisico_real para el proyecto');
+          console.log('⚠️ data.success:', data.success);
+          console.log('⚠️ data.datos:', data.datos);
+          console.log('⚠️ data.datos length:', data.datos ? data.datos.length : 'undefined');
           setRealFisica(0);
         }
       } catch (error) {
@@ -914,43 +1016,57 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
-    // Función para obtener proyección física desde la tabla predictividad
+    // Función para obtener proyección física desde la tabla predictividad usando mes anterior
     const obtenerProyeccionFisica = async () => {
       try {
-        // Construir URL con filtros
-        let url = `${API_BASE}/predictividad/proyeccion_fisica.php`;
-        const params = new URLSearchParams();
+        console.log('🔍 DEBUG - Iniciando obtenerProyeccionFisica');
+        console.log('🔍 DEBUG - proyectoId:', proyectoId);
+        console.log('🔍 DEBUG - hasta20:', hasta20);
         
-        if (proyectoId) {
-          params.append('proyecto_id', proyectoId);
+        if (!proyectoId || !hasta20) {
+          console.log('⚠️ proyectoId o hasta20 no disponibles para proyección física');
+          setProyeccionFisica(0);
+          return;
         }
-        if (fechaDesde) {
-          // Enviar solo el año y mes para que el backend pueda extraer correctamente
-          params.append('fecha_desde', fechaDesde);
-        }
-        if (fechaHasta) {
-          // Enviar solo el año y mes para que el backend pueda extraer correctamente
-          params.append('fecha_hasta', fechaHasta);
-        }
+
+        const requestBody = {
+          proyecto_id: proyectoId,
+          periodo_hasta: hasta20 // Formato: YYYY-MM
+        };
         
-        if (params.toString()) {
-          url += '?' + params.toString();
+        console.log('🔍 DEBUG - Request body:', requestBody);
+        console.log('🔍 DEBUG - URL:', `${API_BASE}/predictividad/test_proyeccion_fisica_dinamico.php`);
+
+        // TEMPORAL: Usar endpoint de prueba dinámico
+        const response = await fetch(`${API_BASE}/predictividad/test_proyeccion_fisica_dinamico.php`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log('🔍 DEBUG - Response status:', response.status);
+        console.log('🔍 DEBUG - Response ok:', response.ok);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
-        console.log('🔍 Consultando proyección física:', url);
-        
-        const response = await fetch(url);
+
         const data = await response.json();
-        
-        console.log('📊 Respuesta proyección física:', data);
+        console.log('🔍 DEBUG - Response data:', data);
         
         if (data.success) {
-          const valorProyeccion = parseFloat(data.total_proyeccion_fisica) || 0;
-          setProyeccionFisica(valorProyeccion);
-          
-          console.log('✅ Proyección física actualizada:', valorProyeccion);
+          const proyeccion = data.data.proyeccion_fisica || 0;
+          console.log('✅ Proyección física obtenida:', {
+            valor: proyeccion,
+            periodo_solicitado: data.data.periodo_solicitado,
+            periodo_anterior_usado: data.data.periodo_anterior_usado,
+            periodo_prediccion: data.data.periodo_prediccion
+          });
+          setProyeccionFisica(proyeccion);
         } else {
-          console.error('❌ Error al obtener proyección física:', data.error);
+          console.log('⚠️ No se encontraron datos de proyección física:', data.message);
           setProyeccionFisica(0);
         }
       } catch (error) {
@@ -1078,7 +1194,7 @@ const Reportabilidad = ({ proyectoId }) => {
     };
 
     const calcularDesviacionFisica = () => {
-      if (proyeccionFisica > 0 && realFisica >= 0) {
+      if (proyeccionFisica !== 0 && realFisica >= 0) {
         // Fórmula: ((REAL - PROYECCIÓN) / PROYECCIÓN) * 100
         const desviacion = ((realFisica - proyeccionFisica) / proyeccionFisica) * 100;
         
@@ -1580,16 +1696,23 @@ const Reportabilidad = ({ proyectoId }) => {
       }
     };
 
+    // Inicializar filtros automáticamente cuando se carga el componente
+    useEffect(() => {
+      if (hasta20) {
+        mapearValoresDesdeHasta20(hasta20);
+      }
+    }, []); // Solo se ejecuta una vez al montar el componente
+
     // Cargar datos al montar el componente y cuando cambien los filtros
     useEffect(() => {
-      console.log('🔄 useEffect ejecutándose con parámetros:', { proyectoId, fechaDesde, fechaHasta, filtroDescripcion });
+      console.log('🔄 useEffect ejecutándose con parámetros:', { proyectoId, fechaDesde, fechaHasta, filtroDescripcion, hasta20 });
       
       if (proyectoId) {
         console.log('🔄 Actualizando datos de predictividad por cambio de filtros');
         obtenerProyeccionFinanciera();
         obtenerRealFinanciera();
         obtenerRealFisica();
-        obtenerProyeccionFisica();
+        obtenerProyeccionFisica(); // Ahora usa hasta20 para calcular mes anterior
         
         // Cargar historial
         obtenerHistorialFinanciero();
@@ -1597,7 +1720,7 @@ const Reportabilidad = ({ proyectoId }) => {
       } else {
         console.log('⚠️ proyectoId no está disponible, no se ejecutan las funciones');
       }
-    }, [proyectoId, fechaDesde, fechaHasta, filtroDescripcion]);
+    }, [proyectoId, fechaDesde, fechaHasta, filtroDescripcion, hasta20]);
 
     // Validar que data sea un array válido
     const datosValidos = Array.isArray(data) ? data : [];
@@ -1811,70 +1934,97 @@ const Reportabilidad = ({ proyectoId }) => {
             justifyContent: 'center',
             flexWrap: 'wrap'
           }}>
+            {/* NUEVO: Filtro principal - Ajusta automáticamente los demás filtros */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Desde:</label>
+              <label style={{ color: '#FF6B35', fontWeight: 700, fontSize: 13 }} title="Filtro principal que ajusta automáticamente Desde, Hasta y Descripción">Seleccione Período:</label>
               <input
                 type="month"
-                value={fechaDesde}
-                onChange={e => setFechaDesde(e.target.value)}
+                value={hasta20}
+                onChange={e => {
+                  setHasta20(e.target.value);
+                  mapearValoresDesdeHasta20(e.target.value);
+                }}
                 style={{
-                  border: '1px solid #1d69db',
+                  border: '2px solid #FF6B35',
                   borderRadius: 4,
                   padding: '4px 8px',
                   fontSize: 12,
                   outline: 'none',
-                  width: '140px'
+                  width: '140px',
+                  backgroundColor: '#FFF5F2',
+                  fontWeight: 600
                 }}
               />
             </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Hasta:</label>
-              <input
-                type="month"
-                value={fechaHasta}
-                onChange={e => setFechaHasta(e.target.value)}
-                style={{
-                  border: '1px solid #1d69db',
-                  borderRadius: 4,
-                  padding: '4px 8px',
-                  fontSize: 12,
-                  outline: 'none',
-                  width: '140px'
-                }}
-              />
+
+            {/* Filtros originales (OCULTOS - controlados automáticamente por Seleccione Período) */}
+            <div style={{ display: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Desde:</label>
+                <input
+                  type="month"
+                  value={fechaDesde}
+                  onChange={e => setFechaDesde(e.target.value)}
+                  style={{
+                    border: '1px solid #1d69db',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    outline: 'none',
+                    width: '140px'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Hasta:</label>
+                <input
+                  type="month"
+                  value={fechaHasta}
+                  onChange={e => setFechaHasta(e.target.value)}
+                  style={{
+                    border: '1px solid #1d69db',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    outline: 'none',
+                    width: '140px'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Descripción:</label>
+                <select
+                  value={filtroDescripcion}
+                  onChange={e => setFiltroDescripcion(e.target.value)}
+                  style={{
+                    border: '1px solid #1d69db',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    outline: 'none',
+                    width: '160px',
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <option value="">Todas</option>
+                  {descripcionesDisponibles.map((descripcion, index) => (
+                    <option key={index} value={descripcion}>
+                      {descripcion}
+                    </option>
+                ))}
+                </select>
+              </div>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ color: '#060270', fontWeight: 600, fontSize: 12 }}>Descripción:</label>
-              <select
-                value={filtroDescripcion}
-                onChange={e => setFiltroDescripcion(e.target.value)}
-                style={{
-                  border: '1px solid #1d69db',
-                  borderRadius: 4,
-                  padding: '4px 8px',
-                  fontSize: 12,
-                  outline: 'none',
-                  width: '160px',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Todas</option>
-                {descripcionesDisponibles.map((descripcion, index) => (
-                  <option key={index} value={descripcion}>
-                    {descripcion}
-                  </option>
-              ))}
-              </select>
-            </div>
-            
-            {(fechaDesde || fechaHasta || filtroDescripcion) && (
+            {hasta20 && (
               <button
                 onClick={() => {
                   setFechaDesde('');
                   setFechaHasta('');
                   setFiltroDescripcion('');
+                  setHasta20('');
                 }}
                 style={{
                   background: '#FF8C00',
@@ -1888,7 +2038,7 @@ const Reportabilidad = ({ proyectoId }) => {
                   alignItems: 'center',
                   gap: 4
                 }}
-                title="Limpiar filtros"
+                title="Limpiar filtro de período"
               >
                 🧹
               </button>
@@ -1902,17 +2052,7 @@ const Reportabilidad = ({ proyectoId }) => {
             gap: '10px',
             alignItems: 'flex-end'
           }}>
-            {/* Etiqueta para identificar la sección */}
-            <div style={{
-              backgroundColor: '#6f42c1',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '11px',
-              fontWeight: 'bold'
-            }}>
-              📈 IMPORTACIÓN DE DATOS
-            </div>
+            
             
             {/* Botones con funcionalidad completa */}
             <div style={{ 
@@ -2603,7 +2743,7 @@ const Reportabilidad = ({ proyectoId }) => {
                         <span style={{ fontSize: '12px', animation: 'spin 1s linear infinite' }}>⟳</span>
                         <span style={{ fontSize: '12px' }}>Cargando...</span>
                       </div>
-                    ) : proyeccionFisica > 0 ? (
+                    ) : proyeccionFisica !== 0 ? (
                       <div
                         style={{ cursor: 'help' }}
                         title={`📊 PROYECCIÓN FÍSICA
@@ -2619,11 +2759,18 @@ const Reportabilidad = ({ proyectoId }) => {
 🔧 Nota: Los datos se obtienen de predicciones basadas en el avance histórico del proyecto`}
                       >
                         <div>
-                          <div style={{ fontWeight: 'bold' }}>
+                          <div style={{ 
+                            fontWeight: 'bold',
+                            color: proyeccionFisica < 0 ? '#dc3545' : '#16355D'
+                          }}>
                             {proyeccionFisica.toFixed(2)}%
                           </div>
-                          <div style={{ fontSize: '10px', color: '#28a745', marginTop: '2px' }}>
-                            ✅ Datos Predictividad
+                          <div style={{ 
+                            fontSize: '10px', 
+                            color: proyeccionFisica < 0 ? '#dc3545' : '#28a745', 
+                            marginTop: '2px' 
+                          }}>
+                            {proyeccionFisica < 0 ? '⚠️' : '✅'} Datos Predictividad
                           </div>
                         </div>
                       </div>
@@ -2948,7 +3095,7 @@ const Reportabilidad = ({ proyectoId }) => {
           </div>
 
           {/* Análisis Dinámico - Predictividad */}
-          {proyeccionFinanciera > 0 && realFinanciera > 0 && proyeccionFisica > 0 && realFisica > 0 && (
+          {proyeccionFinanciera > 0 && realFinanciera > 0 && proyeccionFisica !== 0 && realFisica > 0 && (
             <div style={{ 
               backgroundColor: '#fff3cd', 
               padding: '20px', 
@@ -3752,9 +3899,9 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
             
             // Si hay filtros, verificar si es el mismo mes o rango
             if (fechaDesde === fechaHasta) {
-              // Caso 1: Mismo mes (ej: Julio 2025, Julio 2025) - acumulado desde enero hasta julio
-              const [año] = fechaDesde.split('-');
-              const mesNombre = new Date(parseInt(año), 6, 1).toLocaleDateString('es-ES', { month: 'long' }).toUpperCase(); // Julio
+              // Caso 1: Mismo mes (ej: Agosto 2025, Agosto 2025) - acumulado desde enero hasta el mes del filtro
+              const [año, mes] = fechaDesde.split('-');
+              const mesNombre = new Date(parseInt(año), parseInt(mes) - 1, 1).toLocaleDateString('es-ES', { month: 'long' }).toUpperCase();
               const añoNumero = parseInt(año);
               nombrePeriodoAcumulado = `PERIODO DESDE ENE. - ${mesNombre}. ${añoNumero}`;
               fechaAcumuladoInicio = `${año}-01-01`;
@@ -5057,14 +5204,128 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const getDatosFiltrados = (datos) => {
     let filtrados = datos;
     
+    // Debug: mostrar información de filtrado
+    if (fechaDesde || fechaHasta) {
+      console.log('🔍 Debug - Filtros aplicados:', { fechaDesde, fechaHasta, datosOriginales: datos.length });
+    }
+    
     if (fechaDesde) {
-      filtrados = filtrados.filter(row => row.periodo >= fechaDesde);
+      filtrados = filtrados.filter(row => {
+        if (!row.periodo) return false;
+        
+        // Función para convertir fecha a formato ISO para comparación
+        const convertirFechaAISO = (fechaStr) => {
+          if (!fechaStr) return null;
+          
+          // Si ya está en formato ISO (YYYY-MM-DD), usar directamente
+          if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            return fechaStr;
+          }
+          
+          // Si está en formato DD-MM-YYYY, convertir a ISO
+          if (fechaStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+            const [dia, mes, año] = fechaStr.split('-');
+            return `${año}-${mes}-${dia}`;
+          }
+          
+          // Para otros formatos, intentar parsear correctamente
+          const fecha = new Date(fechaStr);
+          if (isNaN(fecha.getTime())) {
+            console.warn('⚠️ Fecha inválida en filtrado:', fechaStr);
+            return null;
+          }
+          
+          return fecha.toISOString().split('T')[0];
+        };
+        
+        const fechaRowISO = convertirFechaAISO(row.periodo);
+        const fechaDesdeISO = convertirFechaAISO(fechaDesde);
+        
+        if (!fechaRowISO || !fechaDesdeISO) {
+          console.warn('Fecha inválida detectada:', { periodo: row.periodo, fechaDesde });
+          return false;
+        }
+        
+        const cumpleFiltro = fechaRowISO >= fechaDesdeISO;
+        
+        // Debug: mostrar comparación de fechas
+        if (fechaDesde && fechaHasta) {
+          console.log('🔍 Debug - Comparación fecha:', {
+            periodo: row.periodo,
+            fechaRowISO: fechaRowISO,
+            fechaDesdeISO: fechaDesdeISO,
+            cumpleFiltro
+          });
+        }
+        
+        return cumpleFiltro;
+      });
     }
+    
     if (fechaHasta) {
-      filtrados = filtrados.filter(row => row.periodo <= fechaHasta);
+      filtrados = filtrados.filter(row => {
+        if (!row.periodo) return false;
+        
+        // Función para convertir fecha a formato ISO para comparación
+        const convertirFechaAISO = (fechaStr) => {
+          if (!fechaStr) return null;
+          
+          // Si ya está en formato ISO (YYYY-MM-DD), usar directamente
+          if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            return fechaStr;
+          }
+          
+          // Si está en formato DD-MM-YYYY, convertir a ISO
+          if (fechaStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+            const [dia, mes, año] = fechaStr.split('-');
+            return `${año}-${mes}-${dia}`;
+          }
+          
+          // Para otros formatos, intentar parsear correctamente
+          const fecha = new Date(fechaStr);
+          if (isNaN(fecha.getTime())) {
+            console.warn('⚠️ Fecha inválida en filtrado:', fechaStr);
+            return null;
+          }
+          
+          return fecha.toISOString().split('T')[0];
+        };
+        
+        const fechaRowISO = convertirFechaAISO(row.periodo);
+        const fechaHastaISO = convertirFechaAISO(fechaHasta);
+        
+        if (!fechaRowISO || !fechaHastaISO) {
+          console.warn('Fecha inválida detectada:', { periodo: row.periodo, fechaHasta });
+          return false;
+        }
+        
+        const cumpleFiltro = fechaRowISO <= fechaHastaISO;
+        
+        // Debug: mostrar comparación de fechas
+        if (fechaDesde && fechaHasta) {
+          console.log('🔍 Debug - Comparación fecha HASTA:', {
+            periodo: row.periodo,
+            fechaRowISO: fechaRowISO,
+            fechaHastaISO: fechaHastaISO,
+            cumpleFiltro
+          });
+        }
+        
+        return cumpleFiltro;
+      });
     }
+    
     if (filtroVector) {
       filtrados = filtrados.filter(row => row.vector === filtroVector);
+    }
+    
+    // Debug: mostrar resultado final del filtrado
+    if (fechaDesde || fechaHasta) {
+      console.log('🔍 Debug - Resultado filtrado:', { 
+        datosOriginales: datos.length, 
+        datosFiltrados: filtrados.length,
+        filtros: { fechaDesde, fechaHasta, filtroVector }
+      });
     }
     
     return filtrados;
@@ -5092,12 +5353,13 @@ const ReporteLineasBases = ({ proyectoId }) => {
         return getDatosFiltrados(tablaApi);
       case 'todas':
       default:
-        // Ordenar según preferencia: REAL, V0, NPC, API
+        // Ordenar según preferencia: REAL, V0, NPC, API, POA
         const datosOrdenados = [
           ...getDatosFiltrados(tablaReal).map(row => ({ ...row, tipo: 'REAL' })),
           ...getDatosFiltrados(tablaV0).map(row => ({ ...row, tipo: 'V0' })),
           ...getDatosFiltrados(tablaNpc).map(row => ({ ...row, tipo: 'NPC' })),
-          ...getDatosFiltrados(tablaApi).map(row => ({ ...row, tipo: 'API' }))
+          ...getDatosFiltrados(tablaApi).map(row => ({ ...row, tipo: 'API' })),
+          ...getDatosFiltrados(tablaPoa).map(row => ({ ...row, tipo: 'POA' }))
         ];
         return datosOrdenados;
     }
@@ -5148,16 +5410,59 @@ const ReporteLineasBases = ({ proyectoId }) => {
     return periodoMasCercano;
   };
 
+  // Función para obtener el porcentaje de la fecha de corte "HOY"
+  const obtenerPorcentajeHoy = (tipo) => {
+    // Si hay una tabla específica seleccionada, solo mostrar el porcentaje de esa tabla
+    if (tablaVisualizar !== 'todas' && tablaVisualizar !== tipo) {
+      return 0;
+    }
+    
+    const datosGrafica = prepararDatosCurvaS();
+    const periodoHoy = obtenerPosicionLineaCorte();
+    
+    if (!periodoHoy || datosGrafica.length === 0) return 0;
+    
+    const datosHoy = datosGrafica.find(dato => dato.periodo === periodoHoy);
+    if (!datosHoy) return 0;
+    
+    switch (tipo) {
+      case 'real': return datosHoy.real || 0;
+      case 'v0': return datosHoy.v0 || 0;
+      case 'npc': return datosHoy.npc || 0;
+      case 'api': return datosHoy.api || 0;
+      case 'poa': return datosHoy.poa || 0;
+      default: return 0;
+    }
+  };
+
   // Función para preparar datos de la Curva S
   const prepararDatosCurvaS = () => {
     const datosReal = getDatosFiltrados(tablaReal);
     const datosV0 = getDatosFiltrados(tablaV0);
     const datosNpc = getDatosFiltrados(tablaNpc);
     const datosApi = getDatosFiltrados(tablaApi);
+    const datosPoa = getDatosFiltrados(tablaPoa);
+
+    // Filtrar datos según la tabla seleccionada
+    let datosParaGrafica = [];
+    if (tablaVisualizar === 'real') {
+      datosParaGrafica = datosReal;
+    } else if (tablaVisualizar === 'v0') {
+      datosParaGrafica = datosV0;
+    } else if (tablaVisualizar === 'npc') {
+      datosParaGrafica = datosNpc;
+    } else if (tablaVisualizar === 'api') {
+      datosParaGrafica = datosApi;
+    } else if (tablaVisualizar === 'poa') {
+      datosParaGrafica = datosPoa;
+    } else {
+      // Para 'todas' o cualquier otro valor, usar todos los datos
+      datosParaGrafica = [...datosReal, ...datosV0, ...datosNpc, ...datosApi, ...datosPoa];
+    }
 
     // Obtener todos los períodos únicos
     const todosLosPeriodos = new Set();
-    [...datosReal, ...datosV0, ...datosNpc, ...datosApi].forEach(row => {
+    datosParaGrafica.forEach(row => {
       if (row.periodo) {
         todosLosPeriodos.add(row.periodo);
       }
@@ -5172,15 +5477,31 @@ const ReporteLineasBases = ({ proyectoId }) => {
       const v0Data = datosV0.find(row => row.periodo === periodo);
       const npcData = datosNpc.find(row => row.periodo === periodo);
       const apiData = datosApi.find(row => row.periodo === periodo);
+      const poaData = datosPoa.find(row => row.periodo === periodo);
 
-      return {
+      const datosBase = {
         periodo: periodo,
         fecha: new Date(periodo),
         real: realData ? parseFloat(realData.api_acum || 0) * 100 : 0,
         v0: v0Data ? parseFloat(v0Data.api_acum || 0) * 100 : 0,
         npc: npcData ? parseFloat(npcData.api_acum || 0) * 100 : 0,
-        api: apiData ? parseFloat(apiData.api_acum || 0) * 100 : 0
+        api: apiData ? parseFloat(apiData.api_acum || 0) * 100 : 0,
+        poa: poaData ? parseFloat(poaData.api_acum || 0) * 100 : 0
       };
+
+      // Si se seleccionó una tabla específica, solo mostrar esa línea
+      if (tablaVisualizar !== 'todas') {
+        const datosFiltrados = { ...datosBase };
+        // Poner en 0 las líneas que no están seleccionadas
+        if (tablaVisualizar !== 'real') datosFiltrados.real = 0;
+        if (tablaVisualizar !== 'v0') datosFiltrados.v0 = 0;
+        if (tablaVisualizar !== 'npc') datosFiltrados.npc = 0;
+        if (tablaVisualizar !== 'api') datosFiltrados.api = 0;
+        if (tablaVisualizar !== 'poa') datosFiltrados.poa = 0;
+        return datosFiltrados;
+      }
+
+      return datosBase;
     });
 
     return datosGrafica;
@@ -5511,9 +5832,9 @@ const ReporteLineasBases = ({ proyectoId }) => {
         }}>
           <h5 style={{ color: '#16355D', marginBottom: '10px' }}>Real</h5>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
-            {getDatosFiltrados(tablaReal).length}
+            {obtenerPorcentajeHoy('real').toFixed(2)}%
         </div>
-          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>API Acumulado</div>
         </div>
         
         <div style={{ 
@@ -5525,9 +5846,9 @@ const ReporteLineasBases = ({ proyectoId }) => {
         }}>
           <h5 style={{ color: '#16355D', marginBottom: '10px' }}>NPC</h5>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>
-            {getDatosFiltrados(tablaNpc).length}
+            {obtenerPorcentajeHoy('npc').toFixed(2)}%
           </div>
-          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>API Acumulado</div>
         </div>
         
         <div style={{ 
@@ -5539,9 +5860,9 @@ const ReporteLineasBases = ({ proyectoId }) => {
         }}>
           <h5 style={{ color: '#16355D', marginBottom: '10px' }}>POA</h5>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffc107' }}>
-            {getDatosFiltrados(tablaPoa).length}
+            {obtenerPorcentajeHoy('poa').toFixed(2)}%
         </div>
-          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>API Acumulado</div>
         </div>
         
         <div style={{ 
@@ -5553,9 +5874,9 @@ const ReporteLineasBases = ({ proyectoId }) => {
         }}>
           <h5 style={{ color: '#16355D', marginBottom: '10px' }}>V0</h5>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>
-            {getDatosFiltrados(tablaV0).length}
+            {obtenerPorcentajeHoy('v0').toFixed(2)}%
           </div>
-          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>API Acumulado</div>
         </div>
         
         <div style={{ 
@@ -5567,9 +5888,9 @@ const ReporteLineasBases = ({ proyectoId }) => {
         }}>
           <h5 style={{ color: '#16355D', marginBottom: '10px' }}>API</h5>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc3545' }}>
-            {getDatosFiltrados(tablaApi).length}
+            {obtenerPorcentajeHoy('api').toFixed(2)}%
           </div>
-          <div style={{ fontSize: '12px', color: '#6c757d' }}>registros</div>
+          <div style={{ fontSize: '12px', color: '#6c757d' }}>API Acumulado</div>
         </div>
       </div>
 
@@ -5582,7 +5903,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
         marginBottom: '20px'
       }}>
         <h4 style={{ color: '#16355D', marginBottom: '15px', textAlign: 'center' }}>
-          📈 Curva S - API Acumulado (Real, V0, NPC, API)
+          📈 Curva S - API Acumulado {tablaVisualizar === 'todas' ? '(Real, V0, NPC, API, POA)' : `(${tablaVisualizar.toUpperCase()})`}
         </h4>
         
         {prepararDatosCurvaS().length > 0 ? (
@@ -5686,7 +6007,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   wrapperStyle={{ paddingTop: '10px' }}
                 />
                 
-                {/* Líneas de cada vector */}
+                {/* Líneas de cada vector - Orden: REAL, V0, NPC, API, POA */}
                 <Line 
                   type="monotone" 
                   dataKey="real" 
@@ -5726,6 +6047,16 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   dot={false}
                   activeDot={false}
                   name="API"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="poa" 
+                  stroke="#ffc107" 
+                  strokeWidth={1.5}
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={false}
+                  name="POA"
                 />
                 
                 {/* Línea vertical de corte - fecha actual */}
@@ -5851,7 +6182,45 @@ const ReporteLineasBases = ({ proyectoId }) => {
                     {row.vector || '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6' }}>
-                    {row.periodo ? new Date(row.periodo).toLocaleDateString('es-ES') : '-'}
+                    {row.periodo ? (() => {
+                      // Debug: mostrar el valor original del período
+                      console.log('🔍 Debug - Período original:', row.periodo, 'Tipo:', typeof row.periodo);
+                      
+                      // Función para formatear fecha correctamente
+                      const formatearFecha = (fechaStr) => {
+                        if (!fechaStr) return '-';
+                        
+                        // Si está en formato ISO (YYYY-MM-DD), parsear correctamente
+                        if (fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                          const [año, mes, dia] = fechaStr.split('-');
+                          // Crear fecha usando el constructor que no tiene problemas de zona horaria
+                          const fecha = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
+                          console.log('🔍 Debug - ISO parseado:', fechaStr, '->', fecha.toLocaleDateString('es-ES'));
+                          return fecha.toLocaleDateString('es-ES');
+                        }
+                        
+                        // Si está en formato DD-MM-YYYY, convertir a ISO
+                        if (fechaStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                          const [dia, mes, año] = fechaStr.split('-');
+                          const fecha = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
+                          console.log('🔍 Debug - DD-MM-YYYY parseado:', fechaStr, '->', fecha.toLocaleDateString('es-ES'));
+                          return fecha.toLocaleDateString('es-ES');
+                        }
+                        
+                        // Para otros formatos, intentar parsear directamente
+                        const fecha = new Date(fechaStr);
+                        if (isNaN(fecha.getTime())) {
+                          console.warn('⚠️ Fecha inválida:', fechaStr);
+                          return fechaStr; // Mostrar el valor original si no se puede parsear
+                        }
+                        
+                        return fecha.toLocaleDateString('es-ES');
+                      };
+                      
+                      const fechaFormateada = formatearFecha(row.periodo);
+                      console.log('🔍 Debug - Fecha formateada:', fechaFormateada);
+                      return fechaFormateada;
+                    })() : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
                     {row.ie_parcial ? `${(parseFloat(row.ie_parcial) * 100).toFixed(2)}%` : '-'}

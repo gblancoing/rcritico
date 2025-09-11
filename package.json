@@ -1,7 +1,7 @@
 {
   "name": "financiero",
   "version": "1.0.0",
-  "homepage": "https://financiero.jej664caren.cl",
+  "homepage": "https://finance.jej664caren.cl",
   "description": "Proyecto de prueba para visualización en hosting",
   "main": "index.js",
   "scripts": {
@@ -24,6 +24,8 @@
     "d3": "^7.9.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
+    "primeicons": "^7.0.0",
+    "primereact": "^10.9.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",

@@ -15,9 +15,9 @@ console.log('✅ package.json encontrado');
 
 // Verificar que la homepage esté configurada correctamente
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-if (packageJson.homepage !== 'https://financiero.jej664caren.cl') {
+if (packageJson.homepage !== 'https://finance.jej664caren.cl') {
     console.error('❌ Error: La homepage no está configurada correctamente');
-    console.log('💡 La homepage debe ser: https://financiero.jej664caren.cl');
+    console.log('💡 La homepage debe ser: https://finance.jej664caren.cl');
     console.log('💡 Actual: ' + packageJson.homepage);
     process.exit(1);
 }
@@ -163,7 +163,7 @@ function copyDirectory(source, destination) {
 // Crear archivo de instrucciones finales
 const instruccionesFinales = `# SOLUCIÓN FINAL PARA SUBDOMINIO
 
-## 🌐 Subdominio: financiero.jej664caren.cl
+## 🌐 Subdominio: finance.jej664caren.cl
 
 ## 📁 Archivos Preparados
 Todos los archivos necesarios están en la carpeta 'subdominio_solucion_final/'
@@ -172,7 +172,7 @@ Todos los archivos necesarios están en la carpeta 'subdominio_solucion_final/'
 
 ### 1. Subir archivos al servidor
 Subir TODOS los archivos de la carpeta 'subdominio_solucion_final/' al directorio del subdominio:
-/public_html/financiero.jej664caren.cl/
+/public_html/finance.jej664caren.cl/
 
 ### 2. Verificar permisos
 - Archivos: 644
@@ -180,9 +180,9 @@ Subir TODOS los archivos de la carpeta 'subdominio_solucion_final/' al directori
 - .htaccess: 644
 
 ### 3. Probar URLs
-- https://financiero.jej664caren.cl/test_routing.php
-- https://financiero.jej664caren.cl/test_archivos.php
-- https://financiero.jej664caren.cl/
+- https://finance.jej664caren.cl/test_routing.php
+- https://finance.jej664caren.cl/test_archivos.php
+- https://finance.jej664caren.cl/
 
 ### 4. Probar actualización (F5)
 - Navegar a cualquier ruta
@@ -190,7 +190,7 @@ Subir TODOS los archivos de la carpeta 'subdominio_solucion_final/' al directori
 - Debe funcionar sin error 404
 
 ## ✅ Configuración Aplicada
-- Homepage: https://financiero.jej664caren.cl
+- Homepage: https://finance.jej664caren.cl
 - Router PHP corregido para subdominio
 - .htaccess específico para LiteSpeed
 - Build regenerado con URLs correctas
@@ -204,7 +204,7 @@ Subir TODOS los archivos de la carpeta 'subdominio_solucion_final/' al directori
 
 ## 📞 Soporte
 Si necesitas ayuda, contacta al soporte del hosting con:
-- URL del subdominio: https://financiero.jej664caren.cl
+- URL del subdominio: https://finance.jej664caren.cl
 - Error específico
 - Logs de error
 - Solicitar habilitar mod_rewrite en LiteSpeed
@@ -229,12 +229,12 @@ console.log('\n🎯 Próximos pasos:');
 console.log('1. Subir TODOS los archivos de subdominio_solucion_final/ al servidor');
 console.log('2. Reemplazar completamente los archivos en el subdominio');
 console.log('3. Verificar permisos (644/755)');
-console.log('4. Probar: https://financiero.jej664caren.cl/');
+console.log('4. Probar: https://finance.jej664caren.cl/');
 console.log('5. Verificar que F5 funcione en todas las rutas');
 
 console.log('\n📋 URLs esperadas después de la corrección:');
-console.log('- CSS: https://financiero.jej664caren.cl/static/css/main.xxxxx.css');
-console.log('- JS: https://financiero.jej664caren.cl/static/js/main.xxxxx.js');
+console.log('- CSS: https://finance.jej664caren.cl/static/css/main.xxxxx.css');
+console.log('- JS: https://finance.jej664caren.cl/static/js/main.xxxxx.js');
 
 console.log('\n🚨 IMPORTANTE:');
 console.log('- El .htaccess es CRÍTICO para que funcione');
