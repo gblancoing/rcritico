@@ -826,9 +826,11 @@ const Reportabilidad = ({ proyectoId }) => {
     const [historialFisico, setHistorialFisico] = useState([]);
     const [cargandoHistorial, setCargandoHistorial] = useState(false);
     
-    // Estados para los gráficos de tendencias
-    const [datosGraficoFinanciero, setDatosGraficoFinanciero] = useState([]);
-    const [cargandoGraficoFinanciero, setCargandoGraficoFinanciero] = useState(false);
+  // Estados para los gráficos de tendencias
+  const [datosGraficoFisico, setDatosGraficoFisico] = useState([]);
+  const [cargandoGraficoFisico, setCargandoGraficoFisico] = useState(false);
+  const [datosGraficoFinanciero, setDatosGraficoFinanciero] = useState([]);
+  const [cargandoGraficoFinanciero, setCargandoGraficoFinanciero] = useState(false);
 
     // Función para obtener descripciones únicas de la tabla financiero_sap
     const obtenerDescripcionesDisponibles = async () => {
@@ -1148,6 +1150,123 @@ const Reportabilidad = ({ proyectoId }) => {
         setHistorialFinanciero([]);
       } finally {
         setCargandoHistorial(false);
+      }
+    };
+
+    // Función para cargar datos del gráfico físico
+    const cargarDatosGraficoFisico = async () => {
+      if (!proyectoId || !hasta20) return;
+      
+      setCargandoGraficoFisico(true);
+      try {
+        // Generar meses desde enero 2025 hasta el mes seleccionado (igual que gráfico financiero)
+        const meses = [];
+        const [año, mes] = hasta20.split('-');
+        const mesFin = parseInt(mes);
+        
+        // Generar meses desde enero (mes 1) hasta el mes seleccionado
+        for (let mesActual = 1; mesActual <= mesFin; mesActual++) {
+          const mesNombre = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][mesActual - 1];
+          const periodo = `${año}-${mesActual.toString().padStart(2, '0')}`;
+          
+          meses.push({
+            mes: mesNombre,
+            periodo: periodo,
+            fecha: new Date(parseInt(año), mesActual - 1, 1)
+          });
+        }
+        
+        console.log('📊 Meses generados para gráfico físico:', meses);
+        
+        // Consultar datos reales desde av_fisico_real y proyección desde predictividad para cada mes
+        const datosFisicos = await Promise.all(meses.map(async (mes, index) => {
+          // Consultar valor de proyección desde tabla predictividad
+          let valorProyeccion = 0;
+          try {
+            // Para la proyección, necesitamos buscar el período anterior
+            // Ejemplo: para agosto 2025, buscar período_prediccion = 2025-07-31
+            const fechaProyeccion = new Date(parseInt(mes.periodo.split('-')[0]), parseInt(mes.periodo.split('-')[1]) - 1, 0);
+            const periodoProyeccion = fechaProyeccion.toISOString().split('T')[0]; // Formato: 2025-07-31
+            
+            const urlProyeccion = `${API_BASE}/predictividad/obtener_proyeccion_fisica_por_periodo.php?proyecto_id=${proyectoId}&periodo_prediccion=${periodoProyeccion}`;
+            
+            console.log(`🔍 Consultando predictividad para ${mes.mes} (${periodoProyeccion}):`, urlProyeccion);
+            
+            const responseProyeccion = await fetch(urlProyeccion);
+            const resultProyeccion = await responseProyeccion.json();
+            
+            if (resultProyeccion.success && resultProyeccion.data && resultProyeccion.data.length > 0) {
+              const registroProyeccion = resultProyeccion.data.find(item => 
+                item.periodo_prediccion === periodoProyeccion
+              );
+              
+              if (registroProyeccion) {
+                valorProyeccion = parseFloat(registroProyeccion.porcentaje_predicido);
+                console.log(`✅ Proyección ${mes.mes}: ${registroProyeccion.porcentaje_predicido}%`);
+              } else {
+                console.log(`⚠️ No se encontró proyección para ${mes.mes}`);
+              }
+            } else {
+              console.log(`⚠️ No hay datos de proyección para ${mes.mes}:`, resultProyeccion.error || 'Sin datos');
+            }
+          } catch (error) {
+            console.error(`❌ Error consultando proyección ${mes.mes}:`, error);
+          }
+          
+          // Consultar valor real desde av_fisico_real
+          let valorReal = 0;
+          try {
+            const periodoConsulta = `${mes.periodo}-01`; // Formato: 2025-08-01
+            const url = `${API_BASE}/av_fisico_real.php?proyecto_id=${proyectoId}&fecha_desde=${periodoConsulta}&fecha_hasta=${periodoConsulta}`;
+            
+            console.log(`🔍 Consultando av_fisico_real para ${mes.mes}:`, url);
+            
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            if (result.success && result.data && result.data.length > 0) {
+              // Buscar el registro con el valor de api_parcial
+              const registro = result.data.find(item => 
+                item.periodo === periodoConsulta && 
+                item.api_parcial !== null && 
+                item.api_parcial !== undefined
+              );
+              
+              if (registro) {
+                valorReal = parseFloat(registro.api_parcial) * 100; // Convertir a porcentaje
+                console.log(`✅ Real ${mes.mes}: ${registro.api_parcial} → ${valorReal.toFixed(2)}%`);
+              } else {
+                console.log(`⚠️ No se encontró registro real para ${mes.mes}`);
+              }
+            } else {
+              console.log(`⚠️ No hay datos reales para ${mes.mes}:`, result.error || 'Sin datos');
+            }
+          } catch (error) {
+            console.error(`❌ Error consultando real ${mes.mes}:`, error);
+          }
+          
+          return {
+            mes: mes.mes,
+            periodo: mes.periodo,
+            proyeccion: valorProyeccion,
+            real: valorReal,
+            desviacion: valorProyeccion !== 0 ? ((valorReal - valorProyeccion) / valorProyeccion) * 100 : 0
+          };
+        }));
+        
+        console.log('📊 Gráfico físico generado con valores reales:', {
+          proyeccionFisica,
+          realFisica,
+          datosFisicos: datosFisicos.map(d => ({ mes: d.mes, proyeccion: d.proyeccion.toFixed(2), real: d.real.toFixed(2) }))
+        });
+        
+        setDatosGraficoFisico(datosFisicos);
+        
+      } catch (error) {
+        console.error('❌ Error cargando datos del gráfico físico:', error);
+        setDatosGraficoFisico([]);
+      } finally {
+        setCargandoGraficoFisico(false);
       }
     };
 
@@ -1870,6 +1989,9 @@ const Reportabilidad = ({ proyectoId }) => {
         
         // Cargar datos del gráfico financiero
         cargarDatosGraficoFinanciero();
+        
+        // Cargar datos del gráfico físico
+        cargarDatosGraficoFisico();
       } else {
         console.log('⚠️ proyectoId no está disponible, no se ejecutan las funciones');
       }
@@ -3115,76 +3237,45 @@ const Reportabilidad = ({ proyectoId }) => {
                 padding: '20px',
                 width: '100%'
               }}>
-                {/* Generar datos mensuales para el gráfico físico */}
-                {(() => {
-                  // Generar meses desde enero 2025 hasta el mes seleccionado
-                  const meses = [];
-                  const fechaInicio = new Date('2025-01-01');
-                  let fechaFin;
+                {/* Mostrar datos del gráfico físico */}
+                {cargandoGraficoFisico ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px',
+                    color: '#6c757d',
+                    fontSize: '14px'
+                  }}>
+                    <div style={{ fontSize: '48px', marginBottom: '20px' }}>⟳</div>
+                    <strong>Cargando datos del gráfico físico...</strong>
+                  </div>
+                ) : datosGraficoFisico.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px',
+                    color: '#6c757d',
+                    fontSize: '14px'
+                  }}>
+                    <div style={{ fontSize: '48px', marginBottom: '20px' }}>📈</div>
+                    <strong>No hay datos disponibles para el período seleccionado</strong>
+                  </div>
+                ) : (() => {
+                  const datosFisicos = datosGraficoFisico;
                   
-                  if (hasta20) {
-                    const [año, mes] = hasta20.split('-');
-                    fechaFin = new Date(parseInt(año), parseInt(mes), 0); // Último día del mes seleccionado
-                  } else {
-                    fechaFin = new Date();
-                  }
-                  
-                  let fechaActual = new Date(fechaInicio);
-                  while (fechaActual <= fechaFin) {
-                    const mesNombre = fechaActual.toLocaleDateString('es-ES', { month: 'short' });
-                    const periodo = fechaActual.toISOString().split('T')[0].substring(0, 7); // YYYY-MM
-                    
-                    meses.push({
-                      mes: mesNombre,
-                      periodo: periodo,
-                      fecha: new Date(fechaActual)
-                    });
-                    
-                    fechaActual.setMonth(fechaActual.getMonth() + 1);
-                  }
-                  
-                  console.log('📊 Meses generados para gráfico físico:', meses);
-                  console.log('📊 Valores reales de la tabla física:', {
-                    proyeccionFisica,
-                    realFisica,
-                    hasta20
-                  });
-                  
-                  // Generar datos del gráfico físico - listo para valores correctos
-                  const datosFisicos = meses.map((mes, index) => {
-                    // TODO: Reemplazar con valores reales cuando se proporcionen
-                    // Por ahora usar valores de ejemplo para mantener la estructura del gráfico
-                    const proyeccion = 0; // Será reemplazado con valores reales
-                    const real = 0;       // Será reemplazado con valores reales
-                    
-                    return {
-                      mes: mes.mes,
-                      periodo: mes.periodo,
-                      proyeccion: proyeccion,
-                      real: real,
-                      desviacion: proyeccion !== 0 ? ((real - proyeccion) / proyeccion) * 100 : 0
-                    };
-                  });
-                  
-                  console.log('📊 Gráfico físico listo - estructura mantenida, esperando valores correctos');
-                  
-                  if (datosFisicos.length === 0) {
-                    return (
-                      <div style={{
-                        textAlign: 'center',
-                        padding: '40px',
-                        color: '#6c757d',
-                        fontSize: '14px'
-                      }}>
-                        <div style={{ fontSize: '48px', marginBottom: '20px' }}>📈</div>
-                        <strong>No hay datos disponibles para el período seleccionado</strong>
-                      </div>
-                    );
-                  }
+                  console.log('📊 Renderizando gráfico físico con datos:', datosFisicos);
                   
                   const minValor = Math.min(...datosFisicos.map(d => Math.min(d.proyeccion, d.real)));
                   const maxValor = Math.max(...datosFisicos.map(d => Math.max(d.proyeccion, d.real)));
-                  const range = maxValor - minValor || 0.1; // Evitar división por cero
+                  
+                  // Asegurar un rango mínimo visible para valores pequeños
+                  let range = maxValor - minValor;
+                  if (range === 0) {
+                    // Si todos los valores son iguales, crear un rango simétrico
+                    const valorComun = maxValor;
+                    range = Math.max(valorComun * 0.1, 0.1); // 10% del valor o mínimo 0.1%
+                  } else if (range < 0.1) {
+                    // Si el rango es muy pequeño, expandirlo para mejor visualización
+                    range = Math.max(range * 2, 0.1);
+                  }
                   
                   const chartWidth = 100;
                   const chartHeight = 200;
@@ -3250,7 +3341,7 @@ const Reportabilidad = ({ proyectoId }) => {
                               x2={`${x2}%`}
                               y2={y2}
                               stroke="#17a2b8"
-                              strokeWidth="3"
+                              strokeWidth="2"
                               strokeLinecap="round"
                             />
                           );
@@ -3274,7 +3365,7 @@ const Reportabilidad = ({ proyectoId }) => {
                               x2={`${x2}%`}
                               y2={y2}
                               stroke="#fd7e14"
-                              strokeWidth="3"
+                              strokeWidth="2"
                               strokeLinecap="round"
                             />
                           );
@@ -3531,7 +3622,7 @@ const Reportabilidad = ({ proyectoId }) => {
                               x2={`${x2}%`}
                               y2={y2}
                               stroke="#28a745"
-                              strokeWidth="3"
+                              strokeWidth="2"
                               strokeLinecap="round"
                             />
                           );
@@ -3555,7 +3646,7 @@ const Reportabilidad = ({ proyectoId }) => {
                               x2={`${x2}%`}
                               y2={y2}
                               stroke="#dc3545"
-                              strokeWidth="3"
+                              strokeWidth="2"
                               strokeLinecap="round"
                             />
                           );
@@ -7105,7 +7196,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   type="monotone" 
                   dataKey="real" 
                   stroke="#28a745" 
-                  strokeWidth={1.5}
+                  strokeWidth={1.2}
                   connectNulls={false}
                   dot={false}
                   activeDot={false}
@@ -7115,7 +7206,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   type="monotone" 
                   dataKey="v0" 
                   stroke="#17a2b8" 
-                  strokeWidth={1.5}
+                  strokeWidth={1.2}
                   connectNulls={false}
                   dot={false}
                   activeDot={false}
@@ -7125,7 +7216,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   type="monotone" 
                   dataKey="npc" 
                   stroke="#007bff" 
-                  strokeWidth={1.5}
+                  strokeWidth={1.2}
                   connectNulls={false}
                   dot={false}
                   activeDot={false}
@@ -7135,7 +7226,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   type="monotone" 
                   dataKey="api" 
                   stroke="#dc3545" 
-                  strokeWidth={1.5}
+                  strokeWidth={1.2}
                   connectNulls={false}
                   dot={false}
                   activeDot={false}
@@ -7145,7 +7236,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   type="monotone" 
                   dataKey="poa" 
                   stroke="#ffc107" 
-                  strokeWidth={1.5}
+                  strokeWidth={1.2}
                   connectNulls={false}
                   dot={false}
                   activeDot={false}
