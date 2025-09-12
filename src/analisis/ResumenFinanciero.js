@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import './ResumenFinanciero.css';
 import PanelAyuda from './PanelAyuda';
 import { API_BASE } from '../config';
-import EstadoRevisionKPI from './EstadoRevisionKPI';
 
 
   const ResumenFinanciero = ({ proyectoId }) => {
@@ -781,14 +780,6 @@ import EstadoRevisionKPI from './EstadoRevisionKPI';
           </div>
         </div>
 
-        {/* Tarjeta KPI de Estado de Revisión Optimizada */}
-        <EstadoRevisionKPI 
-          datos={{
-            revisado: 1327,
-            porRevisar: 119,
-            pendientes: 17
-          }}
-        />
       </div>
 
       {/* POPUPS FUERA DE LAS TARJETAS KPI - ESQUINA INFERIOR IZQUIERDA */}
