@@ -465,7 +465,7 @@ const Reportabilidad = ({ proyectoId }) => {
     return `${año}-${mes}`;
   };
 
-  const [hasta20, setHasta20] = useState(obtenerMesAnterior()); // NUEVO: Filtro principal con mes anterior por defecto
+  const [hasta20, setHasta20] = useState('2025-08'); // NUEVO: Filtro principal con agosto 2025 por defecto
   const [filtroVector, setFiltroVector] = useState('');
 
   // Función para mapear los valores según Hasta 2.0
@@ -3098,7 +3098,11 @@ const Reportabilidad = ({ proyectoId }) => {
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                📈 Tendencias Físicas (Enero 2025 - {hasta20 ? new Date(hasta20 + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : 'Actual'})
+                📈 Tendencias Físicas (Enero 2025 - {hasta20 ? (() => {
+                  const [año, mes] = hasta20.split('-');
+                  const fecha = new Date(parseInt(año), parseInt(mes) - 1, 1);
+                  return fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                })() : 'Actual'})
               </h4>
               
               <div style={{
@@ -3403,7 +3407,11 @@ const Reportabilidad = ({ proyectoId }) => {
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                💰 Tendencias Financieras (Diciembre 2024 - {hasta20 ? new Date(hasta20 + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : 'Enero 2025'})
+                💰 Tendencias Financieras (Enero 2025 - {hasta20 ? (() => {
+                  const [año, mes] = hasta20.split('-');
+                  const fecha = new Date(parseInt(año), parseInt(mes) - 1, 1);
+                  return fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                })() : 'Enero 2025'})
               </h4>
               
               <div style={{
