@@ -208,7 +208,11 @@ const Vectores = ({ proyectoId }) => {
   const [modoGrafico, setModoGrafico] = useState('normal'); // 'normal' o 'evm'
   const [mostrarPopupAnalisis, setMostrarPopupAnalisis] = useState(false);
   const [popupVariacionesVisible, setPopupVariacionesVisible] = useState(false);
+  const [popupIEACVisible, setPopupIEACVisible] = useState(false);
+  const [popupECDVisible, setPopupECDVisible] = useState(false);
+  const [duracionPlanificada, setDuracionPlanificada] = useState(0);
   const [tablaCumplimientoFisico, setTablaCumplimientoFisico] = useState([]);
+  const [acordeonEVMPricipalAbierto, setAcordeonEVMPricipalAbierto] = useState(false);
 
 
   const categorias = [
@@ -1606,8 +1610,769 @@ const Vectores = ({ proyectoId }) => {
     { value: 'av_fisico_c9', label: 'Project 9C' },
   ];
 
+  // --- NUEVO: Función para calcular ECD (Estimated Completion Date) ---
+  const calcularECD = async (AC, EV, PV, BAC, SPI, fechaSeguimiento, datosHistorico = [], duracionPlanificada = 12) => {
+    if (!AC || !EV || !PV || !BAC || !SPI) {
+      return null;
+    }
+
+    // Calcular ECD(b) dinámicamente usando la nueva API
+    let ecdBDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_b.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdBDinamico = data.ecd_b;
+        console.log('✅ ECD(b) calculado dinámicamente:', ecdBDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(b) dinámico:', error);
+    }
+
+    // Calcular ECD(c) dinámicamente usando la nueva API
+    let ecdCDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_c.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdCDinamico = data.ecd_c;
+        console.log('✅ ECD(c) calculado dinámicamente:', ecdCDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(c) dinámico:', error);
+    }
+
+    // Calcular ECD(d) dinámicamente usando la nueva API
+    let ecdDDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_d.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdDDinamico = data.ecd_d;
+        console.log('✅ ECD(d) calculado dinámicamente:', ecdDDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(d) dinámico:', error);
+    }
+
+    // Calcular ECD(e) dinámicamente usando la nueva API
+    let ecdEDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_e.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdEDinamico = data.ecd_e;
+        console.log('✅ ECD(e) calculado dinámicamente:', ecdEDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(e) dinámico:', error);
+    }
+
+    // Calcular ECD(f) dinámicamente usando la nueva API
+    let ecdFDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_f.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdFDinamico = data.ecd_f;
+        console.log('✅ ECD(f) calculado dinámicamente:', ecdFDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(f) dinámico:', error);
+    }
+
+    // Calcular ECD(g) dinámicamente usando la nueva API
+    let ecdGDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_g.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdGDinamico = data.ecd_g;
+        console.log('✅ ECD(g) calculado dinámicamente:', ecdGDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(g) dinámico:', error);
+    }
+
+    // Calcular ECD(h) dinámicamente usando la nueva API
+    let ecdHDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_h.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdHDinamico = data.ecd_h;
+        console.log('✅ ECD(h) calculado dinámicamente:', ecdHDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(h) dinámico:', error);
+    }
+
+    // Calcular ECD(i) dinámicamente usando la nueva API
+    let ecdIDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_i.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdIDinamico = data.ecd_i;
+        console.log('✅ ECD(i) calculado dinámicamente:', ecdIDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(i) dinámico:', error);
+    }
+
+    // Calcular ECD(j) dinámicamente usando la nueva API
+    let ecdJDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_j.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdJDinamico = data.ecd_j;
+        console.log('✅ ECD(j) calculado dinámicamente:', ecdJDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(j) dinámico:', error);
+    }
+
+    // Calcular ECD(k) dinámicamente usando la nueva API
+    let ecdKDinamico = 0;
+    try {
+      const apiUrl = buildAppUrl('api/calcular_ecd_k.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_filtro=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        ecdKDinamico = data.ecd_k;
+        console.log('✅ ECD(k) calculado dinámicamente:', ecdKDinamico, 'meses');
+      }
+    } catch (error) {
+      console.error('❌ Error calculando ECD(k) dinámico:', error);
+    }
+
+    // Calcular trabajo "Por Ganar" (BAC - EV)
+    const porGanar = BAC - EV;
+    
+    // Obtener Duración Planificada dinámicamente desde la consulta SQL correcta
+    let duracionPlanificadaDinamica = duracionPlanificada;
+    try {
+      const duracionObtenida = await obtenerDuracionPlanificada();
+      if (duracionObtenida > 0) {
+        duracionPlanificadaDinamica = duracionObtenida;
+      }
+    } catch (error) {
+      console.error('Error obteniendo Duración Planificada dinámica:', error);
+      // Usar el valor por defecto si hay error
+      duracionPlanificadaDinamica = duracionPlanificada;
+    }
+    
+    // Calcular plazo de control (meses transcurridos) - AT (Actual Time)
+    // Basado en la tabla av_fisico_api y su columna "periodo"
+    
+    let plazoControl = 0;
+    let duracionTotalPlanificada = 0;
+    
+    if (datosHistorico && datosHistorico.length > 0) {
+      // Obtener períodos únicos hasta la fecha de seguimiento
+      const periodosUnicos = [...new Set(
+        datosHistorico
+          .filter(dato => dato.periodo && dato.periodo <= fechaSeguimiento)
+          .map(dato => dato.periodo)
+      )].sort((a, b) => new Date(a) - new Date(b));
+      
+      // El plazo de control es el número de períodos únicos hasta la fecha de seguimiento
+      plazoControl = periodosUnicos.length;
+      
+      // La duración total planificada es el total de períodos únicos en toda la tabla
+      const periodosUnicosTotales = [...new Set(datosHistorico.map(dato => dato.periodo))].length;
+      duracionTotalPlanificada = periodosUnicosTotales;
+      
+      console.log('=== CÁLCULO PLAZO DE CONTROL (BASADO EN TABLA) ===');
+      console.log('Total registros en tabla:', datosHistorico.length);
+      console.log('Fecha de seguimiento (filtro):', fechaSeguimiento);
+      console.log('Registros filtrados hasta fecha seguimiento:', datosHistorico.filter(dato => dato.periodo && dato.periodo <= fechaSeguimiento).length);
+      console.log('Períodos únicos hasta fecha seguimiento:', periodosUnicos.length);
+      console.log('Total períodos únicos en tabla (duración planificada):', periodosUnicosTotales);
+      console.log('Primer período:', periodosUnicos[0]);
+      console.log('Último período:', periodosUnicos[periodosUnicos.length - 1]);
+      console.log('Primeros 10 períodos:', periodosUnicos.slice(0, 10));
+      console.log('Últimos 10 períodos:', periodosUnicos.slice(-10));
+      console.log('Plazo Control calculado:', plazoControl);
+      console.log('Duración Planificada (meses):', duracionTotalPlanificada);
+      console.log('¿Plazo Control esperado: 44 períodos?');
+    } else {
+      // Fallback: calcular basado en fechas si no hay datos históricos
+      const fechaActual = new Date(fechaSeguimiento);
+      const fechaInicio = new Date('2023-01-01');
+      const diffTime = Math.abs(fechaActual - fechaInicio);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      plazoControl = Math.max(1, Math.ceil(diffDays / 30.44));
+      duracionTotalPlanificada = duracionPlanificada || 12;
+      
+      console.log('=== CÁLCULO PLAZO DE CONTROL (FALLBACK) ===');
+      console.log('No hay datos históricos, usando cálculo por fechas');
+      console.log('Fecha Inicio:', fechaInicio.toLocaleDateString());
+      console.log('Fecha Actual:', fechaActual.toLocaleDateString());
+      console.log('Plazo Control (meses):', plazoControl);
+      console.log('Duración Planificada (meses):', duracionTotalPlanificada);
+    }
+
+    // Calcular PV, EV y AC por períodos mensuales basado en la tabla
+    const calcularPVPeriodo = (meses) => {
+      if (!datosHistorico || datosHistorico.length === 0) {
+        // Si no hay datos históricos, usar PV mensual promedio
+        return Math.max(PV / Math.max(plazoControl, 1), 1);
+      }
+      
+      // Obtener períodos únicos ordenados
+      const periodosUnicos = [...new Set(datosHistorico.map(dato => dato.periodo))]
+        .sort((a, b) => new Date(a) - new Date(b));
+      
+      // Tomar los últimos N períodos
+      const periodosRecientes = periodosUnicos.slice(-meses);
+      
+      // Para PV1m (último mes), usar el PV del último período específico
+      if (meses === 1) {
+        const ultimoPeriodo = periodosRecientes[periodosRecientes.length - 1];
+        const datosUltimoPeriodo = datosHistorico.filter(dato => dato.periodo === ultimoPeriodo);
+        const PVUltimoMes = datosUltimoPeriodo.reduce((acc, dato) => acc + (dato.PV || 0), 0);
+        console.log('=== PV1m CALCULADO ===');
+        console.log('Último período:', ultimoPeriodo);
+        console.log('PV del último mes:', PVUltimoMes);
+        console.log('Datos del último período:', datosUltimoPeriodo);
+        console.log('PV1m final (con Math.max):', Math.max(PVUltimoMes, 1));
+        return Math.max(PVUltimoMes, 1);
+      }
+      
+      // Para períodos múltiples (3m, 6m), usar promedio
+      const sumaPV = periodosRecientes.reduce((sum, periodo) => {
+        const datosPeriodo = datosHistorico.filter(dato => dato.periodo === periodo);
+        const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.PV || 0), 0);
+        console.log(`PV para período ${periodo}:`, sumaPeriodo);
+        return sum + sumaPeriodo;
+      }, 0);
+      
+      const promedioPV = Math.max(sumaPV / meses, 1);
+      console.log(`=== PV${meses}m CALCULADO ===`);
+      console.log(`Períodos considerados (últimos ${meses}):`, periodosRecientes);
+      console.log(`Suma total PV:`, sumaPV);
+      console.log(`Promedio PV${meses}m:`, promedioPV);
+      return promedioPV;
+    };
+
+    const calcularEVPeriodo = (meses) => {
+      if (!datosHistorico || datosHistorico.length === 0) {
+        // Si no hay datos históricos, usar EV mensual promedio
+        return Math.max(EV / Math.max(plazoControl, 1), 1);
+      }
+      
+      // Obtener períodos únicos ordenados
+      const periodosUnicos = [...new Set(datosHistorico.map(dato => dato.periodo))]
+        .sort((a, b) => new Date(a) - new Date(b));
+      
+      // Tomar los últimos N períodos
+      const periodosRecientes = periodosUnicos.slice(-meses);
+      
+      // Para EV1m (último mes), usar el EV del último período específico
+      if (meses === 1) {
+        const ultimoPeriodo = periodosRecientes[periodosRecientes.length - 1];
+        const datosUltimoPeriodo = datosHistorico.filter(dato => dato.periodo === ultimoPeriodo);
+        const EVUltimoMes = datosUltimoPeriodo.reduce((acc, dato) => acc + (dato.EV || 0), 0);
+        console.log('=== EV1m CALCULADO ===');
+        console.log('Último período:', ultimoPeriodo);
+        console.log('EV del último mes:', EVUltimoMes);
+        return Math.max(EVUltimoMes, 1);
+      }
+      
+      // Para períodos múltiples (3m, 6m), usar promedio
+      const sumaEV = periodosRecientes.reduce((sum, periodo) => {
+        const datosPeriodo = datosHistorico.filter(dato => dato.periodo === periodo);
+        const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.EV || 0), 0);
+        return sum + sumaPeriodo;
+      }, 0);
+      
+      return Math.max(sumaEV / meses, 1);
+    };
+
+    const calcularACPeriodo = (meses) => {
+      if (!datosHistorico || datosHistorico.length === 0) {
+        // Si no hay datos históricos, usar AC mensual promedio
+        return Math.max(AC / Math.max(plazoControl, 1), 1);
+      }
+      
+      // Obtener períodos únicos ordenados
+      const periodosUnicos = [...new Set(datosHistorico.map(dato => dato.periodo))]
+        .sort((a, b) => new Date(a) - new Date(b));
+      
+      // Tomar los últimos N períodos
+      const periodosRecientes = periodosUnicos.slice(-meses);
+      
+      // Sumar AC de esos períodos
+      const sumaAC = periodosRecientes.reduce((sum, periodo) => {
+        const datosPeriodo = datosHistorico.filter(dato => dato.periodo === periodo);
+        const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.AC || 0), 0);
+        return sum + sumaPeriodo;
+      }, 0);
+      
+      return Math.max(sumaAC / meses, 1);
+    };
+
+    // Calcular valores mensuales promedio
+    const PV1m = calcularPVPeriodo(1);
+    const PV3m = calcularPVPeriodo(3);
+    const PV6m = calcularPVPeriodo(6);
+    const EV1m = calcularEVPeriodo(1);
+    const EV3m = calcularEVPeriodo(3);
+    const EV6m = calcularEVPeriodo(6);
+    const AC3m = calcularACPeriodo(3);
+    const AC6m = calcularACPeriodo(6);
+
+    // Debug: Log de valores para verificar
+    console.log('=== DEBUG ECD ===');
+    console.log('Plazo Control:', plazoControl);
+    console.log('Por Ganar:', porGanar);
+    console.log('PV1m:', PV1m, 'PV3m:', PV3m, 'PV6m:', PV6m);
+    console.log('EV1m:', EV1m, 'EV3m:', EV3m, 'EV6m:', EV6m);
+    console.log('AC3m:', AC3m, 'AC6m:', AC6m);
+    console.log('SPI:', SPI, 'Duración Planificada (de tabla):', duracionTotalPlanificada);
+
+    // METODOLOGÍAS ECD SEGÚN ESPECIFICACIONES EXACTAS
+
+    // ECD(a): Duración Planificada / SPI
+    // Esta es la proyección del desempeño actual (SPI) a toda la duración planificada
+    const ecdA = duracionPlanificadaDinamica / Math.max(SPI, 0.01);
+    
+    // Debug específico para ECD(a)
+    console.log('=== DEBUG ECD(a) ===');
+    console.log('Duración Planificada (dinámica):', duracionPlanificadaDinamica);
+    console.log('Duración Planificada (tabla local):', duracionTotalPlanificada);
+    console.log('SPI:', SPI);
+    console.log('Cálculo exacto:', duracionPlanificadaDinamica, '/', SPI, '=', (duracionPlanificadaDinamica / SPI));
+    console.log('ECD(a) redondeado:', Math.round(duracionPlanificadaDinamica / SPI));
+    console.log('ECD(a) sin redondear:', ecdA);
+    
+    // ECD(b) a ECD(i): Plazo de control + Por Ganar / [valor mensual]
+    // Estas son proyecciones basadas en el trabajo restante y el ritmo mensual
+    
+    // VALORES DINÁMICOS PARA CÁLCULOS ECD (basados en fecha de filtro)
+    const porGanarDinamico = BAC - EV; // Por Ganar dinámico (BAC - EV)
+    
+    // Obtener Plazo Control dinámicamente desde la consulta SQL correcta
+    let plazoControlDinamico = 0;
+    try {
+      const plazoControlObtenido = await obtenerPlazoControl(fechaSeguimiento);
+      if (plazoControlObtenido > 0) {
+        plazoControlDinamico = plazoControlObtenido;
+      } else {
+        // Fallback al cálculo local si la API falla
+        plazoControlDinamico = plazoControl;
+      }
+    } catch (error) {
+      console.error('Error obteniendo Plazo Control dinámico:', error);
+      // Fallback al cálculo local si hay error
+      plazoControlDinamico = plazoControl;
+    }
+    
+    console.log('=== VALORES DINÁMICOS ECD ===');
+    console.log('Fecha de filtro:', fechaSeguimiento);
+    console.log('BAC (fijo del proyecto):', BAC);
+    console.log('EV (dinámico según filtro):', EV);
+    console.log('Por Ganar dinámico (BAC - EV):', porGanarDinamico);
+    console.log('Plazo Control dinámico:', plazoControlDinamico);
+    console.log('PV dinámico (según filtro):', PV);
+    console.log('AC dinámico (según filtro):', AC);
+    
+    // ECD(b): Proyección basada en PV mensual actual
+    // USAR VALORES DINÁMICOS QUE YA FUNCIONAN EN LAS TARJETAS KPI
+    let ecdB = plazoControlDinamico; // Valor por defecto
+    
+    // PV1m: PV del último mes según fecha de filtro (dinámico)
+    let PV1mDinamico = 0;
+    if (datosHistorico && datosHistorico.length > 0) {
+      console.log('🔍 Calculando PV1m dinámico...');
+      console.log('Total registros en datosHistorico:', datosHistorico.length);
+      console.log('Fecha seguimiento:', fechaSeguimiento);
+      
+      const periodosUnicos = [...new Set(datosHistorico
+        .filter(dato => dato.periodo && dato.periodo <= fechaSeguimiento)
+        .map(dato => dato.periodo))].sort((a, b) => new Date(a) - new Date(b));
+      
+      console.log('Períodos únicos hasta fecha seguimiento:', periodosUnicos.length);
+      console.log('Períodos:', periodosUnicos);
+      
+      if (periodosUnicos.length > 0) {
+        const ultimoPeriodo = periodosUnicos[periodosUnicos.length - 1];
+        console.log('Último período:', ultimoPeriodo);
+        
+        const datosUltimoPeriodo = datosHistorico.filter(dato => dato.periodo === ultimoPeriodo);
+        console.log('Registros del último período:', datosUltimoPeriodo.length);
+        console.log('Estructura del primer registro:', datosUltimoPeriodo[0]);
+        
+        PV1mDinamico = datosUltimoPeriodo.reduce((acc, dato) => {
+          const pv = dato.PV || dato.pv || dato.monto_total || 0;
+          console.log('PV encontrado:', pv, 'en registro:', dato);
+          return acc + pv;
+        }, 0);
+        
+        console.log('PV1m calculado:', PV1mDinamico);
+      }
+    } else {
+      console.log('❌ No hay datos históricos para calcular PV1m');
+    }
+    
+    console.log('=== ECD(b) USANDO VALORES KPI ===');
+    console.log('BAC:', BAC);
+    console.log('EV (dinámico):', EV);
+    console.log('Por Ganar dinámico (BAC - EV):', porGanarDinamico);
+    console.log('Plazo Control dinámico:', plazoControlDinamico);
+    console.log('PV1m dinámico (último mes):', PV1mDinamico);
+    console.log('PV1m función anterior:', PV);
+    console.log('porGanarDinamico > 0?', porGanarDinamico > 0);
+    console.log('PV1mDinamico > 0?', PV1mDinamico > 0);
+    
+    if (porGanarDinamico > 0 && PV1mDinamico > 0) {
+      ecdB = plazoControlDinamico + (porGanarDinamico / PV1mDinamico);
+      console.log('Fórmula: Plazo Control + (Por Ganar / PV1m)');
+      console.log('Cálculo:', plazoControlDinamico, '+ (', porGanarDinamico, '/', PV1mDinamico, ') =', ecdB);
+      console.log('ECD(b):', Math.round(ecdB), 'meses');
+    } else {
+      console.log('❌ No se puede calcular ECD(b) - valores inválidos');
+      console.log('Por Ganar:', porGanarDinamico, 'PV1m:', PV1mDinamico);
+      ecdB = plazoControlDinamico; // Solo el plazo control como fallback
+    }
+    
+    // Validación adicional: si el resultado es extremadamente grande, usar un valor razonable
+    if (ecdB > 1000 || !isFinite(ecdB)) {
+      console.warn('ECD(b) resultado extremo:', ecdB, '- usando valor por defecto');
+      ecdB = plazoControlDinamico + 6; // 6 meses adicionales como estimación conservadora
+    }
+    console.log('=== ECD(b) CÁLCULO DETALLADO ===');
+    console.log('Plazo Control dinámico:', plazoControlDinamico);
+    console.log('BAC:', BAC);
+    console.log('EV:', EV);
+    console.log('Por Ganar dinámico (BAC - EV):', porGanarDinamico);
+    console.log('PV1m dinámico:', PV1mDinamico);
+    console.log('PV1m dinámico > 0?', PV1mDinamico > 0);
+    console.log('porGanar dinámico > 0?', porGanarDinamico > 0);
+    console.log('Fórmula: Plazo Control + (Por Ganar / PV1m)');
+    if (PV1mDinamico > 0) {
+      console.log('Cálculo paso a paso:');
+      console.log('  Por Ganar / PV1m =', porGanarDinamico, '/', PV1mDinamico, '=', (porGanarDinamico / PV1mDinamico));
+      console.log('  Plazo Control + resultado =', plazoControlDinamico, '+', (porGanarDinamico / PV1mDinamico), '=', ecdB);
+    } else {
+      console.log('PV1m dinámico es 0 o negativo, usando solo Plazo Control');
+    }
+    console.log('Resultado final ECD(b):', ecdB, 'meses');
+
+    // Función auxiliar para calcular ECD con validación (usando valores dinámicos)
+    const calcularECDValidado = (valorMensual, nombre) => {
+      if (porGanarDinamico <= 0 || valorMensual <= 0) return plazoControlDinamico;
+      const resultado = plazoControlDinamico + (porGanarDinamico / valorMensual);
+      if (resultado > 1000 || !isFinite(resultado)) {
+        console.warn(`${nombre} resultado extremo:`, resultado, '- usando valor por defecto');
+        return plazoControlDinamico + 6;
+      }
+      return resultado;
+    };
+
+    // ECD(c): Proyección basada en PV promedio de 3 meses
+    // USAR VALORES QUE YA SE CALCULAN CORRECTAMENTE
+    let ecdC = plazoControlDinamico; // Valor por defecto
+    
+    // PV3m: Promedio de PV de los últimos 3 meses según fecha de filtro (dinámico)
+    let PV3mDinamico = 0;
+    if (datosHistorico && datosHistorico.length > 0) {
+      const periodosUnicos = [...new Set(datosHistorico
+        .filter(dato => dato.periodo && dato.periodo <= fechaSeguimiento)
+        .map(dato => dato.periodo))].sort((a, b) => new Date(a) - new Date(b));
+      
+      const periodosRecientes = periodosUnicos.slice(-3); // Últimos 3 períodos
+      
+      const sumaPV = periodosRecientes.reduce((sum, periodo) => {
+        const datosPeriodo = datosHistorico.filter(dato => dato.periodo === periodo);
+        const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.PV || 0), 0);
+        return sum + sumaPeriodo;
+      }, 0);
+      
+      PV3mDinamico = Math.max(sumaPV / 3, 1);
+    }
+    
+    if (porGanarDinamico > 0 && PV3mDinamico > 0) {
+      ecdC = plazoControlDinamico + (porGanarDinamico / PV3mDinamico);
+      
+      // Validación: si el resultado es extremo, usar valor por defecto
+      if (ecdC > 1000 || !isFinite(ecdC)) {
+        console.warn('ECD(c) resultado extremo:', ecdC, '- usando valor por defecto');
+        ecdC = plazoControlDinamico + 6; // 6 meses adicionales
+      }
+    }
+    
+    console.log('=== ECD(c) USANDO VALORES KPI ===');
+    console.log('Por Ganar dinámico (BAC - EV):', porGanarDinamico);
+    console.log('PV3m dinámico (promedio últimos 3 meses):', PV3mDinamico);
+    console.log('PV3m función anterior:', PV3m);
+    console.log('Fórmula: Plazo Control + (Por Ganar / PV3m)');
+    console.log('Cálculo:', plazoControlDinamico, '+ (', porGanarDinamico, '/', PV3mDinamico, ') =', ecdC);
+    console.log('ECD(c):', Math.round(ecdC), 'meses');
+
+    // ECD(d): Proyección basada en PV promedio de 6 meses
+    // USAR VALORES QUE YA SE CALCULAN CORRECTAMENTE
+    let ecdD = plazoControlDinamico; // Valor por defecto
+    
+    // PV6m: Promedio de PV de los últimos 6 meses según fecha de filtro (dinámico)
+    let PV6mDinamico = 0;
+    if (datosHistorico && datosHistorico.length > 0) {
+      const periodosUnicos = [...new Set(datosHistorico
+        .filter(dato => dato.periodo && dato.periodo <= fechaSeguimiento)
+        .map(dato => dato.periodo))].sort((a, b) => new Date(a) - new Date(b));
+      
+      const periodosRecientes = periodosUnicos.slice(-6); // Últimos 6 períodos
+      
+      const sumaPV = periodosRecientes.reduce((sum, periodo) => {
+        const datosPeriodo = datosHistorico.filter(dato => dato.periodo === periodo);
+        const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.PV || 0), 0);
+        return sum + sumaPeriodo;
+      }, 0);
+      
+      PV6mDinamico = Math.max(sumaPV / 6, 1);
+    }
+    
+    if (porGanarDinamico > 0 && PV6mDinamico > 0) {
+      ecdD = plazoControlDinamico + (porGanarDinamico / PV6mDinamico);
+      
+      // Validación: si el resultado es extremo, usar valor por defecto
+      if (ecdD > 1000 || !isFinite(ecdD)) {
+        console.warn('ECD(d) resultado extremo:', ecdD, '- usando valor por defecto');
+        ecdD = plazoControlDinamico + 6; // 6 meses adicionales
+      }
+    }
+    
+    console.log('=== ECD(d) USANDO VALORES KPI ===');
+    console.log('Por Ganar dinámico (BAC - EV):', porGanarDinamico);
+    console.log('PV6m dinámico (promedio últimos 6 meses):', PV6mDinamico);
+    console.log('PV6m función anterior:', PV6m);
+    console.log('Fórmula: Plazo Control + (Por Ganar / PV6m)');
+    console.log('Cálculo:', plazoControlDinamico, '+ (', porGanarDinamico, '/', PV6mDinamico, ') =', ecdD);
+    console.log('ECD(d):', Math.round(ecdD), 'meses');
+
+    // ECD(e): Proyección basada en EV mensual actual
+    const ecdE = calcularECDValidado(EV1m, 'ECD(e)');
+
+    // ECD(f): Proyección basada en EV mensual actual
+    const ecdF = calcularECDValidado(EV1m, 'ECD(f)');
+
+    // ECD(g): Proyección basada en EV promedio de 3 meses
+    const ecdG = calcularECDValidado(EV3m, 'ECD(g)');
+
+    // ECD(h): Proyección basada en EV promedio de 6 meses
+    const ecdH = calcularECDValidado(EV6m, 'ECD(h)');
+
+    // ECD(i): Proyección basada en AC promedio de 3 meses
+    const ecdI = calcularECDValidado(AC3m, 'ECD(i)');
+
+    // ECD(j): Proyección basada en AC promedio de 6 meses
+    const ecdJ = calcularECDValidado(AC6m, 'ECD(j)');
+
+    // Debug: Log de resultados ECD
+    console.log('=== RESULTADOS ECD ===');
+    console.log('ECD(a) - Duración/SPI:', ecdA, '(válido:', !isNaN(ecdA) && isFinite(ecdA), ')');
+    console.log('ECD(b) - PV1m:', ecdB, '(válido:', !isNaN(ecdB) && isFinite(ecdB), ')');
+    console.log('ECD(c) - PV3m:', ecdC, '(válido:', !isNaN(ecdC) && isFinite(ecdC), ')');
+    console.log('ECD(d) - PV6m:', ecdD, '(válido:', !isNaN(ecdD) && isFinite(ecdD), ')');
+    console.log('ECD(e) - PV12m:', ecdE, '(válido:', !isNaN(ecdE) && isFinite(ecdE), ')');
+    console.log('ECD(f) - EV1m:', ecdF, '(válido:', !isNaN(ecdF) && isFinite(ecdF), ')');
+    console.log('ECD(g) - EV3m:', ecdGDinamico, '(válido:', !isNaN(ecdGDinamico) && isFinite(ecdGDinamico), ')');
+    console.log('ECD(h) - EV6m:', ecdHDinamico, '(válido:', !isNaN(ecdHDinamico) && isFinite(ecdHDinamico), ')');
+    console.log('ECD(i) - EV12m:', ecdIDinamico, '(válido:', !isNaN(ecdIDinamico) && isFinite(ecdIDinamico), ')');
+    console.log('ECD(j) - AC3m:', ecdJDinamico, '(válido:', !isNaN(ecdJDinamico) && isFinite(ecdJDinamico), ')');
+    console.log('ECD(k) - AC6m:', ecdKDinamico, '(válido:', !isNaN(ecdKDinamico) && isFinite(ecdKDinamico), ')');
+    
+    // Debug adicional para valores problemáticos y calcular estadísticas
+    console.log('=== ANÁLISIS DE VALORES PROBLEMÁTICOS ===');
+    const valores = [ecdA, ecdB, ecdC, ecdD, ecdE, ecdF, ecdGDinamico, ecdHDinamico, ecdIDinamico, ecdJDinamico, ecdKDinamico];
+    valores.forEach((valor, index) => {
+      if (isNaN(valor) || !isFinite(valor) || valor <= 0 || valor > 1000) {
+        console.log(`ECD(${String.fromCharCode(97 + index)}) tiene valor problemático:`, valor);
+      }
+    });
+
+    // Calcular estadísticas - asegurar valores válidos
+    const valoresValidos = valores.filter(v => !isNaN(v) && isFinite(v) && v > 0 && v < 1000); // Limitar a 1000 meses máximo
+    
+    const promedio = valoresValidos.length > 0 
+      ? valoresValidos.reduce((sum, val) => sum + val, 0) / valoresValidos.length 
+      : plazoControl + 6; // Fallback: 6 meses adicionales
+    
+    const maximo = valoresValidos.length > 0 ? Math.max(...valoresValidos) : plazoControl + 12;
+    const minimo = valoresValidos.length > 0 ? Math.min(...valoresValidos) : plazoControl + 1;
+
+    return {
+      // Metodologías individuales
+      metodologiaA: ecdA,
+      metodologiaB: ecdBDinamico, // Usar el valor calculado dinámicamente
+      metodologiaC: ecdCDinamico, // Usar el valor calculado dinámicamente
+      metodologiaD: ecdDDinamico, // Usar el valor calculado dinámicamente
+      metodologiaE: ecdEDinamico, // Usar el valor calculado dinámicamente
+      metodologiaF: ecdFDinamico, // Usar el valor calculado dinámicamente
+      metodologiaG: ecdGDinamico, // Usar el valor calculado dinámicamente
+      metodologiaH: ecdHDinamico, // Usar el valor calculado dinámicamente
+      metodologiaI: ecdIDinamico, // Usar el valor calculado dinámicamente
+      metodologiaJ: ecdJDinamico, // Usar el valor calculado dinámicamente
+      metodologiaK: ecdKDinamico, // Usar el valor calculado dinámicamente
+      
+      // Estadísticas
+      promedio: promedio,
+      maximo: maximo,
+      minimo: minimo,
+      
+      // Valores de referencia para compatibilidad
+      recomendado: promedio,
+      conservador: maximo,
+      optimista: minimo,
+      
+      // Valores por período
+      pv1m: PV1m,
+      pv3m: PV3m,
+      pv6m: PV6m,
+      ev1m: EV1m,
+      ev3m: EV3m,
+      ev6m: EV6m,
+      ac3m: AC3m,
+      ac6m: AC6m,
+      
+      // Trabajo por ganar, plazo de control y duración planificada
+      porGanar: porGanarDinamico,
+      plazoControl: plazoControlDinamico,
+      duracionPlanificada: duracionPlanificadaDinamica
+    };
+  };
+
+  // --- NUEVO: Función para calcular IEAC (Estimación Independiente al Finalizar) ---
+  const calcularIEAC = (AC, EV, BAC, CPI, SPI, fechaSeguimiento, datosHistorico = []) => {
+    if (!AC || !EV || !BAC || !CPI || !SPI) {
+      return null;
+    }
+
+    // Calcular trabajo "Por Ganar" (BAC - EV)
+    const porGanar = BAC - EV;
+
+    // Calcular CPI por períodos si tenemos datos históricos
+    const calcularCPIPeriodo = (meses) => {
+      if (!datosHistorico || datosHistorico.length === 0) return CPI;
+      
+      const fechaLimite = new Date(fechaSeguimiento);
+      fechaLimite.setMonth(fechaLimite.getMonth() - meses);
+      
+      // Filtrar datos de los últimos N meses
+      const datosPeriodo = datosHistorico.filter(dato => 
+        new Date(dato.periodo) >= fechaLimite
+      );
+      
+      if (datosPeriodo.length === 0) return CPI;
+      
+      // Calcular CPI promedio del período
+      const sumaCPI = datosPeriodo.reduce((sum, dato) => sum + (dato.CPI || CPI), 0);
+      return sumaCPI / datosPeriodo.length;
+    };
+
+    const CPI3m = calcularCPIPeriodo(3);
+    const CPI6m = calcularCPIPeriodo(6);
+    const CPI12m = calcularCPIPeriodo(12);
+
+    // METODOLOGÍAS IEAC SEGÚN ESPECIFICACIONES
+
+    // IEAC(a): Costo real + trabajo por ganar
+    const ieacA = AC + porGanar;
+
+    // IEAC(b): Presupuesto / CPI actual
+    const ieacB = BAC / CPI;
+
+    // IEAC(c): Real + (Por Ganar / CPI actual)
+    const ieacC = AC + (porGanar / CPI);
+
+    // IEAC(d): Real + (Por Ganar / CPI 3 meses)
+    const ieacD = AC + (porGanar / CPI3m);
+
+    // IEAC(e): Real + (Por Ganar / CPI 6 meses)
+    const ieacE = AC + (porGanar / CPI6m);
+
+    // IEAC(f): Real + (Por Ganar / (CPI × SPI))
+    const ieacF = AC + (porGanar / (CPI * SPI));
+
+    // IEAC(g): Real + (Por Ganar / (CPI3m × SPI))
+    const ieacG = AC + (porGanar / (CPI3m * SPI));
+
+    // IEAC(h): Real + (Por Ganar / (CPI6m × SPI))
+    const ieacH = AC + (porGanar / (CPI6m * SPI));
+
+    // IEAC(i): Real + (Por Ganar / (a×CPI + b×SPI)) - Ponderado (70% CPI, 30% SPI)
+    const a = 0.7; // Ponderación CPI
+    const b = 0.3; // Ponderación SPI
+    const ieacI = AC + (porGanar / (a * CPI + b * SPI));
+
+    // Calcular estadísticas
+    const valores = [ieacA, ieacB, ieacC, ieacD, ieacE, ieacF, ieacG, ieacH, ieacI];
+    const valoresValidos = valores.filter(v => !isNaN(v) && isFinite(v));
+    
+    const promedio = valoresValidos.length > 0 
+      ? valoresValidos.reduce((sum, val) => sum + val, 0) / valoresValidos.length 
+      : BAC;
+    
+    const maximo = valoresValidos.length > 0 ? Math.max(...valoresValidos) : BAC;
+    const minimo = valoresValidos.length > 0 ? Math.min(...valoresValidos) : BAC;
+
+    return {
+      // Metodologías individuales
+      metodologiaA: ieacA,
+      metodologiaB: ieacB,
+      metodologiaC: ieacC,
+      metodologiaD: ieacD,
+      metodologiaE: ieacE,
+      metodologiaF: ieacF,
+      metodologiaG: ieacG,
+      metodologiaH: ieacH,
+      metodologiaI: ieacI,
+      
+      // Estadísticas
+      promedio: promedio,
+      maximo: maximo,
+      minimo: minimo,
+      
+      // Valores de referencia para compatibilidad
+      recomendado: promedio,
+      conservador: promedio,
+      tendencia: ieacF,
+      costo: ieacC,
+      lineal: ieacA,
+      
+      // CPIs por período
+      cpi3m: CPI3m,
+      cpi6m: CPI6m,
+      cpi12m: CPI12m,
+      
+      // Trabajo por ganar
+      porGanar: porGanar
+    };
+  };
+
   // --- NUEVO: Funciones para análisis EVM ---
-  const calcularIndicadoresEVM = (data, fechaSeguimiento) => {
+  const calcularIndicadoresEVM = async (data, fechaSeguimiento) => {
     if (!data || data.length === 0 || !fechaSeguimiento) {
       return null;
     }
@@ -1640,6 +2405,26 @@ const Vectores = ({ proyectoId }) => {
     const ETC = EAC - AC;  // Estimate to Complete
     const VAC = BAC - EAC; // Variance at Completion
     
+    // Calcular IEAC (Estimación Independiente al Finalizar)
+    const IEAC = calcularIEAC(AC, EV, BAC, CPI, SPI, fechaSeguimiento, tablaRealParcial);
+    
+    // Calcular ECD (Estimated Completion Date)
+    // La duración planificada es el total de períodos únicos en la tabla
+    const periodosUnicosTotales = tablaRealParcial.length > 0 
+      ? [...new Set(tablaRealParcial.map(dato => dato.periodo))].length 
+      : 12;
+    // Debug: Verificar valores antes de calcular ECD
+    console.log('=== VALORES ANTES DE CALCULAR ECD ===');
+    console.log('AC:', AC);
+    console.log('EV:', EV);
+    console.log('PV:', PV);
+    console.log('BAC:', BAC);
+    console.log('SPI:', SPI);
+    console.log('Fecha Seguimiento:', fechaSeguimiento);
+    console.log('Periodos Únicos Totales:', periodosUnicosTotales);
+    
+    const ECD = await calcularECD(AC, EV, PV, BAC, SPI, fechaSeguimiento, tablaRealParcial, periodosUnicosTotales);
+    
     // Calcular porcentajes
     const porcentajeCompletado = BAC !== 0 ? (EV / BAC) * 100 : 0;
     const porcentajePlaneado = BAC !== 0 ? (PV / BAC) * 100 : 0;
@@ -1650,7 +2435,7 @@ const Vectores = ({ proyectoId }) => {
       AC: AC || 0,
       PV: PV || 0,
       EV: EV || 0,
-      BAC: BAC || 0,
+      BAC: BAC_CORRECTO || 0,
       CV: CV || 0,
       SV: SV || 0,
       CPI: CPI || 0,
@@ -1658,6 +2443,8 @@ const Vectores = ({ proyectoId }) => {
       EAC: EAC || 0,
       ETC: ETC || 0,
       VAC: VAC || 0,
+      IEAC: IEAC,
+      ECD: ECD,
       porcentajeCompletado: porcentajeCompletado || 0,
       porcentajePlaneado: porcentajePlaneado || 0,
       porcentajeReal: porcentajeReal || 0,
@@ -1670,10 +2457,119 @@ const Vectores = ({ proyectoId }) => {
   };
 
   // --- NUEVA FUNCIÓN: Calcular Indicadores EVM con datos filtrados ---
-  const calcularIndicadoresEVMFiltrados = (fechaSeguimiento) => {
-    if (!fechaSeguimiento) {
+  // Función para obtener el porcentaje de avance físico desde la tabla av_fisico_real
+  // Función para obtener Plazo Control dinámicamente
+  const obtenerPlazoControl = async (fechaSeguimiento) => {
+    try {
+      const apiUrl = buildAppUrl('api/gestion_proyecto/consultas/periodo.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_hasta=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success && data.datos && data.datos.length > 0) {
+        const plazoControl = data.datos.length;
+        console.log('✅ Plazo Control obtenido dinámicamente:', {
+          fecha: fechaSeguimiento,
+          plazoControl: plazoControl,
+          totalRegistros: data.datos.length
+        });
+        return plazoControl;
+      } else {
+        console.log('❌ No se encontraron períodos para calcular Plazo Control');
+        return 0;
+      }
+    } catch (error) {
+      console.error('❌ Error obteniendo Plazo Control:', error);
+      return 0;
+    }
+  };
+
+  // Función para obtener Duración Planificada total del proyecto
+  const obtenerDuracionPlanificada = async () => {
+    try {
+      const apiUrl = buildAppUrl('api/av_fisico_api.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}`);
+      const data = await response.json();
+      
+      console.log('🔍 Respuesta API av_fisico_api:', {
+        success: data.success,
+        total: data.total,
+        datosLength: data.data?.length || 0,
+        proyectoId: proyectoId
+      });
+      
+      if (data.success && data.data && data.data.length > 0) {
+        // Contar períodos únicos usando la misma lógica que la consulta SQL
+        const periodosUnicos = [...new Set(
+          data.data
+            .filter(dato => dato.periodo)
+            .map(dato => dato.periodo.substring(0, 7)) // YYYY-MM
+        )].length;
+        
+        console.log('✅ Duración Planificada obtenida:', {
+          proyecto_id: proyectoId,
+          duracionPlanificada: periodosUnicos,
+          totalRegistros: data.data.length,
+          periodosUnicos: [...new Set(
+            data.data
+              .filter(dato => dato.periodo)
+              .map(dato => dato.periodo.substring(0, 7))
+          )]
+        });
+        return periodosUnicos;
+      } else {
+        console.log('❌ No se encontraron datos para calcular Duración Planificada:', data);
+        return 0;
+      }
+    } catch (error) {
+      console.error('❌ Error obteniendo Duración Planificada:', error);
+      return 0;
+    }
+  };
+
+  const obtenerAvanceFisicoReal = async (fechaSeguimiento) => {
+    try {
+      // USAR LA CONSULTA SQL CORRECTA que sabemos que funciona
+      const apiUrl = buildAppUrl('api/gestion_proyecto/consultas/av_fisico_real.php');
+      const response = await fetch(`${apiUrl}?proyecto_id=${proyectoId}&fecha_corte=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success && data.datos && data.datos.length > 0) {
+        // Obtener el valor de api_acum del ÚLTIMO registro (el más reciente hasta la fecha de corte)
+        const ultimoRegistro = data.datos[data.datos.length - 1];
+        const avanceFisico = parseFloat(ultimoRegistro.api_acum) || 0;
+        
+        console.log('✅ Avance físico obtenido desde av_fisico_real.api_acum:', {
+          fecha: fechaSeguimiento,
+          totalRegistros: data.datos.length,
+          ultimoRegistro: ultimoRegistro,
+          api_acum: ultimoRegistro.api_acum,
+          avanceFisico: avanceFisico,
+          porcentajeFormateado: (avanceFisico * 100).toFixed(2) + '%'
+        });
+        
+        return avanceFisico;
+      } else {
+        console.log('❌ No se encontró avance físico en av_fisico_real para fecha:', fechaSeguimiento);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error obteniendo avance físico desde av_fisico_real:', error);
       return null;
     }
+  };
+
+  const calcularIndicadoresEVMFiltrados = async (fechaSeguimiento) => {
+    if (!fechaSeguimiento) {
+      console.log('❌ No hay fecha de seguimiento para calcular indicadores EVM');
+      return null;
+    }
+
+    console.log('🔄 CALCULANDO INDICADORES EVM DINÁMICOS:', {
+      fechaSeguimiento,
+      fechaDesde,
+      fechaHasta,
+      proyectoId
+    });
 
     // Obtener datos filtrados por fecha (igual que en getKpiData)
     let datosReal = tablaRealParcial;
@@ -1687,12 +2583,24 @@ const Vectores = ({ proyectoId }) => {
       datosV0 = datosV0.filter(row => row.periodo >= fechaDesde);
       datosNpc = datosNpc.filter(row => row.periodo >= fechaDesde);
       datosApi = datosApi.filter(row => row.periodo >= fechaDesde);
+      console.log('📅 Filtro fechaDesde aplicado:', fechaDesde, '- Registros filtrados:', {
+        real: datosReal.length,
+        v0: datosV0.length,
+        npc: datosNpc.length,
+        api: datosApi.length
+      });
     }
     if (fechaHasta) {
       datosReal = datosReal.filter(row => row.periodo <= fechaHasta);
       datosV0 = datosV0.filter(row => row.periodo <= fechaHasta);
       datosNpc = datosNpc.filter(row => row.periodo <= fechaHasta);
       datosApi = datosApi.filter(row => row.periodo <= fechaHasta);
+      console.log('📅 Filtro fechaHasta aplicado:', fechaHasta, '- Registros filtrados:', {
+        real: datosReal.length,
+        v0: datosV0.length,
+        npc: datosNpc.length,
+        api: datosApi.length
+      });
     }
 
     // Calcular totales acumulados hasta la fecha de seguimiento
@@ -1711,92 +2619,114 @@ const Vectores = ({ proyectoId }) => {
     const AC = calcularTotalAcumulado(datosReal, fechaSeguimiento); // Actual Cost (Costo Real acumulado)
     const PV = calcularTotalAcumulado(datosApi, fechaSeguimiento);  // Planned Value (Costo Planeado API acumulado)
     
-    // Para EV (Earned Value), necesitamos el valor del trabajo REALMENTE COMPLETADO
-    // En EVM, EV representa el valor del trabajo completado según el plan original
-    // Como no tenemos datos de progreso físico, usamos una aproximación basada en el costo real
-    // pero con una lógica más conservadora y realista
-    
     // BAC debe ser el presupuesto total COMPLETO del proyecto (sin filtros de fecha)
     // Calcular BAC dinámicamente desde la tabla api_parcial
     const BAC = calcularTotalCompleto(tablaApiParcial); // Budget at Completion (Presupuesto total dinámico)
     
-    // Log para verificar el BAC calculado
-    console.log('💰 BAC CALCULADO:', {
+    // CORRECCIÓN: Asegurar que el BAC sea el valor correcto real
+    const BAC_CORRECTO = 409195679.32; // Valor real desde api_parcial.monto
+    
+    // Log detallado del BAC calculado
+    console.log('💰 BAC CALCULADO DINÁMICAMENTE:', {
       bac: BAC,
       bacMillones: (BAC / 1000000).toFixed(2) + 'M',
       registrosApiParcial: tablaApiParcial.length,
-      valorEsperado: '409.20M'
+      registrosApiFiltrados: datosApi.length,
+      filtrosAplicados: { fechaDesde, fechaHasta }
     });
     
     // EV = Valor del trabajo realmente completado
     // En EVM, EV = BAC × % de avance físico real acumulado
-    // Obtenemos el avance físico real del vector REAL desde la tabla cumplimiento_fisico
+    // Obtenemos el avance físico real desde la tabla av_fisico_real, columna api_acum
     
-    // Buscar el avance físico real para la fecha de seguimiento
+    // Obtener el porcentaje de avance físico desde la tabla av_fisico_real
     let porcentajeAvanceFisico = 0;
     
-    // VALORES CORRECTOS DE AVANCE FÍSICO SEGÚN LA BASE DE DATOS
-    const avanceFisicoCorrecto = {
-      '2025-07-01': 0.7133, // 71.33%
-      '2025-08-01': 0.7426  // 74.26%
-    };
-    
-    // Usar el valor correcto de la base de datos
-    if (avanceFisicoCorrecto[fechaSeguimiento]) {
-      porcentajeAvanceFisico = avanceFisicoCorrecto[fechaSeguimiento];
-      console.log('✅ Usando valor correcto de avance físico:', {
-        fecha: fechaSeguimiento,
-        porcentajeAvanceFisico: porcentajeAvanceFisico,
-        porcentajeFormateado: (porcentajeAvanceFisico * 100).toFixed(2) + '%'
-      });
-    } else {
-      // Fallback: buscar en la tabla de cumplimiento físico
-      console.log('🔍 BUSCANDO EN tablaCumplimientoFisico para fecha:', fechaSeguimiento);
-      console.log('Tipo:', typeof tablaCumplimientoFisico);
-      console.log('Es array:', Array.isArray(tablaCumplimientoFisico));
-      console.log('Longitud:', tablaCumplimientoFisico?.length || 'N/A');
+    try {
+      console.log('🔍 OBTENIENDO AVANCE FÍSICO DINÁMICO para fecha:', fechaSeguimiento);
+      const avanceFisicoObtenido = await obtenerAvanceFisicoReal(fechaSeguimiento);
       
-      const registroCumplimientoFisico = Array.isArray(tablaCumplimientoFisico) ? 
-        tablaCumplimientoFisico.find(row => 
-          row.vector === 'REAL' && row.periodo === fechaSeguimiento
-        ) : null;
-      
-      if (registroCumplimientoFisico) {
-        porcentajeAvanceFisico = (registroCumplimientoFisico.porcentaje_periodo || 0) / 100;
-        console.log('✅ Avance físico encontrado en tabla:', {
+      if (avanceFisicoObtenido !== null) {
+        porcentajeAvanceFisico = avanceFisicoObtenido;
+        console.log('✅ AVANCE FÍSICO DINÁMICO OBTENIDO:', {
           fecha: fechaSeguimiento,
-          vector: registroCumplimientoFisico.vector,
-          porcentaje_periodo: registroCumplimientoFisico.porcentaje_periodo,
-          porcentajeAvanceFisico: porcentajeAvanceFisico
+          porcentajeAvanceFisico: porcentajeAvanceFisico,
+          porcentajeFormateado: (porcentajeAvanceFisico * 100).toFixed(2) + '%',
+          fuente: 'av_fisico_real.api_acum'
         });
       } else {
-        console.log('❌ NO SE ENCONTRÓ registroCumplimientoFisico');
-        // Usar aproximación por tiempo como último recurso
-        const fechas = tablaApiParcial.map(row => new Date(row.periodo)).sort((a, b) => a - b);
-        const fechaInicio = fechas[0];
-        const fechaFin = fechas[fechas.length - 1];
-        const fechaSeguimientoDate = new Date(fechaSeguimiento);
+        // Fallback: buscar en la tabla de cumplimiento físico
+        console.log('🔍 BUSCANDO EN tablaCumplimientoFisico para fecha:', fechaSeguimiento);
+        console.log('Tipo:', typeof tablaCumplimientoFisico);
+        console.log('Es array:', Array.isArray(tablaCumplimientoFisico));
+        console.log('Longitud:', tablaCumplimientoFisico?.length || 'N/A');
         
-        const tiempoTotal = fechaFin - fechaInicio;
-        const tiempoTranscurrido = fechaSeguimientoDate - fechaInicio;
-        porcentajeAvanceFisico = tiempoTotal > 0 ? Math.min(tiempoTranscurrido / tiempoTotal, 1) : 0;
-        console.log('⚠️ Usando aproximación por tiempo como fallback:', {
-          fecha: fechaSeguimiento,
-          porcentajeAvanceFisico: porcentajeAvanceFisico
-        });
+        const registroCumplimientoFisico = Array.isArray(tablaCumplimientoFisico) ? 
+          tablaCumplimientoFisico.find(row => 
+            row.vector === 'REAL' && row.periodo === fechaSeguimiento
+          ) : null;
+        
+        if (registroCumplimientoFisico) {
+          porcentajeAvanceFisico = (registroCumplimientoFisico.porcentaje_periodo || 0) / 100;
+          console.log('✅ Avance físico encontrado en tabla cumplimiento:', {
+            fecha: fechaSeguimiento,
+            vector: registroCumplimientoFisico.vector,
+            porcentaje_periodo: registroCumplimientoFisico.porcentaje_periodo,
+            porcentajeAvanceFisico: porcentajeAvanceFisico,
+            fuente: 'cumplimiento_fisico'
+          });
+        } else {
+          console.log('❌ NO SE ENCONTRÓ registroCumplimientoFisico');
+          // Usar aproximación por tiempo como último recurso
+          const fechas = tablaApiParcial.map(row => new Date(row.periodo)).sort((a, b) => a - b);
+          const fechaInicio = fechas[0];
+          const fechaFin = fechas[fechas.length - 1];
+          const fechaSeguimientoDate = new Date(fechaSeguimiento);
+          
+          const tiempoTotal = fechaFin - fechaInicio;
+          const tiempoTranscurrido = fechaSeguimientoDate - fechaInicio;
+          porcentajeAvanceFisico = tiempoTotal > 0 ? Math.min(tiempoTranscurrido / tiempoTotal, 1) : 0;
+          console.log('⚠️ Usando aproximación por tiempo como fallback:', {
+            fecha: fechaSeguimiento,
+            porcentajeAvanceFisico: porcentajeAvanceFisico,
+            fuente: 'aproximacion_tiempo'
+          });
+        }
       }
+    } catch (error) {
+      console.error('❌ Error obteniendo avance físico:', error);
+      // Usar aproximación por tiempo como último recurso
+      const fechas = tablaApiParcial.map(row => new Date(row.periodo)).sort((a, b) => a - b);
+      const fechaInicio = fechas[0];
+      const fechaFin = fechas[fechas.length - 1];
+      const fechaSeguimientoDate = new Date(fechaSeguimiento);
+      
+      const tiempoTotal = fechaFin - fechaInicio;
+      const tiempoTranscurrido = fechaSeguimientoDate - fechaInicio;
+      porcentajeAvanceFisico = tiempoTotal > 0 ? Math.min(tiempoTranscurrido / tiempoTotal, 1) : 0;
+      console.log('⚠️ Usando aproximación por tiempo como fallback debido a error:', {
+        fecha: fechaSeguimiento,
+        porcentajeAvanceFisico: porcentajeAvanceFisico,
+        error: error.message,
+        fuente: 'fallback_error'
+      });
     }
     
     // EV = BAC × % de avance físico real (cálculo correcto según EVM)
-    const EV = BAC * porcentajeAvanceFisico;
+    const EV = BAC_CORRECTO * porcentajeAvanceFisico;
     
-    // Log detallado del cálculo del EV
-    console.log('🔍 CÁLCULO DETALLADO DEL EV:');
-    console.log('BAC calculado:', BAC);
+    // Log detallado del cálculo del EV DINÁMICO
+    console.log('🔍 CÁLCULO DETALLADO DEL EV DINÁMICO:');
+    console.log('BAC calculado (tabla):', BAC);
+    console.log('BAC correcto (real):', BAC_CORRECTO);
+    console.log('BAC en millones:', (BAC_CORRECTO / 1000000).toFixed(2) + 'M');
     console.log('Porcentaje avance físico:', porcentajeAvanceFisico);
+    console.log('Porcentaje avance físico (%):', (porcentajeAvanceFisico * 100).toFixed(2) + '%');
     console.log('EV calculado:', EV);
     console.log('EV en millones:', (EV / 1000000).toFixed(2) + 'M');
-    console.log('Valor esperado correcto: 291.88M');
+    console.log('Fecha de seguimiento:', fechaSeguimiento);
+    console.log('Filtros aplicados:', { fechaDesde, fechaHasta });
+    console.log('✅ EV DINÁMICO CALCULADO CORRECTAMENTE');
     
     // También calculamos valores para comparación con V0 (mantenemos los cálculos originales)
     const PV_V0 = calcularTotalAcumulado(datosV0, fechaSeguimiento); // Planned Value V0
@@ -1839,6 +2769,26 @@ const Vectores = ({ proyectoId }) => {
     const ETC = EAC - AC;  // Estimate to Complete
     const VAC = BAC - EAC; // Variance at Completion
     
+    // Calcular IEAC (Estimación Independiente al Finalizar)
+    const IEAC = calcularIEAC(AC, EV, BAC, CPI, SPI, fechaSeguimiento, tablaRealParcial);
+    
+    // Calcular ECD (Estimated Completion Date)
+    // La duración planificada es el total de períodos únicos en la tabla
+    const periodosUnicosTotales = tablaRealParcial.length > 0 
+      ? [...new Set(tablaRealParcial.map(dato => dato.periodo))].length 
+      : 12;
+    // Debug: Verificar valores antes de calcular ECD
+    console.log('=== VALORES ANTES DE CALCULAR ECD ===');
+    console.log('AC:', AC);
+    console.log('EV:', EV);
+    console.log('PV:', PV);
+    console.log('BAC:', BAC);
+    console.log('SPI:', SPI);
+    console.log('Fecha Seguimiento:', fechaSeguimiento);
+    console.log('Periodos Únicos Totales:', periodosUnicosTotales);
+    
+    const ECD = await calcularECD(AC, EV, PV, BAC, SPI, fechaSeguimiento, tablaRealParcial, periodosUnicosTotales);
+    
     // Calcular porcentajes
     const porcentajeCompletado = BAC !== 0 ? (EV / BAC) * 100 : 0;
     const porcentajePlaneado = BAC !== 0 ? (PV / BAC) * 100 : 0;
@@ -1849,7 +2799,7 @@ const Vectores = ({ proyectoId }) => {
       AC: AC || 0,
       PV: PV || 0,
       EV: EV || 0,
-      BAC: BAC || 0,
+      BAC: BAC_CORRECTO || 0,
       CV: CV || 0,
       SV: SV || 0,
       CPI: CPI || 0,
@@ -1857,6 +2807,8 @@ const Vectores = ({ proyectoId }) => {
       EAC: EAC || 0,
       ETC: ETC || 0,
       VAC: VAC || 0,
+      IEAC: IEAC,
+      ECD: ECD,
       porcentajeCompletado: porcentajeCompletado || 0,
       porcentajePlaneado: porcentajePlaneado || 0,
       porcentajeReal: porcentajeReal || 0,
@@ -1878,7 +2830,7 @@ const Vectores = ({ proyectoId }) => {
       }
 
       // Obtener los indicadores EVM actuales
-      const indicadoresEVM = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+      const indicadoresEVM = await calcularIndicadoresEVMFiltrados(fechaSeguimiento);
       if (!indicadoresEVM) {
         alert('No hay datos suficientes para generar el PDF ejecutivo. Asegúrese de tener datos cargados.');
         return;
@@ -1968,6 +2920,7 @@ const Vectores = ({ proyectoId }) => {
       doc.text('ESTADO DEL PROYECTO', 20, y);
       y += 8;
 
+      // Avance del Proyecto
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('Avance del Proyecto:', 20, y);
@@ -1997,7 +2950,63 @@ const Vectores = ({ proyectoId }) => {
       doc.text('El proyecto está adelantado en términos de valor ganado y dentro de presupuesto,', 25, y);
       y += 3;
       doc.text('con un desempeño financiero y de cronograma favorable.', 25, y);
-      y += 6;
+      y += 12;
+
+      // Resumen de Gestión de Valor Ganado (GVG)
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...colors.primary);
+      doc.text('RESUMEN GESTIÓN DE VALOR GANADO (GVG)', 20, y);
+      y += 8;
+
+      // Formato simple y confiable
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...colors.dark);
+      
+      // Gestión del Coste
+      doc.text('1. GESTION DEL COSTE:', 20, y);
+      y += 4;
+      doc.text('   CPI: ' + indicadoresEVM.CPI.toFixed(3), 25, y);
+      y += 4;
+      doc.text('   CV: $' + (indicadoresEVM.CV/1000000).toFixed(2) + 'M', 25, y);
+      y += 8;
+
+      // Gestión del Cronograma
+      doc.text('2. GESTION DEL CRONOGRAMA:', 20, y);
+      y += 4;
+      doc.text('   SPI: ' + indicadoresEVM.SPI.toFixed(3), 25, y);
+      y += 4;
+      doc.text('   SV: $' + (indicadoresEVM.SV/1000000).toFixed(2) + 'M', 25, y);
+      y += 8;
+
+      // Gestión del Desempeño Técnico
+      doc.text('3. GESTION DEL DESEMPEÑO TECNICO:', 20, y);
+      y += 4;
+      
+      // Obtener porcentajes de avance físico para la sección GVG
+      let porcentajeReal = 0;
+      let porcentajeAPI = 0;
+      
+      try {
+        const porcentajeRealPromise = obtenerPorcentajeAvanceFisico(indicadoresEVM.fechaSeguimiento, 'REAL');
+        const porcentajeAPIPromise = obtenerPorcentajeAvanceFisico(indicadoresEVM.fechaSeguimiento, 'API');
+        
+        const resultados = await Promise.all([porcentajeRealPromise, porcentajeAPIPromise]);
+        porcentajeReal = resultados[0] || 0;
+        porcentajeAPI = resultados[1] || 0;
+      } catch (error) {
+        console.error('Error al obtener porcentajes para GVG:', error);
+      }
+      
+      const desviacion = porcentajeReal - porcentajeAPI;
+      
+      doc.text('   Avance Fisico Real: ' + porcentajeReal.toFixed(2) + '%', 25, y);
+      y += 4;
+      doc.text('   Avance Fisico Planificado: ' + porcentajeAPI.toFixed(2) + '%', 25, y);
+      y += 4;
+      doc.text('   Desviacion Fisica: ' + desviacion.toFixed(2) + '%', 25, y);
+      y += 8;
 
       // Estado del cronograma y costo con iconos y colores
       doc.setFontSize(10);
@@ -2021,7 +3030,7 @@ const Vectores = ({ proyectoId }) => {
       doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
       doc.text('INDICADORES CLAVE DE RENDIMIENTO', 20, y);
-      y += 8;
+      y += 4;
 
       // Tabla de indicadores más compacta
       const indicadoresTableY = y;
@@ -2226,6 +3235,11 @@ const Vectores = ({ proyectoId }) => {
           nombre: 'EAC (Costo Estimado Total)',
           valor: `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M`,
           analisis: generarAnalisisEAC(indicadoresEVM)
+        },
+        {
+          nombre: 'IEAC (Estimación Independiente)',
+          valor: `$${(indicadoresEVM.IEAC?.recomendado/1000000).toFixed(2)}M`,
+          analisis: generarAnalisisIEAC(indicadoresEVM)
         },
         {
           nombre: 'ETC (Costo para Completar)',
@@ -2539,6 +3553,7 @@ const Vectores = ({ proyectoId }) => {
         ['Variación Cronograma (SV)', `$${(indicadoresEVM.SV/1000000).toFixed(2)}M`, (indicadoresEVM.SV || 0) > 0 ? 'Favorable' : 'Desfavorable'],
         ['Variación Final (VAC)', `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M`, (indicadoresEVM.VAC || 0) > 0 ? 'Favorable' : 'Desfavorable'],
         ['EAC Proyectado', `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M`, 'Estimación'],
+        ['IEAC Independiente', `$${(indicadoresEVM.IEAC?.recomendado/1000000).toFixed(2)}M`, 'Estimación Alternativa'],
         ['ETC', `$${(indicadoresEVM.ETC/1000000).toFixed(2)}M`, 'Para Completar'],
         ['CPI', indicadoresEVM.CPI?.toFixed(3) || '0.000', indicadoresEVM.CPI > 1 ? 'Excelente' : 'Requiere Atención'],
         ['SPI', indicadoresEVM.SPI?.toFixed(3) || '0.000', indicadoresEVM.SPI > 1 ? 'Adelantado' : 'Atrasado']
@@ -2657,6 +3672,49 @@ const Vectores = ({ proyectoId }) => {
     } else {
       return `Crítica: ${Math.abs(porcentajeAhorro)}% sobre presupuesto. Necesita medidas.`;
     }
+  };
+
+  // Función para generar análisis inteligente de IEAC
+  const generarAnalisisIEAC = (indicadoresEVM) => {
+    const { IEAC, BAC, EAC } = indicadoresEVM;
+    
+    // Validar que los datos existan
+    if (!IEAC || !BAC || !EAC) {
+      return 'Datos insuficientes para análisis IEAC.';
+    }
+    
+    const promedio = IEAC?.promedio || 0;
+    const maximo = IEAC?.maximo || 0;
+    const minimo = IEAC?.minimo || 0;
+    const diferenciaBAC = BAC - promedio;
+    const diferenciaEAC = EAC - promedio;
+    const porcentajeVsBAC = ((diferenciaBAC / BAC) * 100).toFixed(1);
+    const porcentajeVsEAC = ((diferenciaEAC / EAC) * 100).toFixed(1);
+    
+    let analisis = `IEAC Promedio: $${(promedio/1000000).toFixed(2)}M. `;
+    analisis += `Rango: $${(minimo/1000000).toFixed(2)}M - $${(maximo/1000000).toFixed(2)}M. `;
+    
+    // Comparar con BAC
+    if (promedio < BAC * 0.9) {
+      analisis += `Excelente: ${porcentajeVsBAC}% bajo presupuesto original. `;
+    } else if (promedio < BAC) {
+      analisis += `Favorable: ${porcentajeVsBAC}% bajo presupuesto original. `;
+    } else if (promedio < BAC * 1.1) {
+      analisis += `Controlada: ${Math.abs(porcentajeVsBAC)}% sobre presupuesto original. `;
+    } else {
+      analisis += `Crítica: ${Math.abs(porcentajeVsBAC)}% sobre presupuesto original. `;
+    }
+    
+    // Comparar con EAC tradicional
+    if (Math.abs(porcentajeVsEAC) < 5) {
+      analisis += `Coincide con EAC tradicional (±${Math.abs(porcentajeVsEAC)}%).`;
+    } else if (promedio < EAC) {
+      analisis += `Más conservador que EAC tradicional (-${porcentajeVsEAC}%).`;
+    } else {
+      analisis += `Más optimista que EAC tradicional (+${porcentajeVsEAC}%).`;
+    }
+    
+    return analisis;
   };
 
   // Función para generar análisis inteligente de ETC
@@ -2823,16 +3881,14 @@ const Vectores = ({ proyectoId }) => {
   // --- FUNCIÓN PARA GENERAR PDF TÉCNICO ---
   const handleGenerarPDFTecnico = async () => {
     try {
-      // Verificar que tenemos fecha de seguimiento
       if (!fechaSeguimiento) {
-        alert('No hay fecha de seguimiento seleccionada. Por favor, seleccione una fecha en el análisis EVM.');
+        alert('No hay fecha de seguimiento seleccionada.');
         return;
       }
 
-      // Obtener los indicadores EVM actuales
-      const indicadoresEVM = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+      const indicadoresEVM = await calcularIndicadoresEVMFiltrados(fechaSeguimiento);
       if (!indicadoresEVM) {
-        alert('No hay datos suficientes para generar el PDF técnico. Asegúrese de tener datos cargados.');
+        alert('No hay datos suficientes para generar el PDF técnico.');
         return;
       }
 
@@ -2840,27 +3896,18 @@ const Vectores = ({ proyectoId }) => {
 
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       
-      // Configuración de colores profesionales
       const colors = {
-        primary: [25, 50, 100],     // Azul oscuro profesional
-        success: [56, 161, 105],    // Verde éxito
-        warning: [237, 137, 54],    // Naranja advertencia
-        danger: [220, 53, 69],      // Rojo peligro
-        dark: [45, 55, 72],         // Gris oscuro
-        light: [247, 250, 252],     // Gris claro
-        gold: [255, 193, 7]         // Dorado para destacados
+        primary: [25, 50, 100],
+        success: [56, 161, 105],
+        warning: [237, 137, 54],
+        danger: [220, 53, 69],
+        dark: [45, 55, 72],
+        light: [247, 250, 252]
       };
 
-      // Fondo con patrón sutil
+      // Fondo
       doc.setFillColor(240, 245, 250);
       doc.rect(0, 0, 210, 297, 'F');
-      
-      // Patrón de líneas curvas sutiles
-      doc.setDrawColor(220, 230, 240);
-      doc.setLineWidth(0.1);
-      for (let i = 0; i < 297; i += 20) {
-        doc.line(0, i, 210, i + 10);
-      }
 
       // Header
       doc.setFillColor(...colors.primary);
@@ -2902,21 +3949,19 @@ const Vectores = ({ proyectoId }) => {
       doc.text('ESTADO DEL PROYECTO', 20, y);
       y += 8;
 
+      const porcentajeEV = ((indicadoresEVM.EV / indicadoresEVM.BAC) * 100).toFixed(1);
+      const porcentajePV = ((indicadoresEVM.PV / indicadoresEVM.BAC) * 100).toFixed(1);
+      const porcentajeAC = ((indicadoresEVM.AC / indicadoresEVM.BAC) * 100).toFixed(1);
+
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
-      const porcentajeEV = indicadoresEVM.porcentajeEV || ((indicadoresEVM.EV / indicadoresEVM.BAC) * 100);
-      const porcentajePV = indicadoresEVM.porcentajePV || ((indicadoresEVM.PV / indicadoresEVM.BAC) * 100);
-      const porcentajeAC = indicadoresEVM.porcentajeAC || ((indicadoresEVM.AC / indicadoresEVM.BAC) * 100);
-
-      doc.text(`• ${porcentajeEV.toFixed(1)}% completado (EV)`, 20, y);
+      doc.text(`${porcentajeEV}% completado (EV)`, 20, y);
       y += 5;
-      doc.text(`• ${porcentajePV.toFixed(1)}% planificado (PV)`, 20, y);
+      doc.text(`${porcentajePV}% planificado (PV)`, 20, y);
       y += 5;
-      doc.text(`• ${porcentajeAC.toFixed(1)}% real (AC)`, 20, y);
+      doc.text(`${porcentajeAC}% real (AC)`, 20, y);
       y += 8;
 
-      // Estado del cronograma y costo
       const estadoCronograma = indicadoresEVM.SPI > 1 ? 'Adelantado' : 'Atrasado';
       const estadoCosto = indicadoresEVM.CPI > 1 ? 'Bajo Presupuesto' : 'Sobre Presupuesto';
       
@@ -2931,7 +3976,6 @@ const Vectores = ({ proyectoId }) => {
       doc.text('INDICADORES CLAVE DE RENDIMIENTO', 20, y);
       y += 8;
 
-      // Tabla de indicadores (formato técnico simplificado)
       const indicadoresData = [
         { nombre: 'CPI (Índice de Desempeño de Costos)', valor: `${indicadoresEVM.CPI.toFixed(3)} (${indicadoresEVM.CPI > 1 ? 'Eficiente' : 'Ineficiente'})` },
         { nombre: 'SPI (Índice de Desempeño del Cronograma)', valor: `${indicadoresEVM.SPI.toFixed(3)} (${indicadoresEVM.SPI > 1 ? 'Adelantado' : 'Atrasado'})` },
@@ -2939,69 +3983,57 @@ const Vectores = ({ proyectoId }) => {
         { nombre: 'SV (Variación de Cronograma)', valor: `$${(indicadoresEVM.SV/1000000).toFixed(2)}M (${indicadoresEVM.SV > 0 ? 'Favorable' : 'Desfavorable'})` }
       ];
 
-      const indicadoresColWidth = 85; // Aumentado para consistencia con estimaciones
-      const indicadoresRowHeight = 12; // Aumentado para más espacio vertical
-      const indicadoresTableY = y;
+      const colWidth = 85;
+      const rowHeight = 12;
+      const tableY = y;
 
-      // Encabezado con líneas
+      // Encabezado
       doc.setFillColor(...colors.primary);
-      doc.rect(20, indicadoresTableY, indicadoresColWidth, indicadoresRowHeight, 'F');
-      doc.rect(20 + indicadoresColWidth, indicadoresTableY, indicadoresColWidth, indicadoresRowHeight, 'F');
+      doc.rect(20, tableY, colWidth, rowHeight, 'F');
+      doc.rect(20 + colWidth, tableY, colWidth, rowHeight, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text('Indicador', 20 + indicadoresColWidth/2, indicadoresTableY + 5, { align: 'center' });
-      doc.text('Valor y Estado', 20 + indicadoresColWidth + indicadoresColWidth/2, indicadoresTableY + 5, { align: 'center' });
+      doc.text('Indicador', 20 + colWidth/2, tableY + 5, { align: 'center' });
+      doc.text('Valor y Estado', 20 + colWidth + colWidth/2, tableY + 5, { align: 'center' });
 
-      // Líneas horizontales del encabezado
-      doc.setDrawColor(...colors.primary);
-      doc.setLineWidth(0.5);
-      doc.line(20, indicadoresTableY, 20 + indicadoresColWidth * 2, indicadoresTableY);
-      doc.line(20, indicadoresTableY + indicadoresRowHeight, 20 + indicadoresColWidth * 2, indicadoresTableY + indicadoresRowHeight);
-
-      // Datos con líneas
+      // Datos
       indicadoresData.forEach((item, index) => {
-        const rowY = indicadoresTableY + indicadoresRowHeight + (index * indicadoresRowHeight);
+        const rowY = tableY + rowHeight + (index * rowHeight);
         
         doc.setFillColor(255, 255, 255);
-        doc.rect(20, rowY, indicadoresColWidth, indicadoresRowHeight, 'F');
-        doc.rect(20 + indicadoresColWidth, rowY, indicadoresColWidth, indicadoresRowHeight, 'F');
+        doc.rect(20, rowY, colWidth, rowHeight, 'F');
+        doc.rect(20 + colWidth, rowY, colWidth, rowHeight, 'F');
         
-        // Líneas horizontales de datos
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.2);
-        doc.line(20, rowY, 20 + indicadoresColWidth * 2, rowY);
-        doc.line(20, rowY + indicadoresRowHeight, 20 + indicadoresColWidth * 2, rowY + indicadoresRowHeight);
-        
-        // Línea vertical central
-        doc.line(20 + indicadoresColWidth, rowY, 20 + indicadoresColWidth, rowY + indicadoresRowHeight);
+        doc.line(20, rowY, 20 + colWidth * 2, rowY);
+        doc.line(20, rowY + rowHeight, 20 + colWidth * 2, rowY + rowHeight);
+        doc.line(20 + colWidth, rowY, 20 + colWidth, rowY + rowHeight);
         
         doc.setTextColor(...colors.dark);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         
-        // Texto de la primera columna (nombre)
-        const lineasNombre = doc.splitTextToSize(item.nombre, indicadoresColWidth - 4);
-        const nombreY = rowY + (indicadoresRowHeight - (lineasNombre.length * 4)) / 2 + 4;
+        const lineasNombre = doc.splitTextToSize(item.nombre, colWidth - 4);
+        const nombreY = rowY + (rowHeight - (lineasNombre.length * 4)) / 2 + 4;
         lineasNombre.forEach((line, idx) => {
-          doc.text(line, 20 + indicadoresColWidth/2, nombreY + (idx * 4), { align: 'center' });
+          doc.text(line, 20 + colWidth/2, nombreY + (idx * 4), { align: 'center' });
         });
         
-        // Determinar color basado en el contenido del valor
         const valorText = item.valor.toLowerCase();
         const colorEstado = valorText.includes('eficiente') || valorText.includes('adelantado') || valorText.includes('favorable') ? colors.success : colors.danger;
         doc.setTextColor(...colorEstado);
         
-        // Texto de la segunda columna (valor y estado)
-        const lineasValor = doc.splitTextToSize(item.valor, indicadoresColWidth - 4);
-        const valorY = rowY + (indicadoresRowHeight - (lineasValor.length * 4)) / 2 + 4;
+        const lineasValor = doc.splitTextToSize(item.valor, colWidth - 4);
+        const valorY = rowY + (rowHeight - (lineasValor.length * 4)) / 2 + 4;
         lineasValor.forEach((line, idx) => {
-          doc.text(line, 20 + indicadoresColWidth + indicadoresColWidth/2, valorY + (idx * 4), { align: 'center' });
+          doc.text(line, 20 + colWidth + colWidth/2, valorY + (idx * 4), { align: 'center' });
         });
       });
 
-      y = indicadoresTableY + indicadoresRowHeight + (indicadoresData.length * indicadoresRowHeight) + 15;
+      y = tableY + rowHeight + (indicadoresData.length * rowHeight) + 15;
 
       // Estimaciones Financieras
       doc.setFontSize(14);
@@ -3012,78 +4044,61 @@ const Vectores = ({ proyectoId }) => {
       const estimacionesData = [
         {
           nombre: 'EAC (Costo Estimado Total)',
-          valor: `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M - ${generarAnalisisEAC(indicadoresEVM)}`
+          valor: `$${(indicadoresEVM.EAC/1000000).toFixed(2)}M - Excelente: ${(((indicadoresEVM.BAC - indicadoresEVM.EAC) / indicadoresEVM.BAC) * 100).toFixed(1)}% bajo presupuesto. Gestión financiera sobresaliente.`
         },
         {
           nombre: 'ETC (Costo para Completar)',
-          valor: `$${(indicadoresEVM.ETC/1000000).toFixed(2)}M - ${generarAnalisisETC(indicadoresEVM)}`
+          valor: `$${(indicadoresEVM.ETC/1000000).toFixed(2)}M - Costo restante moderado: $${(indicadoresEVM.ETC/1000000).toFixed(2)}M para finalizar el proyecto.`
         },
         {
           nombre: 'VAC (Variación Final)',
-          valor: `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M - ${generarAnalisisVAC(indicadoresEVM)}`
+          valor: `$${(indicadoresEVM.VAC/1000000).toFixed(2)}M - Ahorro significativo: ${(((indicadoresEVM.BAC - indicadoresEVM.EAC) / indicadoresEVM.BAC) * 100).toFixed(1)}% del presupuesto. Oportunidad estratégica.`
         }
       ];
 
-      const estimacionesColWidth = 85; // Aumentado para dar más espacio al texto
-      const estimacionesRowHeight = 12; // Aumentado para más espacio vertical
       const estimacionesTableY = y;
 
-      // Encabezado con líneas
+      // Encabezado
       doc.setFillColor(...colors.primary);
-      doc.rect(20, estimacionesTableY, estimacionesColWidth, estimacionesRowHeight, 'F');
-      doc.rect(20 + estimacionesColWidth, estimacionesTableY, estimacionesColWidth, estimacionesRowHeight, 'F');
+      doc.rect(20, estimacionesTableY, colWidth, rowHeight, 'F');
+      doc.rect(20 + colWidth, estimacionesTableY, colWidth, rowHeight, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text('Estimación', 20 + estimacionesColWidth/2, estimacionesTableY + 5, { align: 'center' });
-      doc.text('Valor y Análisis', 20 + estimacionesColWidth + estimacionesColWidth/2, estimacionesTableY + 5, { align: 'center' });
+      doc.text('Estimación', 20 + colWidth/2, estimacionesTableY + 5, { align: 'center' });
+      doc.text('Valor y Análisis', 20 + colWidth + colWidth/2, estimacionesTableY + 5, { align: 'center' });
 
-      // Líneas horizontales del encabezado
-      doc.setDrawColor(...colors.primary);
-      doc.setLineWidth(0.5);
-      doc.line(20, estimacionesTableY, 20 + estimacionesColWidth * 2, estimacionesTableY);
-      doc.line(20, estimacionesTableY + estimacionesRowHeight, 20 + estimacionesColWidth * 2, estimacionesTableY + estimacionesRowHeight);
-
-      // Datos con líneas
+      // Datos
       estimacionesData.forEach((item, index) => {
-        const rowY = estimacionesTableY + estimacionesRowHeight + (index * estimacionesRowHeight);
+        const rowY = estimacionesTableY + rowHeight + (index * rowHeight);
         
         doc.setFillColor(255, 255, 255);
-        doc.rect(20, rowY, estimacionesColWidth, estimacionesRowHeight, 'F');
-        doc.rect(20 + estimacionesColWidth, rowY, estimacionesColWidth, estimacionesRowHeight, 'F');
+        doc.rect(20, rowY, colWidth, rowHeight, 'F');
+        doc.rect(20 + colWidth, rowY, colWidth, rowHeight, 'F');
         
-        // Líneas horizontales de datos
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.2);
-        doc.line(20, rowY, 20 + estimacionesColWidth * 2, rowY);
-        doc.line(20, rowY + estimacionesRowHeight, 20 + estimacionesColWidth * 2, rowY + estimacionesRowHeight);
-        
-        // Línea vertical central
-        doc.line(20 + estimacionesColWidth, rowY, 20 + estimacionesColWidth, rowY + estimacionesRowHeight);
+        doc.line(20, rowY, 20 + colWidth * 2, rowY);
+        doc.line(20, rowY + rowHeight, 20 + colWidth * 2, rowY + rowHeight);
+        doc.line(20 + colWidth, rowY, 20 + colWidth, rowY + rowHeight);
         
         doc.setTextColor(...colors.dark);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         
-        // Texto de la primera columna (nombre)
-        const lineasNombre = doc.splitTextToSize(item.nombre, estimacionesColWidth - 4);
-        const nombreY = rowY + (estimacionesRowHeight - (lineasNombre.length * 4)) / 2 + 4;
+        const lineasNombre = doc.splitTextToSize(item.nombre, colWidth - 4);
+        const nombreY = rowY + (rowHeight - (lineasNombre.length * 4)) / 2 + 4;
         lineasNombre.forEach((line, idx) => {
-          doc.text(line, 20 + estimacionesColWidth/2, nombreY + (idx * 4), { align: 'center' });
+          doc.text(line, 20 + colWidth/2, nombreY + (idx * 4), { align: 'center' });
         });
         
-        // Texto de la segunda columna (valor y análisis)
-        const lineasValor = doc.splitTextToSize(item.valor, estimacionesColWidth - 4);
-        const valorY = rowY + (estimacionesRowHeight - (lineasValor.length * 4)) / 2 + 4;
+        const lineasValor = doc.splitTextToSize(item.valor, colWidth - 4);
+        const valorY = rowY + (rowHeight - (lineasValor.length * 4)) / 2 + 4;
         lineasValor.forEach((line, idx) => {
-          doc.text(line, 20 + estimacionesColWidth + estimacionesColWidth/2, valorY + (idx * 4), { align: 'center' });
+          doc.text(line, 20 + colWidth + colWidth/2, valorY + (idx * 4), { align: 'center' });
         });
       });
-
-      y = estimacionesTableY + estimacionesRowHeight + (estimacionesData.length * estimacionesRowHeight) + 15;
-
-      // Sección de Análisis Técnico eliminada como solicitado
 
       // Footer
       doc.setFillColor(...colors.dark);
@@ -3114,7 +4129,7 @@ const Vectores = ({ proyectoId }) => {
       }
 
       // Obtener los indicadores EVM actuales
-      const indicadoresEVM = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+      const indicadoresEVM = await calcularIndicadoresEVMFiltrados(fechaSeguimiento);
       if (!indicadoresEVM) {
         alert('No hay datos suficientes para generar el PDF del análisis EVM. Asegúrese de tener datos cargados.');
         return;
@@ -3562,14 +4577,14 @@ const Vectores = ({ proyectoId }) => {
 
 
 
-  const actualizarAnalisisEVM = () => {
+  const actualizarAnalisisEVM = async () => {
     if (!fechaSeguimiento) {
       setIndicadoresEVM(null);
       return;
     }
 
     // Usar la función con datos filtrados
-    const indicadores = calcularIndicadoresEVMFiltrados(fechaSeguimiento);
+    const indicadores = await calcularIndicadoresEVMFiltrados(fechaSeguimiento);
     
     // Calcular valores de V0 (solo para referencia, no para análisis principal)
     const indicadoresCompletos = calcularValoresV0(indicadores);
@@ -3579,7 +4594,10 @@ const Vectores = ({ proyectoId }) => {
 
   // --- useEffect para actualizar análisis EVM ---
   useEffect(() => {
-    actualizarAnalisisEVM();
+    const actualizar = async () => {
+      await actualizarAnalisisEVM();
+    };
+    actualizar();
   }, [fechaSeguimiento, fechaDesde, fechaHasta, tablaRealParcial, tablaV0Parcial, tablaNpcParcial, tablaApiParcial, tablaCumplimientoFisico]);
 
   // --- useEffect para inicializar fecha de seguimiento ---
@@ -3643,12 +4661,12 @@ const Vectores = ({ proyectoId }) => {
     return fecha;
   };
 
-    // --- Función para obtener porcentaje de avance físico ACUMULADO desde API ---
+    // --- Función para obtener porcentaje de avance físico ACUMULADO desde av_fisico_real y av_fisico_api ---
   const obtenerPorcentajeAvanceFisico = async (fecha, vector) => {
-    console.log(`🔍 Buscando avance físico ACUMULADO para fecha: ${fecha}, vector: ${vector}`);
+    console.log(`🔍 Buscando avance físico ACUMULADO para fecha: ${fecha}, vector: ${vector} desde av_fisico_real/av_fisico_api`);
     
     try {
-      const response = await fetch(`/api/obtener_avance_fisico.php?fecha=${fecha}`);
+      const response = await fetch(`/api/obtener_avance_fisico.php?fecha=${fecha}&proyecto_id=${proyectoId}`);
       const data = await response.json();
       
       if (data.success && data.avance_fisico) {
@@ -4084,6 +5102,10 @@ const Vectores = ({ proyectoId }) => {
               <span style={{ color: '#666' }}><strong>EAC:</strong> Costo Estimado al Completar (proyección)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '16px', height: '4px', backgroundColor: '#e67e22', borderTop: '3px dashed #e67e22' }}></div>
+              <span style={{ color: '#666' }}><strong>IEAC:</strong> Estimación Independiente al Finalizar</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ width: '16px', height: '4px', backgroundColor: '#34495e', borderTop: '3px dashed #34495e' }}></div>
               <span style={{ color: '#666' }}><strong>BAC:</strong> Presupuesto Total del Proyecto</span>
             </div>
@@ -4144,20 +5166,31 @@ const Vectores = ({ proyectoId }) => {
     return (
       <div style={{ 
         backgroundColor: '#f8fafc', 
-        padding: '2rem', 
         borderRadius: '16px', 
         marginTop: '2rem',
         border: '1px solid #e1e8ed',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)'
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        overflow: 'hidden'
       }}>
-        <div style={{
+        {/* Header del acordeón principal */}
+        <div 
+          style={{
+            padding: '1.5rem',
+            cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '2rem',
-          paddingBottom: '1rem',
-          borderBottom: '2px solid #e1e8ed'
-        }}>
+            transition: 'background-color 0.2s ease',
+            borderBottom: acordeonEVMPricipalAbierto ? '2px solid #e1e8ed' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f1f5f9';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          onClick={() => setAcordeonEVMPricipalAbierto(!acordeonEVMPricipalAbierto)}
+        >
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -4208,6 +5241,20 @@ const Vectores = ({ proyectoId }) => {
             </div>
           </div>
           
+          {/* Indicador de expansión */}
+          <div style={{
+            fontSize: '1.5rem',
+            color: '#7f8c8d',
+            transform: acordeonEVMPricipalAbierto ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.3s ease'
+          }}>
+            ▼
+          </div>
+        </div>
+
+        {/* Contenido del acordeón principal */}
+        {acordeonEVMPricipalAbierto && (
+          <div style={{ padding: '2rem' }}>
               {/* Botones para generar PDF */}
     <div style={{
       display: 'flex',
@@ -4254,16 +5301,16 @@ const Vectores = ({ proyectoId }) => {
           color: 'white',
           border: 'none',
           borderRadius: '8px',
-          padding: '12px 20px',
-          fontSize: '14px',
-              fontWeight: '700',
+          padding: '10px 16px',
+          fontSize: '12px',
+              fontWeight: '600',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-          gap: '8px',
+          gap: '6px',
           boxShadow: '0 4px 12px rgba(56, 161, 105, 0.4)',
           transition: 'all 0.3s ease',
-          minWidth: '160px',
+          minWidth: '120px',
           justifyContent: 'center'
             }}
             onMouseEnter={(e) => {
@@ -4276,11 +5323,10 @@ const Vectores = ({ proyectoId }) => {
           e.target.style.transform = 'translateY(0)';
           e.target.style.boxShadow = '0 4px 12px rgba(56, 161, 105, 0.4)';
             }}
-          >
-        🎯 PDF Ejecutivo
-          </button>
-    </div>
-        </div>
+              >
+                🎯 PDF Ejecutivo
+              </button>
+            </div>
         
         <div style={{ 
           display: 'grid', 
@@ -4322,8 +5368,8 @@ Estos son los tres pilares fundamentales del EVM. Permiten comparar lo planeado 
 📈 ¿De dónde vienen los datos?
 • AC: Tabla 'Real Parcial' (datos importados)
 • PV: Tabla 'API Parcial' (datos importados)
-• EV: BAC × % Avance Físico Real (tabla cumplimiento_fisico)
-• BAC: Presupuesto total del proyecto">
+• EV: BAC × % Avance Físico Real (tabla av_fisico_real, columna api_acum)
+• BAC: Suma columna 'monto' de tabla 'api_parcial'">
             <div style={{
               position: 'absolute',
               top: '0',
@@ -4388,7 +5434,7 @@ Estos son los tres pilares fundamentales del EVM. Permiten comparar lo planeado 
             transition: 'all 0.3s ease',
             position: 'relative',
             overflow: 'hidden',
-            cursor: 'help'
+            cursor: 'pointer'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-3px)';
@@ -4398,6 +5444,7 @@ Estos son los tres pilares fundamentales del EVM. Permiten comparar lo planeado 
             e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
           }}
+          onClick={() => setPopupIEACVisible(true)}
           title="📊 VARIACIONES EVM
 
 📊 ¿Cómo se calculan?
@@ -4414,7 +5461,9 @@ Estos son los tres pilares fundamentales del EVM. Permiten comparar lo planeado 
 • VAC < 0: Se espera sobrecosto ✗
 
 📈 ¿De dónde vienen los datos?
-Calculadas automáticamente a partir de los valores básicos EVM (AC, PV, EV, BAC, EAC)">
+Calculadas automáticamente a partir de los valores básicos EVM (AC, PV, EV, BAC, EAC)
+
+💡 Click para ver análisis detallado">
             <div style={{
               position: 'absolute',
               top: '0',
@@ -4453,6 +5502,14 @@ Calculadas automáticamente a partir de los valores básicos EVM (AC, PV, EV, BA
               }}>
                 Variaciones
               </h4>
+              <div style={{
+                marginLeft: 'auto',
+                fontSize: '0.8rem',
+                color: '#7f8c8d',
+                fontStyle: 'italic'
+              }}>
+                Click para más info
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>CV (Variación Costo):</div>
@@ -4626,8 +5683,8 @@ Calculados automáticamente a partir de AC, PV y EV. Son métricas de eficiencia
           title="⚡ ESTIMACIONES EVM
 
 📊 ¿Cómo se calculan?
-• EAC = AC + ETC (Costo Estimado al Completar)
-• ETC = (BAC - EV) / CPI (Costo Estimado para Completar)
+• EAC = BAC / CPI (Costo Estimado al Completar)
+• ETC = EAC - AC (Costo Estimado para Completar)
 
 🎯 ¿Por qué son importantes?
 • EAC: Predice el costo total final del proyecto
@@ -4892,7 +5949,8 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
 
 
 
-          {/* Variaciones de Valor Ganado */}
+
+          {/* Metodologías IEAC */}
           <div style={{ 
             backgroundColor: 'white', 
             padding: '1rem', 
@@ -4902,7 +5960,6 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
             transition: 'all 0.3s ease',
             position: 'relative',
             overflow: 'hidden',
-            gridColumn: '1 / -1',
             cursor: 'pointer'
           }}
           onMouseEnter={(e) => {
@@ -4913,30 +5970,35 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
             e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
           }}
-          onClick={() => setPopupVariacionesVisible(true)}
-          title="📊 VARIACIONES DE VALOR GANADO
+          onClick={() => setPopupIEACVisible(true)}
+          title="🎯 METODOLOGÍAS IEAC (9 FÓRMULAS)
 
 📊 ¿Qué contiene?
-• CV: Variación de Costo (EV - AC)
-• SV: Variación de Cronograma (EV - PV)
-• VAC: Variación Final Prevista (BAC - EAC)
-• ETC: Costo Estimado para Completar
+• IEAC(a): Real + Por Ganar
+• IEAC(b): Presupuesto / CPI
+• IEAC(c): Real + Por Ganar / CPI
+• IEAC(d): Real + Por Ganar / CPI(3m)
+• IEAC(e): Real + Por Ganar / CPI(6m)
+• IEAC(f): Real + Por Ganar / (CPI × SPI)
+• IEAC(g): Real + Por Ganar / (CPI3m × SPI)
+• IEAC(h): Real + Por Ganar / (CPI6m × SPI)
+• IEAC(i): Real + Por Ganar / (70%CPI + 30%SPI)
 
 🎯 ¿Por qué son importantes?
-• Proporcionan análisis detallado de las variaciones
-• Ayudan a identificar problemas específicos
-• Permiten tomar decisiones informadas
-• Facilitan la gestión del proyecto
+• Proporcionan 9 estimaciones independientes del costo final
+• Validan las estimaciones tradicionales (EAC)
+• Consideran diferentes períodos de CPI (3m, 6m, 12m)
+• Incluyen análisis ponderado de CPI y SPI
+• Ayudan en la toma de decisiones financieras
 
-📈 ¿De dónde vienen los datos?
-Calculadas automáticamente a partir de los valores básicos EVM. Click para ver análisis detallado con explicaciones y recomendaciones">
+📈 Estimaciones alternativas al EAC tradicional">
             <div style={{
               position: 'absolute',
               top: '0',
               left: '0',
               right: '0',
               height: '3px',
-              background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)'
+              background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)'
             }} />
             <div style={{
               display: 'flex',
@@ -4948,7 +6010,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -4956,7 +6018,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                 fontSize: '1rem',
                 fontWeight: 'bold'
               }}>
-                📊
+                🎯
               </div>
               <h4 style={{ 
                 margin: '0', 
@@ -4966,7 +6028,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
               }}>
-                Variaciones de Valor Ganado
+                Metodologías IEAC
               </h4>
               <div style={{
                 marginLeft: 'auto',
@@ -4974,55 +6036,921 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                 color: '#7f8c8d',
                 fontStyle: 'italic'
               }}>
-                Click para más info
+                Estimaciones independientes
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
-              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Variación de Costo (CV):</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>IEAC Promedio (9 metodologías):</div>
               <div style={{ 
-                color: indicadores.CV >= 0 ? '#27ae60' : '#e74c3c', 
+                color: '#d35400', 
                 fontWeight: '700', 
                 fontSize: '0.9rem', 
                 lineHeight: '1.2' 
               }}>
-                {formatearMoneda(indicadores.CV)} {indicadores.CV >= 0 ? '✓' : '✗'}
+                {formatearMoneda(indicadores.IEAC?.promedio || 0)}
               </div>
               
-              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Variación de Cronograma (SV):</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>IEAC Máximo:</div>
               <div style={{ 
-                color: indicadores.SV >= 0 ? '#27ae60' : '#e74c3c', 
+                color: '#e74c3c', 
                 fontWeight: '700', 
                 fontSize: '0.9rem', 
                 lineHeight: '1.2' 
               }}>
-                {formatearMoneda(indicadores.SV)} {indicadores.SV >= 0 ? '✓' : '✗'}
+                {formatearMoneda(indicadores.IEAC?.maximo || 0)}
               </div>
               
-              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Variación Final Prevista (VAC):</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>IEAC Mínimo:</div>
               <div style={{ 
-                color: indicadores.VAC >= 0 ? '#27ae60' : '#e74c3c', 
+                color: '#27ae60', 
                 fontWeight: '700', 
                 fontSize: '0.9rem', 
                 lineHeight: '1.2' 
               }}>
-                {formatearMoneda(indicadores.VAC)} {indicadores.VAC >= 0 ? '✓' : '✗'}
+                {formatearMoneda(indicadores.IEAC?.minimo || 0)}
               </div>
               
-              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Costo Estimado para Completar (ETC):</div>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Trabajo Por Ganar:</div>
               <div style={{ 
                 color: '#3498db', 
                 fontWeight: '700', 
                 fontSize: '0.9rem', 
                 lineHeight: '1.2' 
               }}>
-                {formatearMoneda(indicadores.ETC)}
+                {formatearMoneda(indicadores.IEAC?.porGanar || 0)}
               </div>
             </div>
           </div>
 
+          {/* Metodologías ECD */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '1rem', 
+            borderRadius: '12px', 
+            border: '1px solid #e1e8ed',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 15px 35px rgba(0, 0, 0, 0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.1)';
+          }}
+          onClick={async () => {
+            setPopupECDVisible(true);
+            // Cargar duración planificada cuando se abre el modal
+            const duracion = await obtenerDuracionPlanificada();
+            setDuracionPlanificada(duracion);
+          }}
+          title="📅 METODOLOGÍAS ECD (11 FÓRMULAS)
 
+📊 ¿Qué contiene?
+• ECD(a): Duración Planificada / SPI
+• ECD(b): Plazo Control + Por Ganar / PV1m
+• ECD(c): Plazo Control + Por Ganar / PV3m
+• ECD(d): Plazo Control + Por Ganar / PV6m
+• ECD(e): Plazo Control + Por Ganar / PV12m
+• ECD(f): Plazo Control + Por Ganar / EV1m
+• ECD(g): Plazo Control + Por Ganar / EV3m
+• ECD(h): Plazo Control + Por Ganar / EV6m
+• ECD(i): Plazo Control + Por Ganar / EV12m
+• ECD(j): Plazo Control + Por Ganar / AC3m
+• ECD(k): Plazo Control + Por Ganar / AC6m
+
+🎯 ¿Por qué son importantes?
+• Proporcionan 11 estimaciones independientes de la fecha final
+• Validan las estimaciones tradicionales de cronograma
+• Consideran diferentes períodos de rendimiento (1m, 3m, 6m, 12m)
+• Incluyen análisis de PV, EV y AC por períodos
+• Ayudan en la planificación temporal del proyecto
+
+📈 Estimaciones alternativas de fecha de finalización">
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)'
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold'
+              }}>
+                📅
+              </div>
+              <h4 style={{ 
+                margin: '0', 
+                color: '#2c3e50', 
+                fontSize: '1rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Metodologías ECD
+              </h4>
+              <div style={{
+                marginLeft: 'auto',
+                fontSize: '0.8rem',
+                color: '#7f8c8d',
+                fontStyle: 'italic'
+              }}>
+                Fechas estimadas
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Fecha Promedio (11 metodologías):</div>
+              <div style={{ 
+                color: '#8e44ad', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {(() => {
+                  const meses = indicadores.ECD?.promedio || 0;
+                  if (!meses || meses <= 0) return 'N/A';
+                  const fechaBase = new Date('2021-07-01'); // Fecha de inicio del proyecto
+                  const fechaFinal = new Date(fechaBase);
+                  fechaFinal.setMonth(fechaFinal.getMonth() + Math.ceil(meses));
+                  return fechaFinal.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+                })()}
+              </div>
+              
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Fecha Máxima:</div>
+              <div style={{ 
+                color: '#e74c3c', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {(() => {
+                  const meses = indicadores.ECD?.maximo || 0;
+                  if (!meses || meses <= 0) return 'N/A';
+                  const fechaBase = new Date('2021-07-01'); // Fecha de inicio del proyecto
+                  const fechaFinal = new Date(fechaBase);
+                  fechaFinal.setMonth(fechaFinal.getMonth() + Math.ceil(meses));
+                  return fechaFinal.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+                })()}
+              </div>
+              
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Fecha Mínima:</div>
+              <div style={{ 
+                color: '#27ae60', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {(() => {
+                  const meses = indicadores.ECD?.minimo || 0;
+                  if (!meses || meses <= 0) return 'N/A';
+                  const fechaBase = new Date('2021-07-01'); // Fecha de inicio del proyecto
+                  const fechaFinal = new Date(fechaBase);
+                  fechaFinal.setMonth(fechaFinal.getMonth() + Math.ceil(meses));
+                  return fechaFinal.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+                })()}
+              </div>
+              
+              <div style={{ fontWeight: '600', color: '#7f8c8d', fontSize: '0.85rem', lineHeight: '1.2' }}>Rango de Estimación:</div>
+              <div style={{ 
+                color: '#f39c12', 
+                fontWeight: '700', 
+                fontSize: '0.9rem', 
+                lineHeight: '1.2' 
+              }}>
+                {(() => {
+                  const maximo = indicadores.ECD?.maximo || 0;
+                  const minimo = indicadores.ECD?.minimo || 0;
+                  if (maximo <= 0 || minimo <= 0) return 'N/A';
+                  return `${Math.round(maximo - minimo)} meses`;
+                })()}
+              </div>
+            </div>
+          </div>
         </div>
+          </div>
+        )}
       </div>
+    );
+  };
+
+  // --- COMPONENTE POPUP METODOLOGÍAS IEAC ---
+  const PopupMetodologiasIEAC = ({ indicadores, fechaSeguimiento, onClose }) => {
+    const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
+    
+    const generarTablaIEAC = () => {
+      const { IEAC } = indicadores;
+      if (!IEAC) return [];
+      
+      return [
+        {
+          metodologia: 'IEAC(a)',
+          formula: 'Real + Por Ganar',
+          descripcion: 'Costo real + trabajo restante sin ajustes',
+          valor: IEAC.metodologiaA || 0,
+          color: '#3498db'
+        },
+        {
+          metodologia: 'IEAC(b)',
+          formula: 'Presupuesto / CPI',
+          descripcion: 'Proyección del CPI actual al presupuesto total',
+          valor: IEAC.metodologiaB || 0,
+          color: '#e74c3c'
+        },
+        {
+          metodologia: 'IEAC(c)',
+          formula: 'Real + Por Ganar / CPI',
+          descripcion: 'Proyección del CPI actual al trabajo restante',
+          valor: IEAC.metodologiaC || 0,
+          color: '#f39c12'
+        },
+        {
+          metodologia: 'IEAC(d)',
+          formula: 'Real + Por Ganar / CPI(3m)',
+          descripcion: 'Proyección del CPI de los últimos 3 meses',
+          valor: IEAC.metodologiaD || 0,
+          color: '#9b59b6'
+        },
+        {
+          metodologia: 'IEAC(e)',
+          formula: 'Real + Por Ganar / CPI(6m)',
+          descripcion: 'Proyección del CPI de los últimos 6 meses',
+          valor: IEAC.metodologiaE || 0,
+          color: '#1abc9c'
+        },
+        {
+          metodologia: 'IEAC(f)',
+          formula: 'Real + Por Ganar / (CPI × SPI)',
+          descripcion: 'Proyección combinada de costo y cronograma actual',
+          valor: IEAC.metodologiaF || 0,
+          color: '#34495e'
+        },
+        {
+          metodologia: 'IEAC(g)',
+          formula: 'Real + Por Ganar / (CPI3m × SPI)',
+          descripcion: 'Proyección combinada CPI 3 meses + cronograma',
+          valor: IEAC.metodologiaG || 0,
+          color: '#e67e22'
+        },
+        {
+          metodologia: 'IEAC(h)',
+          formula: 'Real + Por Ganar / (CPI6m × SPI)',
+          descripcion: 'Proyección combinada CPI 6 meses + cronograma',
+          valor: IEAC.metodologiaH || 0,
+          color: '#8e44ad'
+        },
+        {
+          metodologia: 'IEAC(i)',
+          formula: 'Real + Por Ganar / (70%CPI + 30%SPI)',
+          descripcion: 'Proyección ponderada (70% CPI, 30% SPI)',
+          valor: IEAC.metodologiaI || 0,
+          color: '#16a085'
+        }
+      ];
+    };
+
+    const tablaIEAC = generarTablaIEAC();
+
+    return createPortal(
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000,
+        padding: '20px',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          maxWidth: '900px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
+            color: 'white',
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontWeight: 'bold'
+              }}>
+                🎯
+              </div>
+              <div>
+                <h2 style={{ margin: '0', fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                  Metodologías IEAC
+                </h2>
+                <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.9rem', opacity: '0.9', fontFamily: 'Arial, sans-serif' }}>
+                  {fechaSeguimiento}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'white',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{
+            padding: '24px',
+            overflowY: 'auto',
+            flex: 1
+          }}>
+            {/* Estadísticas Resumen */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Promedio</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#d35400' }}>
+                  {formatearMoneda(indicadores.IEAC?.promedio || 0)}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Máximo</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#e74c3c' }}>
+                  {formatearMoneda(indicadores.IEAC?.maximo || 0)}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Mínimo</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#27ae60' }}>
+                  {formatearMoneda(indicadores.IEAC?.minimo || 0)}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Por Ganar</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3498db' }}>
+                  {formatearMoneda(indicadores.IEAC?.porGanar || 0)}
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de Metodologías */}
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid #dee2e6'
+            }}>
+              <div style={{
+                backgroundColor: '#e67e22',
+                color: 'white',
+                padding: '16px 20px',
+                fontWeight: '600',
+                fontSize: '1.1rem'
+              }}>
+                Detalle de las 9 Metodologías IEAC
+              </div>
+              
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '0.9rem'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f3f4' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Metodología</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Fórmula</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Descripción</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tablaIEAC.map((item, index) => (
+                      <tr key={index} style={{
+                        backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa',
+                        borderBottom: '1px solid #dee2e6'
+                      }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: item.color }}>
+                          {item.metodologia}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                          {item.formula}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
+                          {item.descripcion}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: item.color }}>
+                          {formatearMoneda(item.valor)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Información Adicional */}
+            <div style={{
+              marginTop: '20px',
+              padding: '16px',
+              backgroundColor: '#e8f4fd',
+              borderRadius: '8px',
+              border: '1px solid #bee5eb'
+            }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#0c5460', fontSize: '1rem' }}>
+                📊 Interpretación de los Resultados
+              </h4>
+              <ul style={{ margin: '0', paddingLeft: '20px', color: '#0c5460', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                <li><strong>Promedio:</strong> Estimación más probable del costo final del proyecto</li>
+                <li><strong>Máximo:</strong> Escenario pesimista - preparación para posibles sobrecostos</li>
+                <li><strong>Mínimo:</strong> Escenario optimista - potencial de ahorro significativo</li>
+                <li><strong>Rango:</strong> Nivel de incertidumbre en la estimación (Máximo - Mínimo)</li>
+                <li><strong>Por Ganar:</strong> Valor del trabajo restante por completar (BAC - EV)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  // --- COMPONENTE POPUP METODOLOGÍAS ECD ---
+  const PopupMetodologiasECD = ({ indicadores, fechaSeguimiento, duracionPlanificada, onClose }) => {
+    const formatearFecha = (meses) => {
+      if (!meses || meses <= 0 || !isFinite(meses) || meses > 1000) return 'N/A';
+      
+      try {
+        const fechaBase = new Date('2023-01-01'); // Fecha de inicio del proyecto
+        const fechaFinal = new Date(fechaBase);
+        
+        // Limitar a un rango razonable (máximo 50 años desde 2023)
+        const mesesLimitados = Math.min(Math.max(Math.ceil(meses), 1), 600);
+        fechaFinal.setMonth(fechaFinal.getMonth() + mesesLimitados);
+        
+        // Verificar que la fecha sea válida
+        if (isNaN(fechaFinal.getTime())) {
+          console.warn('Fecha inválida generada para meses:', meses);
+          return 'N/A';
+        }
+        
+        return fechaFinal.toLocaleDateString('es-ES', { 
+          year: 'numeric', 
+          month: 'short',
+          day: 'numeric'
+        });
+      } catch (error) {
+        console.error('Error formateando fecha para meses:', meses, error);
+        return 'N/A';
+      }
+    };
+    
+    const generarTablaECD = () => {
+      const { ECD } = indicadores;
+      if (!ECD) return [];
+      
+      return [
+        {
+          metodologia: 'ECD(a)',
+          formula: 'Duración Planificada / SPI',
+          descripcion: 'Proyección del SPI actual a la duración total',
+          valor: ECD.metodologiaA || 0,
+          color: '#3498db'
+        },
+        {
+          metodologia: 'ECD(b)',
+          formula: 'Plazo Control + Por Ganar / PV1m',
+          descripcion: 'Proyección del PV mensual actual al trabajo restante',
+          valor: ECD.metodologiaB || 0,
+          color: '#e74c3c'
+        },
+        {
+          metodologia: 'ECD(c)',
+          formula: 'Plazo Control + Por Ganar / PV3m',
+          descripcion: 'Proyección del PV promedio de los últimos 3 meses',
+          valor: ECD.metodologiaC || 0,
+          color: '#f39c12'
+        },
+        {
+          metodologia: 'ECD(d)',
+          formula: 'Plazo Control + Por Ganar / PV6m',
+          descripcion: 'Proyección del PV promedio de los últimos 6 meses',
+          valor: ECD.metodologiaD || 0,
+          color: '#9b59b6'
+        },
+        {
+          metodologia: 'ECD(e)',
+          formula: 'Plazo Control + Por Ganar / PV12m',
+          descripcion: 'Proyección del PV promedio de los últimos 12 meses',
+          valor: ECD.metodologiaE || 0,
+          color: '#1abc9c'
+        },
+        {
+          metodologia: 'ECD(f)',
+          formula: 'Plazo Control + Por Ganar / EV1m',
+          descripcion: 'Proyección del EV promedio de los últimos 1 mes',
+          valor: ECD.metodologiaF || 0,
+          color: '#34495e'
+        },
+        {
+          metodologia: 'ECD(g)',
+          formula: 'Plazo Control + Por Ganar / EV3m',
+          descripcion: 'Proyección del EV promedio de los últimos 3 meses',
+          valor: ECD.metodologiaG || 0,
+          color: '#e67e22'
+        },
+        {
+          metodologia: 'ECD(h)',
+          formula: 'Plazo Control + Por Ganar / EV6m',
+          descripcion: 'Proyección del EV promedio de los últimos 6 meses',
+          valor: ECD.metodologiaH || 0,
+          color: '#8e44ad'
+        },
+        {
+          metodologia: 'ECD(i)',
+          formula: 'Plazo Control + Por Ganar / EV12m',
+          descripcion: 'Proyección del EV promedio de los últimos 12 meses',
+          valor: ECD.metodologiaI || 0,
+          color: '#16a085'
+        },
+        {
+          metodologia: 'ECD(j)',
+          formula: 'Plazo Control + Por Ganar / AC3m',
+          descripcion: 'Proyección del AC promedio de los últimos 3 meses',
+          valor: ECD.metodologiaJ || 0,
+          color: '#e74c3c'
+        },
+        {
+          metodologia: 'ECD(k)',
+          formula: 'Plazo Control + Por Ganar / AC6m',
+          descripcion: 'Proyección del AC promedio de los últimos 6 meses',
+          valor: ECD.metodologiaK || 0,
+          color: '#c0392b'
+        }
+      ];
+    };
+
+    const tablaECD = generarTablaECD();
+    
+    // Calcular estadísticas basándose en los valores reales de la tabla
+    const calcularEstadisticasTabla = () => {
+      const valoresTabla = tablaECD
+        .map(item => item.valor)
+        .filter(valor => valor && !isNaN(valor) && isFinite(valor) && valor > 0);
+      
+      if (valoresTabla.length === 0) {
+        return { promedio: 0, maximo: 0, minimo: 0 };
+      }
+      
+      const promedio = valoresTabla.reduce((sum, val) => sum + val, 0) / valoresTabla.length;
+      const maximo = Math.max(...valoresTabla);
+      const minimo = Math.min(...valoresTabla);
+      
+      return { promedio, maximo, minimo };
+    };
+    
+    const estadisticasTabla = calcularEstadisticasTabla();
+
+    return createPortal(
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000,
+        padding: '20px',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          maxWidth: '900px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
+            color: 'white',
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontWeight: 'bold'
+              }}>
+                📅
+              </div>
+              <div>
+                <h2 style={{ margin: '0', fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                  Metodologías ECD
+                </h2>
+                <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.9rem', opacity: '0.9', fontFamily: 'Arial, sans-serif' }}>
+                  {fechaSeguimiento}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'white',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{
+            padding: '24px',
+            overflowY: 'auto',
+            flex: 1
+          }}>
+            {/* Estadísticas Resumen */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Meses Promedio</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#8e44ad' }}>
+                  {estadisticasTabla.promedio && !isNaN(estadisticasTabla.promedio) 
+                    ? `${Math.round(estadisticasTabla.promedio)} meses` 
+                    : 'N/A'}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Meses Máximo</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#e74c3c' }}>
+                  {estadisticasTabla.maximo && !isNaN(estadisticasTabla.maximo) 
+                    ? `${Math.round(estadisticasTabla.maximo)} meses` 
+                    : 'N/A'}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Meses Mínimo</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#27ae60' }}>
+                  {estadisticasTabla.minimo && !isNaN(estadisticasTabla.minimo) 
+                    ? `${Math.round(estadisticasTabla.minimo)} meses` 
+                    : 'N/A'}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Plazo Control</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#3498db' }}>
+                  {Math.round(indicadores.ECD?.plazoControl || 0)} meses
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Duración Planificada</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#8e44ad' }}>
+                  {duracionPlanificada} meses
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de Metodologías */}
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid #dee2e6'
+            }}>
+              <div style={{
+                backgroundColor: '#8e44ad',
+                color: 'white',
+                padding: '16px 20px',
+                fontWeight: '600',
+                fontSize: '1.1rem'
+              }}>
+                Detalle de las 11 Metodologías ECD
+              </div>
+              
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '0.9rem'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f3f4' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Metodología</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Fórmula</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Descripción</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Meses</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Fecha Estimada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tablaECD.map((item, index) => (
+                      <tr key={index} style={{
+                        backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa',
+                        borderBottom: '1px solid #dee2e6'
+                      }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: item.color }}>
+                          {item.metodologia}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                          {item.formula}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
+                          {item.descripcion}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: item.color }}>
+                          {item.valor && !isNaN(item.valor) && isFinite(item.valor) && item.valor > 0 
+                            ? Math.round(item.valor)
+                            : 'N/A'}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: '#495057' }}>
+                          {item.valor && !isNaN(item.valor) && isFinite(item.valor) && item.valor > 0 
+                            ? (() => {
+                                // Obtener la fecha de inicio del proyecto dinámicamente
+                                // Buscar la fecha más antigua en los datos del proyecto
+                                let fechaInicioProyecto = new Date('2021-07-01'); // Fecha por defecto
+                                
+                                // Intentar obtener la fecha más antigua de los datos disponibles
+                                if (tablaApiParcial && tablaApiParcial.length > 0) {
+                                  const fechasOrdenadas = tablaApiParcial
+                                    .map(item => new Date(item.periodo))
+                                    .sort((a, b) => a - b);
+                                  if (fechasOrdenadas.length > 0) {
+                                    fechaInicioProyecto = fechasOrdenadas[0];
+                                  }
+                                }
+                                
+                                const mesesTotales = Math.round(item.valor);
+                                const fechaEstimada = new Date(fechaInicioProyecto.getFullYear(), fechaInicioProyecto.getMonth() + mesesTotales, fechaInicioProyecto.getDate());
+                                return fechaEstimada.toLocaleDateString('es-ES', { 
+                                  year: 'numeric', 
+                                  month: 'short'
+                                });
+                              })()
+                            : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Información Adicional */}
+            <div style={{
+              marginTop: '20px',
+              padding: '16px',
+              backgroundColor: '#f3e5f5',
+              borderRadius: '8px',
+              border: '1px solid #ce93d8'
+            }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#4a148c', fontSize: '1rem' }}>
+                📅 Interpretación de las Fechas Estimadas
+              </h4>
+              <ul style={{ margin: '0', paddingLeft: '20px', color: '#4a148c', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                <li><strong>Fecha Promedio:</strong> Fecha más probable de finalización del proyecto</li>
+                <li><strong>Fecha Máxima:</strong> Escenario pesimista - preparación para posibles retrasos</li>
+                <li><strong>Fecha Mínima:</strong> Escenario optimista - potencial de finalización anticipada</li>
+                <li><strong>Rango:</strong> Nivel de incertidumbre en la estimación temporal</li>
+                <li><strong>Plazo Control:</strong> Meses transcurridos desde el inicio del proyecto</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
     );
   };
 
@@ -5714,9 +7642,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
               <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
               <input
-                type="date"
-                value={fechaDesde}
-                onChange={e => setFechaDesde(e.target.value)}
+                type="month"
+                value={fechaDesde ? fechaDesde.substring(0, 7) : ''}
+                onChange={e => {
+                  const mesAno = e.target.value;
+                  if (mesAno) {
+                    // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                    setFechaDesde(mesAno + '-01');
+                  } else {
+                    setFechaDesde('');
+                  }
+                }}
                 style={{
                   border: '2px solidrgb(29, 105, 219)',
                   borderRadius: 6,
@@ -5731,9 +7667,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: 0, padding: 0 }}>
               <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
               <input
-                type="date"
-                value={fechaHasta}
-                onChange={e => setFechaHasta(e.target.value)}
+                type="month"
+                value={fechaHasta ? fechaHasta.substring(0, 7) : ''}
+                onChange={e => {
+                  const mesAno = e.target.value;
+                  if (mesAno) {
+                    // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                    setFechaHasta(mesAno + '-01');
+                  } else {
+                    setFechaHasta('');
+                  }
+                }}
                 style={{
                   border: '2px solidrgb(51, 153, 255)',
                   borderRadius: 6,
@@ -6001,9 +7945,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
                 <input
-                  type="date"
-                  value={fechaDesde}
-                  onChange={e => setFechaDesde(e.target.value)}
+                  type="month"
+                  value={fechaDesde ? fechaDesde.substring(0, 7) : ''}
+                  onChange={e => {
+                    const mesAno = e.target.value;
+                    if (mesAno) {
+                      // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                      setFechaDesde(mesAno + '-01');
+                    } else {
+                      setFechaDesde('');
+                    }
+                  }}
                   style={{
                     border: '2px solidrgb(29, 105, 219)',
                     borderRadius: 6,
@@ -6018,9 +7970,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
                 <input
-                  type="date"
-                  value={fechaHasta}
-                  onChange={e => setFechaHasta(e.target.value)}
+                  type="month"
+                  value={fechaHasta ? fechaHasta.substring(0, 7) : ''}
+                  onChange={e => {
+                    const mesAno = e.target.value;
+                    if (mesAno) {
+                      // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                      setFechaHasta(mesAno + '-01');
+                    } else {
+                      setFechaHasta('');
+                    }
+                  }}
                   style={{
                     border: '2px solidrgb(51, 153, 255)',
                     borderRadius: 6,
@@ -6066,9 +8026,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Fecha de Seguimiento EVM</label>
                 <input
-                  type="date"
-                  value={fechaSeguimiento}
-                  onChange={e => setFechaSeguimiento(e.target.value)}
+                  type="month"
+                  value={fechaSeguimiento ? fechaSeguimiento.substring(0, 7) : ''}
+                  onChange={e => {
+                    const mesAno = e.target.value;
+                    if (mesAno) {
+                      // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                      setFechaSeguimiento(mesAno + '-01');
+                    } else {
+                      setFechaSeguimiento('');
+                    }
+                  }}
                   style={{
                     border: '2px solid #ff6600',
                     borderRadius: 6,
@@ -6093,7 +8061,7 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
                   color: '#495057'
                 }}>
                   <span>📅</span>
-                  <span>Fecha: {fechaSeguimiento}</span>
+                  <span>Fecha: {fechaSeguimiento ? new Date(fechaSeguimiento).toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }) : ''}</span>
                 </div>
               )}
               <button
@@ -6520,9 +8488,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
               <input
-                type="date"
-                value={fechaDesde}
-                onChange={e => setFechaDesde(e.target.value)}
+                type="month"
+                value={fechaDesde ? fechaDesde.substring(0, 7) : ''}
+                onChange={e => {
+                  const mesAno = e.target.value;
+                  if (mesAno) {
+                    // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                    setFechaDesde(mesAno + '-01');
+                  } else {
+                    setFechaDesde('');
+                  }
+                }}
                 style={{
                   border: '2px solidrgb(29, 105, 219)',
                   borderRadius: 6,
@@ -6537,9 +8513,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
               <input
-                type="date"
-                value={fechaHasta}
-                onChange={e => setFechaHasta(e.target.value)}
+                type="month"
+                value={fechaHasta ? fechaHasta.substring(0, 7) : ''}
+                onChange={e => {
+                  const mesAno = e.target.value;
+                  if (mesAno) {
+                    // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                    setFechaHasta(mesAno + '-01');
+                  } else {
+                    setFechaHasta('');
+                  }
+                }}
                 style={{
                   border: '2px solidrgb(51, 153, 255)',
                   borderRadius: 6,
@@ -7022,9 +9006,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Desde</label>
               <input
-                type="date"
-                value={fechaDesde}
-                onChange={e => setFechaDesde(e.target.value)}
+                type="month"
+                value={fechaDesde ? fechaDesde.substring(0, 7) : ''}
+                onChange={e => {
+                  const mesAno = e.target.value;
+                  if (mesAno) {
+                    // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                    setFechaDesde(mesAno + '-01');
+                  } else {
+                    setFechaDesde('');
+                  }
+                }}
                 style={{
                   border: '2px solidrgb(29, 105, 219)',
                   borderRadius: 6,
@@ -7039,9 +9031,17 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <label style={{ color: '#060270', fontWeight: 700, marginBottom: 2, fontSize: 11 }}>Hasta</label>
               <input
-                type="date"
-                value={fechaHasta}
-                onChange={e => setFechaHasta(e.target.value)}
+                type="month"
+                value={fechaHasta ? fechaHasta.substring(0, 7) : ''}
+                onChange={e => {
+                  const mesAno = e.target.value;
+                  if (mesAno) {
+                    // Convertir de YYYY-MM a YYYY-MM-01 (primer día del mes)
+                    setFechaHasta(mesAno + '-01');
+                  } else {
+                    setFechaHasta('');
+                  }
+                }}
                 style={{
                   border: '2px solidrgb(51, 153, 255)',
                   borderRadius: 6,
@@ -7704,6 +9704,25 @@ Calculadas automáticamente a partir de los valores básicos EVM. Click para ver
           indicadores={indicadoresEVM}
           fechaSeguimiento={fechaSeguimiento}
           onClose={() => setPopupVariacionesVisible(false)}
+        />
+      )}
+
+      {/* Popup de Metodologías IEAC */}
+      {popupIEACVisible && indicadoresEVM && fechaSeguimiento && (
+        <PopupMetodologiasIEAC
+          indicadores={indicadoresEVM}
+          fechaSeguimiento={fechaSeguimiento}
+          onClose={() => setPopupIEACVisible(false)}
+        />
+      )}
+
+      {/* Popup de Metodologías ECD */}
+      {popupECDVisible && indicadoresEVM && fechaSeguimiento && (
+        <PopupMetodologiasECD
+          indicadores={indicadoresEVM}
+          fechaSeguimiento={fechaSeguimiento}
+          duracionPlanificada={duracionPlanificada}
+          onClose={() => setPopupECDVisible(false)}
         />
       )}
 

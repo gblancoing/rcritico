@@ -26,22 +26,51 @@ try {
         throw new Exception('Formato de fecha inválido. Use YYYY-MM-DD');
     }
     
-    // Consulta SQL para obtener avance físico ACUMULADO hasta la fecha
-    $sql = "SELECT cf.vector, cf.porcentaje_periodo as acumulado_periodo 
-            FROM cumplimiento_fisico cf 
-            WHERE cf.periodo = ? 
-            AND cf.vector IN ('REAL', 'API') 
-            ORDER BY cf.vector";
+    // Obtener proyecto_id desde parámetros GET
+    $proyecto_id = isset($_GET['proyecto_id']) ? (int)$_GET['proyecto_id'] : 1;
     
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('s', $fecha);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    // Consulta SQL para obtener avance físico REAL desde av_fisico_real
+    // Nota: api_acum está almacenado como decimal (ej: 0.74) y se convertirá a porcentaje (74%)
+    $sql_real = "SELECT api_acum 
+                 FROM av_fisico_real 
+                 WHERE proyecto_id = ? 
+                 AND periodo = ? 
+                 ORDER BY periodo DESC 
+                 LIMIT 1";
+    
+    $stmt_real = $conn->prepare($sql_real);
+    $stmt_real->bind_param('is', $proyecto_id, $fecha);
+    $stmt_real->execute();
+    $result_real = $stmt_real->get_result();
+    
+    // Consulta SQL para obtener avance físico API desde av_fisico_api
+    // Nota: api_acum está almacenado como decimal (ej: 0.68) y se convertirá a porcentaje (68%)
+    $sql_api = "SELECT api_acum 
+                FROM av_fisico_api 
+                WHERE proyecto_id = ? 
+                AND periodo = ? 
+                ORDER BY periodo DESC 
+                LIMIT 1";
+    
+    $stmt_api = $conn->prepare($sql_api);
+    $stmt_api->bind_param('is', $proyecto_id, $fecha);
+    $stmt_api->execute();
+    $result_api = $stmt_api->get_result();
     
     $avanceFisico = [];
     
-    while ($row = $result->fetch_assoc()) {
-        $avanceFisico[$row['vector']] = floatval($row['acumulado_periodo']);
+    // Obtener valor REAL (convertir de decimal a porcentaje)
+    if ($row_real = $result_real->fetch_assoc()) {
+        $avanceFisico['REAL'] = floatval($row_real['api_acum']) * 100;
+    } else {
+        $avanceFisico['REAL'] = null;
+    }
+    
+    // Obtener valor API (convertir de decimal a porcentaje)
+    if ($row_api = $result_api->fetch_assoc()) {
+        $avanceFisico['API'] = floatval($row_api['api_acum']) * 100;
+    } else {
+        $avanceFisico['API'] = null;
     }
     
     // Preparar respuesta
@@ -64,6 +93,7 @@ try {
     ]);
 }
 
-$stmt->close();
+$stmt_real->close();
+$stmt_api->close();
 $conn->close();
 ?> 
