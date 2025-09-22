@@ -103,6 +103,303 @@ const reportesGestion = [
 const ALTURA_BARRA_SUPERIOR = 56;
 const ANCHO_SIDEBAR = 240;
 
+// --- COMPONENTE POPUP METODOLOGÍAS IEAC ---
+const PopupMetodologiasIEAC = ({ indicadores, fechaSeguimiento, onClose }) => {
+  const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
+  
+  const generarTablaIEAC = () => {
+    const { IEAC } = indicadores;
+    if (!IEAC) return [];
+    
+    return [
+      {
+        metodologia: 'IEAC(a)',
+        formula: 'Real + Por Ganar',
+        descripcion: 'Costo real + trabajo restante sin ajustes',
+        valor: IEAC.metodologiaA || 0,
+        color: '#3498db'
+      },
+      {
+        metodologia: 'IEAC(b)',
+        formula: 'Presupuesto / CPI',
+        descripcion: 'Proyección del CPI actual al presupuesto total',
+        valor: IEAC.metodologiaB || 0,
+        color: '#e74c3c'
+      },
+      {
+        metodologia: 'IEAC(c)',
+        formula: 'Real + Por Ganar / CPI',
+        descripcion: 'Proyección del CPI actual al trabajo restante',
+        valor: IEAC.metodologiaC || 0,
+        color: '#f39c12'
+      },
+      {
+        metodologia: 'IEAC(d)',
+        formula: 'Real + Por Ganar / CPI(3m)',
+        descripcion: 'Proyección del CPI de los últimos 3 meses',
+        valor: IEAC.metodologiaD || 0,
+        color: '#9b59b6'
+      },
+      {
+        metodologia: 'IEAC(e)',
+        formula: 'Real + Por Ganar / CPI(6m)',
+        descripcion: 'Proyección del CPI de los últimos 6 meses',
+        valor: IEAC.metodologiaE || 0,
+        color: '#1abc9c'
+      },
+      {
+        metodologia: 'IEAC(f)',
+        formula: 'Real + Por Ganar / (CPI × SPI)',
+        descripcion: 'Proyección combinada de costo y cronograma actual',
+        valor: IEAC.metodologiaF || 0,
+        color: '#34495e'
+      },
+      {
+        metodologia: 'IEAC(g)',
+        formula: 'Real + Por Ganar / (CPI3m × SPI)',
+        descripcion: 'Proyección combinada CPI 3 meses + cronograma',
+        valor: IEAC.metodologiaG || 0,
+        color: '#e67e22'
+      },
+      {
+        metodologia: 'IEAC(h)',
+        formula: 'Real + Por Ganar / (CPI6m × SPI)',
+        descripcion: 'Proyección combinada CPI 6 meses + cronograma',
+        valor: IEAC.metodologiaH || 0,
+        color: '#8e44ad'
+      },
+      {
+        metodologia: 'IEAC(i)',
+        formula: 'Real + Por Ganar / (70%CPI + 30%SPI)',
+        descripcion: 'Proyección ponderada (70% CPI, 30% SPI)',
+        valor: IEAC.metodologiaI || 0,
+        color: '#16a085'
+      }
+    ];
+  };
+
+  const tablaIEAC = generarTablaIEAC();
+
+  return createPortal(
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        maxWidth: '900px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
+          color: 'white',
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}>
+              🎯
+            </div>
+            <div>
+              <h2 style={{ margin: '0', fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                Metodologías IEAC
+              </h2>
+              <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.9rem', opacity: '0.9', fontFamily: 'Arial, sans-serif' }}>
+                {fechaSeguimiento}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{
+          padding: '24px',
+          overflowY: 'auto',
+          flex: 1
+        }}>
+          {/* Estadísticas Resumen */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Promedio</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#d35400' }}>
+                {formatearMoneda(indicadores.IEAC?.promedio || 0)}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Máximo</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#e74c3c' }}>
+                {formatearMoneda(indicadores.IEAC?.maximo || 0)}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Mínimo</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#27ae60' }}>
+                {formatearMoneda(indicadores.IEAC?.minimo || 0)}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Por Ganar</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3498db' }}>
+                {formatearMoneda(indicadores.IEAC?.porGanar || 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de Metodologías */}
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: '1px solid #dee2e6'
+          }}>
+            <div style={{
+              backgroundColor: '#e67e22',
+              color: 'white',
+              padding: '16px 20px',
+              fontWeight: '600',
+              fontSize: '1.1rem'
+            }}>
+              Detalle de las 9 Metodologías IEAC
+            </div>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f3f4' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Metodología</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Fórmula</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Descripción</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tablaIEAC.map((item, index) => (
+                    <tr key={index} style={{
+                      backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa',
+                      borderBottom: '1px solid #dee2e6'
+                    }}>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', color: item.color }}>
+                        {item.metodologia}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                        {item.formula}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
+                        {item.descripcion}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: item.color }}>
+                        {formatearMoneda(item.valor)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Información Adicional */}
+          <div style={{
+            marginTop: '20px',
+            padding: '16px',
+            backgroundColor: '#e8f4fd',
+            borderRadius: '8px',
+            border: '1px solid #bee5eb'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#0c5460', fontSize: '1rem' }}>
+              📊 Interpretación de los Resultados
+            </h4>
+            <ul style={{ margin: '0', paddingLeft: '20px', color: '#0c5460', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              <li><strong>Promedio:</strong> Estimación más probable del costo final del proyecto</li>
+              <li><strong>Máximo:</strong> Escenario pesimista - preparación para posibles sobrecostos</li>
+              <li><strong>Mínimo:</strong> Escenario optimista - potencial de ahorro significativo</li>
+              <li><strong>Rango:</strong> Nivel de incertidumbre en la estimación (Máximo - Mínimo)</li>
+              <li><strong>Por Ganar:</strong> Valor del trabajo restante por completar (BAC - EV)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 
 const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVisible }) => (
@@ -5883,6 +6180,339 @@ const ReporteLineasBases = ({ proyectoId }) => {
     };
 
   // Función eliminada - cargarIndicadores
+      
+      // Array de APIs de IEAC para calcular el promedio
+      const apisIEAC = [
+        'calcular_ieac_a.php',
+        'calcular_ieac_b.php',
+        'calcular_ieac_c.php',
+        'calcular_ieac_d.php',
+        'calcular_ieac_e.php',
+        'calcular_ieac_f.php',
+        'calcular_ieac_g.php',
+        'calcular_ieac_h.php',
+        'calcular_ieac_i.php'
+      ];
+      
+      // Array de APIs de ECD para calcular el promedio
+      const apisECD = [
+        'calcular_ecd_a.php',
+        'calcular_ecd_b.php',
+        'calcular_ecd_c.php',
+        'calcular_ecd_d.php', 
+        'calcular_ecd_e.php',
+        'calcular_ecd_f.php',
+        'calcular_ecd_g.php',
+        'calcular_ecd_h.php',
+        'calcular_ecd_i.php',
+        'calcular_ecd_j.php',
+        'calcular_ecd_k.php'
+      ];
+      
+      const datosIEAC = {};
+      const datosECD = {};
+      
+      // Calcular cada metodología IEAC
+      for (const api of apisIEAC) {
+        try {
+          const response = await fetch(`${API_BASE}/${api}?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`);
+          const data = await response.json();
+          
+          if (data.success && data[`ieac_${api.split('_')[2].split('.')[0]}`]) {
+            const valor = data[`ieac_${api.split('_')[2].split('.')[0]}`];
+            if (valor && !isNaN(valor) && isFinite(valor) && valor > 0) {
+              const letra = api.split('_')[2].split('.')[0];
+              datosIEAC[`metodologia${letra.toUpperCase()}`] = valor;
+              console.log(`✅ IEAC(${letra}): ${formatearMoneda(valor)}`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error calculando ${api}:`, error);
+        }
+      }
+      
+      // Calcular ECD(a), ECD(c) y ECD(d) desde APIs (igual que vectores.js)
+      try {
+        console.log('🔍 Iniciando cálculo de ECD(a), ECD(c), ECD(d)...');
+        
+        // ECD(a) se calcula localmente (igual que vectores.js)
+        // Necesitamos obtener SPI y duración planificada
+        console.log('🔍 Obteniendo datos IEAC para ECD(a)...');
+        const responseIEAC = await fetch(`${API_BASE}/calcular_ieac_a.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`);
+        const datosIEAC = await responseIEAC.json();
+        console.log('🔍 Respuesta IEAC:', datosIEAC);
+        
+        if (datosIEAC.success) {
+          const { ac, ev, bac } = datosIEAC;
+          console.log('🔍 Datos IEAC obtenidos:', { ac, ev, bac });
+          
+          // Obtener PV para calcular SPI
+          console.log('🔍 Obteniendo PV para calcular SPI...');
+          const responseAPI = await fetch(`${API_BASE}/calcular_ieac_b.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`);
+          const datosAPI = await responseAPI.json();
+          console.log('🔍 Respuesta API PV:', datosAPI);
+          
+          if (datosAPI.success && datosAPI.pv) {
+            const PV = datosAPI.pv;
+            const SPI = PV !== 0 ? ev / PV : 0;
+            
+            // Obtener duración planificada
+            console.log('🔍 Obteniendo duración planificada...');
+            const responseDuracion = await fetch(`${API_BASE}/av_fisico_api.php?proyecto_id=${proyectoId}`);
+            const datosDuracion = await responseDuracion.json();
+            console.log('🔍 Respuesta duración:', datosDuracion);
+            
+            if (datosDuracion.success && datosDuracion.data && datosDuracion.data.length > 0) {
+              const periodosUnicos = [...new Set(
+                datosDuracion.data
+                  .filter(dato => dato.periodo)
+                  .map(dato => dato.periodo.substring(0, 7)) // YYYY-MM
+              )];
+              
+              const duracionPlanificadaDinamica = periodosUnicos.length;
+              console.log('🔍 Duración planificada calculada:', duracionPlanificadaDinamica);
+              
+              // ECD(a): Duración Planificada / SPI (igual que vectores.js)
+              if (SPI > 0) {
+                const ecdA = duracionPlanificadaDinamica / Math.max(SPI, 0.01);
+                datosECD.metodologiaA = ecdA;
+                console.log(`✅ ECD(a) calculado localmente: ${ecdA.toFixed(2)} meses (${duracionPlanificadaDinamica} / ${SPI.toFixed(3)})`);
+              } else {
+                console.warn('⚠️ SPI es 0 o negativo, no se puede calcular ECD(a)');
+              }
+            } else {
+              console.warn('⚠️ No se obtuvieron datos de duración planificada');
+            }
+          }
+        }
+        
+        // ECD(c) y ECD(d) se calculan localmente (igual que vectores.js)
+        // Obtener datos históricos para calcular PV3m y PV6m
+        console.log('🔍 Obteniendo datos históricos para ECD(c) y ECD(d)...');
+        const responseHistorico = await fetch(`${API_BASE}/gestion_proyecto/consultas/lineas_bases.php?proyecto_id=${proyectoId}&fecha_desde=2023-01&fecha_hasta=${fechaCorte}`);
+        const datosHistorico = await responseHistorico.json();
+        console.log('🔍 Respuesta datos históricos:', datosHistorico);
+        
+        if (datosHistorico.success && datosHistorico.datos) {
+          const datos = datosHistorico.datos;
+          const porGanarDinamico = bac - ev; // Por Ganar dinámico (BAC - EV)
+          
+          // Calcular plazo control dinámico (períodos transcurridos hasta fecha de corte)
+          const periodosUnicos = [...new Set(datos
+            .filter(dato => dato.periodo && dato.periodo <= fechaCorte)
+            .map(dato => dato.periodo))].sort((a, b) => new Date(a) - new Date(b));
+          
+          const plazoControlDinamico = periodosUnicos.length;
+          
+          // ECD(c): Plazo Control + Por Ganar / PV3m (igual que vectores.js)
+          let ecdC = plazoControlDinamico; // Valor por defecto
+          
+          // PV3m: Promedio de PV de los últimos 3 meses según fecha de filtro (dinámico)
+          let PV3mDinamico = 0;
+          if (datos && datos.length > 0) {
+            const periodosRecientes = periodosUnicos.slice(-3); // Últimos 3 períodos
+            
+            const sumaPV = periodosRecientes.reduce((sum, periodo) => {
+              const datosPeriodo = datos.filter(dato => dato.periodo === periodo);
+              const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.PV || 0), 0);
+              return sum + sumaPeriodo;
+            }, 0);
+            
+            PV3mDinamico = Math.max(sumaPV / 3, 1);
+          }
+          
+          if (porGanarDinamico > 0 && PV3mDinamico > 0) {
+            ecdC = plazoControlDinamico + (porGanarDinamico / PV3mDinamico);
+            
+            // Validación: si el resultado es extremo, usar valor por defecto
+            if (ecdC > 1000 || !isFinite(ecdC)) {
+              console.warn('ECD(c) resultado extremo:', ecdC, '- usando valor por defecto');
+              ecdC = plazoControlDinamico + 6; // 6 meses adicionales
+            }
+          }
+          
+          datosECD.metodologiaC = ecdC;
+          console.log(`✅ ECD(c) calculado localmente: ${ecdC.toFixed(2)} meses (${plazoControlDinamico} + ${porGanarDinamico} / ${PV3mDinamico.toFixed(2)})`);
+          
+          // ECD(d): Plazo Control + Por Ganar / PV6m (igual que vectores.js)
+          let ecdD = plazoControlDinamico; // Valor por defecto
+          
+          // PV6m: Promedio de PV de los últimos 6 meses según fecha de filtro (dinámico)
+          let PV6mDinamico = 0;
+          if (datos && datos.length > 0) {
+            const periodosRecientes = periodosUnicos.slice(-6); // Últimos 6 períodos
+            
+            const sumaPV = periodosRecientes.reduce((sum, periodo) => {
+              const datosPeriodo = datos.filter(dato => dato.periodo === periodo);
+              const sumaPeriodo = datosPeriodo.reduce((acc, dato) => acc + (dato.PV || 0), 0);
+              return sum + sumaPeriodo;
+            }, 0);
+            
+            PV6mDinamico = Math.max(sumaPV / 6, 1);
+          }
+          
+          if (porGanarDinamico > 0 && PV6mDinamico > 0) {
+            ecdD = plazoControlDinamico + (porGanarDinamico / PV6mDinamico);
+            
+            // Validación: si el resultado es extremo, usar valor por defecto
+            if (ecdD > 1000 || !isFinite(ecdD)) {
+              console.warn('ECD(d) resultado extremo:', ecdD, '- usando valor por defecto');
+              ecdD = plazoControlDinamico + 6; // 6 meses adicionales
+            }
+          }
+          
+          datosECD.metodologiaD = ecdD;
+          console.log(`✅ ECD(d) calculado localmente: ${ecdD.toFixed(2)} meses (${plazoControlDinamico} + ${porGanarDinamico} / ${PV6mDinamico.toFixed(2)})`);
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(a), ECD(c), ECD(d) localmente:', error);
+        console.error('❌ Stack trace:', error.stack);
+      }
+
+      // Calcular cada metodología ECD (b, e-k) desde APIs
+      // ECD(a), ECD(c) y ECD(d) ya se calcularon localmente arriba
+      for (const api of apisECD) {
+        try {
+          const letra = api.split('_')[2].split('.')[0];
+          
+          // Omitir ECD(a), ECD(c) y ECD(d) que ya se calcularon localmente
+          if (letra !== 'a' && letra !== 'c' && letra !== 'd') {
+            const response = await fetch(`${API_BASE}/${api}?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`);
+            const data = await response.json();
+            
+            if (data.success && data[`ecd_${letra}`]) {
+              const valor = data[`ecd_${letra}`];
+              if (valor && !isNaN(valor) && isFinite(valor) && valor > 0) {
+                datosECD[`metodologia${letra.toUpperCase()}`] = valor;
+                console.log(`✅ ECD(${letra}): ${valor} meses`);
+              }
+            }
+          } else {
+            console.log(`⏭️ ECD(${letra}) ya calculado localmente, omitiendo API`);
+          }
+        } catch (error) {
+          console.error(`❌ Error calculando ${api}:`, error);
+        }
+      }
+      
+      // Obtener Por Ganar desde la API calcular_ieac_a.php (EXACTAMENTE igual que vectores.js)
+      let porGanar = 0;
+      
+      console.log('🚀 INICIANDO CÁLCULO DE POR GANAR DESDE API calcular_ieac_a.php');
+      console.log('🔍 Parámetros:', { proyectoId, fechaCorte, API_BASE });
+      
+      try {
+        // Obtener Por Ganar desde calcular_ieac_a.php (EXACTAMENTE igual que vectores.js)
+        console.log('🔍 Obteniendo Por Ganar desde calcular_ieac_a.php...');
+        const urlPorGanar = `${API_BASE}/calcular_ieac_a.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`;
+        console.log('🔍 URL Por Ganar:', urlPorGanar);
+        
+        const responsePorGanar = await fetch(urlPorGanar);
+        console.log('🔍 Response Por Ganar status:', responsePorGanar.status);
+        
+        const datosPorGanar = await responsePorGanar.json();
+        console.log('🔍 Respuesta calcular_ieac_a.php completa:', datosPorGanar);
+        console.log('🔍 datosPorGanar.success:', datosPorGanar.success);
+        console.log('🔍 datosPorGanar.debug existe:', !!datosPorGanar.debug);
+        
+        if (datosPorGanar.success && datosPorGanar.debug) {
+          // Obtener Por Ganar del debug de la API
+          porGanar = parseFloat(datosPorGanar.debug.por_ganar) || 0;
+          console.log('✅ Por Ganar obtenido desde calcular_ieac_a.php:', porGanar, 'en millones:', (porGanar / 1000000).toFixed(2) + 'M');
+          console.log('🔍 Debug completo:', datosPorGanar.debug);
+        } else {
+          console.error('❌ Error en datos Por Ganar:', { success: datosPorGanar.success, debug: datosPorGanar.debug });
+        }
+        
+      } catch (error) {
+        console.error('❌ Error obteniendo Por Ganar:', error);
+        console.error('❌ Stack trace:', error.stack);
+      }
+      
+      // Calcular estadísticas IEAC
+      const valoresIEAC = Object.values(datosIEAC).filter(v => v > 0);
+      if (valoresIEAC.length > 0) {
+        const promedioIEAC = valoresIEAC.reduce((sum, val) => sum + val, 0) / valoresIEAC.length;
+        const maximoIEAC = Math.max(...valoresIEAC);
+        const minimoIEAC = Math.min(...valoresIEAC);
+        
+        // Calcular Por Ganar correctamente: BAC - EV (igual que vectores.js)
+        const porGanar = BAC - EV;
+        
+        setIndicadoresIEAC({
+          IEAC: {
+            ...datosIEAC,
+            promedio: promedioIEAC,
+            maximo: maximoIEAC,
+            minimo: minimoIEAC,
+            porGanar: porGanar
+          }
+        });
+        
+        console.log('✅ INDICADORES IEAC ESTABLECIDOS:', {
+          promedio: formatearMoneda(promedioIEAC),
+          maximo: formatearMoneda(maximoIEAC),
+          minimo: formatearMoneda(minimoIEAC),
+          porGanar: formatearMoneda(porGanar),
+          valores: valoresIEAC.length
+        });
+        
+        console.log('📊 Indicadores IEAC calculados:', {
+          promedio: formatearMoneda(promedioIEAC),
+          maximo: formatearMoneda(maximoIEAC),
+          minimo: formatearMoneda(minimoIEAC),
+          porGanar: formatearMoneda(porGanar),
+          BAC: formatearMoneda(BAC),
+          EV: formatearMoneda(EV),
+          valores: valoresIEAC.length
+        });
+      }
+      
+      // Debug: Verificar valores calculados antes de asignar al estado
+      console.log('🔍 Valores ECD calculados antes de asignar al estado:', {
+        metodologiaA: datosECD.metodologiaA,
+        metodologiaB: datosECD.metodologiaB,
+        metodologiaC: datosECD.metodologiaC,
+        metodologiaD: datosECD.metodologiaD,
+        todosLosValores: datosECD
+      });
+      
+      // Calcular estadísticas ECD
+      const valoresECD = Object.values(datosECD).filter(v => v > 0);
+      if (valoresECD.length > 0) {
+        const promedioECD = valoresECD.reduce((sum, val) => sum + val, 0) / valoresECD.length;
+        const maximoECD = Math.max(...valoresECD);
+        const minimoECD = Math.min(...valoresECD);
+        
+        const estadoECD = {
+          ECD: {
+            ...datosECD,
+            promedio: promedioECD,
+            maximo: maximoECD,
+            minimo: minimoECD,
+            rango: maximoECD - minimoECD,
+            plazoControl: 44 // Valor por defecto, se puede calcular dinámicamente
+          }
+        };
+        
+        console.log('🔍 Estado ECD que se va a asignar:', estadoECD);
+        setIndicadoresECD(estadoECD);
+        
+        console.log('📊 Indicadores ECD calculados:', {
+          promedio: promedioECD.toFixed(1) + ' meses',
+          maximo: maximoECD.toFixed(1) + ' meses',
+          minimo: minimoECD.toFixed(1) + ' meses',
+          valores: valoresECD.length
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cargando indicadores:', error);
+    } finally {
+      console.log('🏁 FINALIZANDO cargarIndicadores');
+      setCargandoIndicadores(false);
+    }
+  };
 
   // Función para calcular parámetros beta basados en el tipo de proyecto
   const calcularParametrosBeta = (tipo = 'construccion') => {
@@ -6040,6 +6670,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFisicoProyectado(); // Cargar datos de av_fisico_proyectado
       cargarAvFinancieroIncurrido(); // Cargar datos de av_financiero_incurrido
       cargarIEACAvg(); // Cargar datos de IEAC (avg)
+      cargarIndicadores(); // Cargar indicadores IEAC y ECD
     }
   }, [proyectoId]);
 
@@ -6053,6 +6684,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFisicoProyectado();
       cargarAvFinancieroIncurrido();
       cargarIEACAvg();
+      cargarIndicadores(); // Recargar indicadores cuando cambie la fecha de corte
     }
   }, [fechaDesde, fechaHasta, fechaCorte]);
 
@@ -6877,6 +7509,14 @@ const ReporteLineasBases = ({ proyectoId }) => {
           </table>
       </div>
 
+      {/* Modal IEAC */}
+      {mostrarModalIEAC && indicadoresIEAC && (
+        <PopupMetodologiasIEAC 
+          indicadores={indicadoresIEAC} 
+          fechaSeguimiento={fechaCorte} 
+          onClose={() => setMostrarModalIEAC(false)} 
+        />
+      )}
 
     </div>
   );

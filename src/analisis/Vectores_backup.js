@@ -5122,6 +5122,26 @@ const Vectores = ({ proyectoId }) => {
             label={{ value: `BAC: $${(indicadores?.BAC / 1000000).toFixed(0)}M`, position: "right" }}
           />
 
+          {/* Líneas IEAC Max y Min */}
+          {indicadores?.maximo && (
+            <ReferenceLine 
+              y={indicadores.maximo} 
+              stroke="#8B4513" 
+              strokeDasharray="3 3"
+              strokeWidth={2}
+              label={{ value: `IEAC Max: $${(indicadores.maximo / 1000000).toFixed(0)}M`, position: "right" }}
+            />
+          )}
+          {indicadores?.minimo && (
+            <ReferenceLine 
+              y={indicadores.minimo} 
+              stroke="#8B4513" 
+              strokeDasharray="3 3"
+              strokeWidth={2}
+              label={{ value: `IEAC Min: $${(indicadores.minimo / 1000000).toFixed(0)}M`, position: "right" }}
+            />
+          )}
+
           {/* Línea EAC proyectada */}
           {indicadores && (
             <Line 
@@ -5185,6 +5205,52 @@ const Vectores = ({ proyectoId }) => {
                   }}
               />
             </>
+          )}
+
+          {/* Líneas verticales ECD */}
+          {indicadores?.ecdMinimo && (
+            <ReferenceLine 
+              x={indicadores.ecdMinimo} 
+              stroke="#8B4513"
+              strokeDasharray="4 4"
+              strokeWidth={2}
+              label={{ 
+                value: `ECD Mín: ${indicadores.ecdMinimo}`, 
+                position: "top",
+                fill: '#8B4513',
+                fontSize: 11,
+                fontWeight: 'bold'
+              }}
+            />
+          )}
+          {indicadores?.duracionPlanificada && (
+            <ReferenceLine 
+              x={indicadores.duracionPlanificada} 
+              stroke="#8B4513"
+              strokeDasharray="4 4"
+              strokeWidth={2}
+              label={{ 
+                value: `Duración Plan: ${indicadores.duracionPlanificada}`, 
+                position: "top",
+                fill: '#8B4513',
+                fontSize: 11,
+                fontWeight: 'bold'
+              }}
+            />
+          )}
+
+          {/* Área sombreada IEAC y ECD */}
+          {indicadores?.maximo && indicadores?.minimo && indicadores?.ecdMinimo && indicadores?.duracionPlanificada && (
+            <ReferenceArea 
+              x1={indicadores.ecdMinimo}
+              x2={indicadores.duracionPlanificada}
+              y1={indicadores.minimo}
+              y2={indicadores.maximo}
+              stroke="#8B4513"
+              strokeOpacity={0.3}
+              fill="#8B4513"
+              fillOpacity={0.1}
+            />
           )}
         </LineChart>
       </ResponsiveContainer>
