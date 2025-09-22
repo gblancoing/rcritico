@@ -103,6 +103,238 @@ const reportesGestion = [
 const ALTURA_BARRA_SUPERIOR = 56;
 const ANCHO_SIDEBAR = 240;
 
+// --- COMPONENTE MODAL METODOLOGÍAS IEAC ---
+const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 }) => {
+  // Función para formatear moneda
+  const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
+  
+  // Calcular estadísticas
+  const valores = datosIEAC.map(item => item.valor).filter(v => v > 0);
+  const promedio = valores.length > 0 ? valores.reduce((sum, val) => sum + val, 0) / valores.length : 0;
+  const maximo = valores.length > 0 ? Math.max(...valores) : 0;
+  const minimo = valores.length > 0 ? Math.min(...valores) : 0;
+  const rango = maximo - minimo;
+  
+  return createPortal(
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        maxWidth: '900px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
+          color: 'white',
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}>
+              🎯
+            </div>
+            <div>
+              <h2 style={{ margin: '0', fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                Metodologías IEAC
+              </h2>
+              <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.9rem', opacity: '0.9', fontFamily: 'Arial, sans-serif' }}>
+                {fechaCorte}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{
+          padding: '24px',
+          overflowY: 'auto',
+          flex: 1
+        }}>
+          {/* Estadísticas Resumen */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Promedio</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#d35400' }}>
+                {formatearMoneda(promedio)}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Máximo</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#e74c3c' }}>
+                {formatearMoneda(maximo)}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Mínimo</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#27ae60' }}>
+                {formatearMoneda(minimo)}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Por Ganar</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3498db' }}>
+                {formatearMoneda(porGanar)}
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de Metodologías */}
+          <div style={{
+            backgroundColor: '#f8f9fa',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            border: '1px solid #dee2e6'
+          }}>
+            <div style={{
+              backgroundColor: '#e67e22',
+              color: 'white',
+              padding: '16px 20px',
+              fontWeight: '600',
+              fontSize: '1.1rem'
+            }}>
+              Detalle de las 9 Metodologías IEAC
+            </div>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f3f4' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Metodología</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Fórmula</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Descripción</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datosIEAC.map((item, index) => (
+                    <tr key={index} style={{
+                      backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa',
+                      borderBottom: '1px solid #dee2e6'
+                    }}>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', color: item.color }}>
+                        {item.metodologia}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                        {item.formula}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
+                        {item.descripcion}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: item.color }}>
+                        {formatearMoneda(item.valor)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Información Adicional */}
+          <div style={{
+            marginTop: '20px',
+            padding: '16px',
+            backgroundColor: '#e8f4fd',
+            borderRadius: '8px',
+            border: '1px solid #bee5eb'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#0c5460', fontSize: '1rem' }}>
+              📊 Interpretación de los Resultados
+            </h4>
+            <ul style={{ margin: '0', paddingLeft: '20px', color: '#0c5460', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              <li><strong>Promedio:</strong> Estimación más probable del costo final del proyecto</li>
+              <li><strong>Máximo:</strong> Escenario pesimista - preparación para posibles sobrecostos</li>
+              <li><strong>Mínimo:</strong> Escenario optimista - potencial de ahorro significativo</li>
+              <li><strong>Por Ganar:</strong> Trabajo restante por completar (BAC - EV)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 
 
 const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVisible }) => (
@@ -5570,6 +5802,12 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const [datosIEACAvg, setDatosIEACAvg] = useState([]);
   const [cargandoIEACAvg, setCargandoIEACAvg] = useState(false);
 
+  // Estados para Metodologías IEAC
+  const [datosIEAC, setDatosIEAC] = useState([]);
+  const [cargandoIEAC, setCargandoIEAC] = useState(false);
+  const [mostrarModalIEAC, setMostrarModalIEAC] = useState(false);
+  const [porGanar, setPorGanar] = useState(0);
+
   // Estados para la distribución beta
   const [parametrosBeta, setParametrosBeta] = useState({ alpha: 2.5, beta: 1.5 });
   const [tipoProyecto, setTipoProyecto] = useState('construccion');
@@ -5882,7 +6120,139 @@ const ReporteLineasBases = ({ proyectoId }) => {
     }
     };
 
-  // Función eliminada - cargarIndicadores
+  // Función para cargar Metodologías IEAC
+  const cargarMetodologiasIEAC = async () => {
+    if (!proyectoId || !fechaCorte) {
+      console.log('⚠️ No se puede cargar IEAC: proyectoId o fechaCorte faltantes');
+      return;
+    }
+
+    setCargandoIEAC(true);
+    console.log('🚀 Cargando Metodologías IEAC para fecha de corte:', fechaCorte);
+    
+    try {
+      // Obtener Por Ganar desde calcular_ieac_a.php (que ya calcula BAC, AC, EV y Por Ganar)
+      let porGanarCalculado = 0;
+      try {
+        console.log('🔍 Obteniendo Por Ganar desde calcular_ieac_a.php...');
+        const responsePorGanar = await fetch(`${API_BASE}/calcular_ieac_a.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`);
+        const dataPorGanar = await responsePorGanar.json();
+        console.log('🔍 Respuesta calcular_ieac_a.php:', dataPorGanar);
+        
+        if (dataPorGanar.success) {
+          // Obtener Por Ganar del debug de la API
+          porGanarCalculado = parseFloat(dataPorGanar.debug?.por_ganar) || 0;
+          console.log('✅ Por Ganar obtenido desde calcular_ieac_a.php:', porGanarCalculado, 'en millones:', (porGanarCalculado / 1000000).toFixed(2) + 'M');
+          console.log('🔍 Debug completo:', dataPorGanar.debug);
+        } else {
+          console.error('❌ Error en datos Por Ganar:', dataPorGanar);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error obteniendo Por Ganar:', error);
+      }
+      
+      setPorGanar(porGanarCalculado);
+      
+      // Array de APIs de IEAC
+      const apisIEAC = [
+        'calcular_ieac_a.php',
+        'calcular_ieac_b.php',
+        'calcular_ieac_c.php',
+        'calcular_ieac_d.php',
+        'calcular_ieac_e.php',
+        'calcular_ieac_f.php',
+        'calcular_ieac_g.php',
+        'calcular_ieac_h.php',
+        'calcular_ieac_i.php'
+      ];
+      
+      const datosIEAC = [];
+      
+      // Calcular cada metodología IEAC
+      for (const api of apisIEAC) {
+        try {
+          const response = await fetch(`${API_BASE}/${api}?proyecto_id=${proyectoId}&fecha_filtro=${fechaCorte}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            const letra = api.split('_')[2].split('.')[0];
+            const valor = data[`ieac_${letra}`];
+            
+            if (valor && !isNaN(valor) && isFinite(valor) && valor > 0) {
+              datosIEAC.push({
+                metodologia: `IEAC(${letra})`,
+                formula: getFormulaIEAC(letra),
+                descripcion: getDescripcionIEAC(letra),
+                valor: valor,
+                color: getColorIEAC(letra)
+              });
+              console.log(`✅ IEAC(${letra}): ${formatearMoneda(valor)}`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error calculando ${api}:`, error);
+        }
+      }
+      
+      setDatosIEAC(datosIEAC);
+      console.log('✅ Metodologías IEAC cargadas:', datosIEAC.length);
+      
+    } catch (error) {
+      console.error('❌ Error cargando Metodologías IEAC:', error);
+    } finally {
+      setCargandoIEAC(false);
+    }
+  };
+
+  // Función para obtener la fórmula de cada metodología IEAC
+  const getFormulaIEAC = (letra) => {
+    const formulas = {
+      'a': 'Real + Por Ganar',
+      'b': 'Presupuesto / CPI',
+      'c': 'Real + Por Ganar / CPI',
+      'd': 'Real + Por Ganar / CPI(3m)',
+      'e': 'Real + Por Ganar / CPI(6m)',
+      'f': 'Real + Por Ganar / (CPI × SPI)',
+      'g': 'Real + Por Ganar / (CPI3m × SPI)',
+      'h': 'Real + Por Ganar / (CPI6m × SPI)',
+      'i': 'Real + Por Ganar / (70%CPI + 30%SPI)'
+    };
+    return formulas[letra] || '';
+  };
+
+  // Función para obtener la descripción de cada metodología IEAC
+  const getDescripcionIEAC = (letra) => {
+    const descripciones = {
+      'a': 'Costo real + trabajo restante sin ajustes',
+      'b': 'Proyección del CPI actual al presupuesto total',
+      'c': 'Proyección del CPI actual al trabajo restante',
+      'd': 'Proyección del CPI de los últimos 3 meses',
+      'e': 'Proyección del CPI de los últimos 6 meses',
+      'f': 'Proyección combinada de costo y cronograma actual',
+      'g': 'Proyección combinada CPI 3 meses + cronograma',
+      'h': 'Proyección combinada CPI 6 meses + cronograma',
+      'i': 'Proyección ponderada (70% CPI, 30% SPI)'
+    };
+    return descripciones[letra] || '';
+  };
+
+  // Función para obtener el color de cada metodología IEAC
+  const getColorIEAC = (letra) => {
+    const colores = {
+      'a': '#3498db',
+      'b': '#e74c3c',
+      'c': '#f39c12',
+      'd': '#9b59b6',
+      'e': '#1abc9c',
+      'f': '#34495e',
+      'g': '#e67e22',
+      'h': '#8e44ad',
+      'i': '#16a085'
+    };
+    return colores[letra] || '#6c757d';
+  };
+
 
   // Función para calcular parámetros beta basados en el tipo de proyecto
   const calcularParametrosBeta = (tipo = 'construccion') => {
@@ -6040,6 +6410,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFisicoProyectado(); // Cargar datos de av_fisico_proyectado
       cargarAvFinancieroIncurrido(); // Cargar datos de av_financiero_incurrido
       cargarIEACAvg(); // Cargar datos de IEAC (avg)
+      cargarMetodologiasIEAC(); // Cargar Metodologías IEAC
     }
   }, [proyectoId]);
 
@@ -6053,6 +6424,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFisicoProyectado();
       cargarAvFinancieroIncurrido();
       cargarIEACAvg();
+      cargarMetodologiasIEAC(); // Recargar Metodologías IEAC cuando cambie la fecha de corte
     }
   }, [fechaDesde, fechaHasta, fechaCorte]);
 
@@ -6477,6 +6849,26 @@ const ReporteLineasBases = ({ proyectoId }) => {
             🧹 Limpiar
           </button>
 
+          {/* Botón Metodologías IEAC */}
+          <button
+            onClick={() => setMostrarModalIEAC(true)}
+            disabled={cargandoIEAC || !datosIEAC || datosIEAC.length === 0}
+            style={{
+              background: datosIEAC && datosIEAC.length > 0 ? '#e67e22' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              cursor: datosIEAC && datosIEAC.length > 0 ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              marginTop: '20px',
+              marginLeft: '10px',
+              opacity: datosIEAC && datosIEAC.length > 0 ? 1 : 0.6
+            }}
+            title={datosIEAC && datosIEAC.length > 0 ? "Ver Metodologías IEAC" : "Cargando datos IEAC..."}
+          >
+            🎯 Metodologías IEAC
+          </button>
 
         </div>
       </div>
@@ -6877,6 +7269,15 @@ const ReporteLineasBases = ({ proyectoId }) => {
           </table>
       </div>
 
+      {/* Modal Metodologías IEAC */}
+      {mostrarModalIEAC && datosIEAC && datosIEAC.length > 0 && (
+        <ModalMetodologiasIEAC 
+          datosIEAC={datosIEAC} 
+          fechaCorte={fechaCorte} 
+          porGanar={porGanar}
+          onClose={() => setMostrarModalIEAC(false)} 
+        />
+      )}
 
     </div>
   );
