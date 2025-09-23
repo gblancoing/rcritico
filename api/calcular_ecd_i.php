@@ -48,7 +48,7 @@ try {
             FROM av_fisico_real
             WHERE proyecto_id = ? 
               AND DATE_FORMAT(periodo, '%Y-%m') <= ?
-            GROUP BY DATE_FORMAT(periodo, '%Y-%m')
+            GROUP BY DATE_FORMAT(periodo, '%Y-%m'), proyecto_id, api_parcial
             ORDER BY DATE_FORMAT(periodo, '%Y-%m') DESC
             LIMIT 12
         ) AS ultimos_12_meses
@@ -83,21 +83,28 @@ try {
             error_log("🔍 ECD(i) EV12m: $ev12m");
             
             // Calcular ECD(i) manualmente usando la misma fórmula
-            if ($ev12m > 0) {
+            if ($ev12m > 0 && $bac_total > 0) {
                 $por_ganar = $bac_total - ($bac_total * $avance_fisico);
                 $denominador = $bac_total * $ev12m; // BAC × EV12m
-                $ecd_i_calculado = $por_ganar / $denominador;
-                $valor_final = $plazo_control + $ecd_i_calculado;
-                $ecd_i = round($valor_final);
                 
-                error_log("🔍 ECD(i) Por Ganar: $por_ganar");
-                error_log("🔍 ECD(i) Denominador (BAC × EV12m): $denominador");
-                error_log("🔍 ECD(i) ECD Calculado (Por Ganar / Denominador): $ecd_i_calculado");
-                error_log("🔍 ECD(i) Valor final (plazo + calculado): $valor_final");
-                error_log("🔍 ECD(i) Valor redondeado: $ecd_i");
+                // Validar que el denominador no sea 0
+                if ($denominador > 0) {
+                    $ecd_i_calculado = $por_ganar / $denominador;
+                    $valor_final = $plazo_control + $ecd_i_calculado;
+                    $ecd_i = round($valor_final);
+                    
+                    error_log("🔍 ECD(i) Por Ganar: $por_ganar");
+                    error_log("🔍 ECD(i) Denominador (BAC × EV12m): $denominador");
+                    error_log("🔍 ECD(i) ECD Calculado (Por Ganar / Denominador): $ecd_i_calculado");
+                    error_log("🔍 ECD(i) Valor final (plazo + calculado): $valor_final");
+                    error_log("🔍 ECD(i) Valor redondeado: $ecd_i");
+                } else {
+                    $ecd_i = 0;
+                    error_log("❌ ECD(i) Denominador es 0, no se puede calcular");
+                }
             } else {
                 $ecd_i = 0;
-                error_log("❌ ECD(i) EV12m es 0, no se puede calcular");
+                error_log("❌ ECD(i) EV12m o BAC es 0, no se puede calcular - EV12m: $ev12m, BAC: $bac_total");
             }
         } else {
             $ecd_i = 0;
@@ -110,7 +117,8 @@ try {
         $result = null;
     }
 
-    echo json_encode([
+    // Validar que el resultado sea válido antes de enviar
+    $response_data = [
         'success' => true,
         'ecd_i' => $ecd_i,
         'proyecto_id' => $proyecto_id,
@@ -123,9 +131,19 @@ try {
             'ev12m' => $result['ev12m'] ?? 'NULL',
             'por_ganar' => isset($result['bac_total']) && isset($result['avance_fisico']) ? ($result['bac_total'] - ($result['bac_total'] * $result['avance_fisico'])) : 'NULL',
             'ecd_calculado' => isset($result['bac_total']) && isset($result['avance_fisico']) && isset($result['ev12m']) && $result['ev12m'] > 0 ? (($result['bac_total'] - ($result['bac_total'] * $result['avance_fisico'])) / ($result['bac_total'] * $result['ev12m'])) : 'NULL',
-            'valor_final' => $ecd_i
+            'valor_final' => $ecd_i,
+            'is_valid' => !is_null($ecd_i) && $ecd_i > 0 && is_finite($ecd_i)
         ]
-    ]);
+    ];
+
+    // Si el valor no es válido, marcar como error pero mantener la estructura
+    if ($ecd_i <= 0 || !is_finite($ecd_i)) {
+        $response_data['success'] = false;
+        $response_data['message'] = 'ECD(i) no se pudo calcular correctamente';
+        $response_data['ecd_i'] = 0;
+    }
+
+    echo json_encode($response_data);
 
 } catch (Exception $e) {
     http_response_code(500);

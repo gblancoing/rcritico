@@ -65,7 +65,7 @@ try {
                 FROM real_parcial 
                 WHERE proyecto_id = ?
                   AND DATE_FORMAT(periodo, '%Y-%m') <= ?
-                GROUP BY DATE_FORMAT(periodo, '%Y-%m')
+                GROUP BY DATE_FORMAT(periodo, '%Y-%m'), proyecto_id
                 ORDER BY DATE_FORMAT(periodo, '%Y-%m') DESC
                 LIMIT 3
             ) AS ultimos_3_meses

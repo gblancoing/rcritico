@@ -76,13 +76,13 @@ try {
                         -- BAC total
                         (SELECT COALESCE(SUM(monto), 0) FROM api_parcial WHERE proyecto_id = ?) as bac_total,
                         -- Avance físico de ese mes
-                        COALESCE(MAX(afr.api_acum), 0) as avance_fisico
+                        COALESCE(afr.api_acum, 0) as avance_fisico
                     FROM real_parcial rp
                     LEFT JOIN av_fisico_real afr ON rp.proyecto_id = afr.proyecto_id 
                         AND DATE_FORMAT(rp.periodo, '%Y-%m') = DATE_FORMAT(afr.periodo, '%Y-%m')
                     WHERE rp.proyecto_id = ?
                       AND DATE_FORMAT(rp.periodo, '%Y-%m') <= ?
-                    GROUP BY DATE_FORMAT(rp.periodo, '%Y-%m')
+                    GROUP BY DATE_FORMAT(rp.periodo, '%Y-%m'), rp.proyecto_id, afr.api_acum, rp.periodo
                     ORDER BY DATE_FORMAT(rp.periodo, '%Y-%m') DESC
                     LIMIT 3
                 ) AS meses_con_datos

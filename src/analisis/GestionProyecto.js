@@ -336,7 +336,6 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
 };
 
 
-
 const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVisible }) => (
   <>
     <div
@@ -5808,6 +5807,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const [mostrarModalIEAC, setMostrarModalIEAC] = useState(false);
   const [porGanar, setPorGanar] = useState(0);
 
+
   // Estados para la distribución beta
   const [parametrosBeta, setParametrosBeta] = useState({ alpha: 2.5, beta: 1.5 });
   const [tipoProyecto, setTipoProyecto] = useState('construccion');
@@ -6205,6 +6205,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
     }
   };
 
+
   // Función para obtener la fórmula de cada metodología IEAC
   const getFormulaIEAC = (letra) => {
     const formulas = {
@@ -6397,7 +6398,9 @@ const ReporteLineasBases = ({ proyectoId }) => {
 
   // Cargar todas las tablas al montar el componente
   useEffect(() => {
+    console.log('🔍 useEffect ejecutándose - proyectoId:', proyectoId);
     if (proyectoId) {
+      console.log('🔍 Cargando datos para proyectoId:', proyectoId);
       cargarDatosTabla('av_fisico_real', setTablaReal);
       cargarDatosTabla('av_fisico_npc', setTablaNpc);
       cargarDatosTabla('av_fisico_poa', setTablaPoa);
@@ -6411,6 +6414,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFinancieroIncurrido(); // Cargar datos de av_financiero_incurrido
       cargarIEACAvg(); // Cargar datos de IEAC (avg)
       cargarMetodologiasIEAC(); // Cargar Metodologías IEAC
+    } else {
+      console.log('⚠️ proyectoId no está disponible');
     }
   }, [proyectoId]);
 
@@ -6870,6 +6875,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
             🎯 Metodologías IEAC
           </button>
 
+
         </div>
       </div>
 
@@ -7278,6 +7284,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
           onClose={() => setMostrarModalIEAC(false)} 
         />
       )}
+
 
     </div>
   );
