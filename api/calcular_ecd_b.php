@@ -20,9 +20,13 @@ try {
         throw new Exception('proyecto_id y fecha_filtro son requeridos');
     }
 
-    // Consulta SQL para calcular ECD(b)
+    // Consulta SQL para calcular ECD(b) y obtener plazo_control por separado
     $sql = "SELECT 
         (SELECT COUNT(DISTINCT DATE_FORMAT(periodo, '%Y-%m')) as plazo_control
+         FROM av_fisico_api 
+         WHERE proyecto_id = ?
+             AND DATE_FORMAT(periodo, '%Y-%m') <= ?) as plazo_control,
+        (SELECT COUNT(DISTINCT DATE_FORMAT(periodo, '%Y-%m')) as plazo_control_calc
          FROM av_fisico_api 
          WHERE proyecto_id = ?
              AND DATE_FORMAT(periodo, '%Y-%m') <= ?) 
@@ -60,7 +64,8 @@ try {
     // Preparar y ejecutar la consulta
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        $proyecto_id, $fecha_filtro,  // plazo_control
+        $proyecto_id, $fecha_filtro,  // plazo_control primera vez
+        $proyecto_id, $fecha_filtro,  // plazo_control segunda vez
         $proyecto_id,                 // BAC primera vez
         $proyecto_id,                 // BAC segunda vez
         $proyecto_id, $fecha_filtro,  // avance_fisico
@@ -70,10 +75,12 @@ try {
 
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     $ecd_b = $result ? round($result['ecd_b']) : 0;
+    $plazo_control = $result ? round($result['plazo_control']) : 0;
 
     echo json_encode([
         'success' => true,
         'ecd_b' => $ecd_b,
+        'plazo_control' => $plazo_control,
         'proyecto_id' => $proyecto_id,
         'fecha_filtro' => $fecha_filtro
     ]);

@@ -103,6 +103,313 @@ const reportesGestion = [
 const ALTURA_BARRA_SUPERIOR = 56;
 const ANCHO_SIDEBAR = 240;
 
+// --- COMPONENTE MODAL METODOLOGÍAS ECD ---
+const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClose }) => {
+  const formatearFecha = (meses) => {
+    if (!meses || meses <= 0 || !isFinite(meses) || meses > 1000) return 'N/A';
+    
+    try {
+      const fechaBase = new Date('2023-01-01'); // Fecha de inicio del proyecto
+      const fechaFinal = new Date(fechaBase);
+      
+      // Limitar a un rango razonable (máximo 50 años desde 2023)
+      const mesesLimitados = Math.min(Math.max(Math.ceil(meses), 1), 600);
+      fechaFinal.setMonth(fechaFinal.getMonth() + mesesLimitados);
+      
+      // Verificar que la fecha sea válida
+      if (isNaN(fechaFinal.getTime())) {
+        console.warn('Fecha inválida generada para meses:', meses);
+        return 'N/A';
+      }
+      
+      return fechaFinal.toLocaleDateString('es-ES', { 
+        year: 'numeric', 
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formateando fecha para meses:', meses, error);
+      return 'N/A';
+    }
+  };
+  
+  // Generar tabla ECD usando datos directos
+  const generarTablaECD = () => {
+    if (!datosECD) return [];
+    
+    return [
+      {
+        metodologia: 'ECD(a)',
+        formula: 'Duración Planificada / SPI',
+        descripcion: 'Proyección del SPI actual a la duración total',
+        valor: datosECD.metodologiaA || 0,
+        color: '#3498db'
+      },
+      {
+        metodologia: 'ECD(b)',
+        formula: 'Plazo Control + Por Ganar / PV1m',
+        descripcion: 'Proyección del PV mensual actual al trabajo restante',
+        valor: datosECD.metodologiaB || 0,
+        color: '#e74c3c'
+      },
+      {
+        metodologia: 'ECD(c)',
+        formula: 'Plazo Control + Por Ganar / PV3m',
+        descripcion: 'Proyección del PV promedio de los últimos 3 meses',
+        valor: datosECD.metodologiaC || 0,
+        color: '#f39c12'
+      },
+      {
+        metodologia: 'ECD(d)',
+        formula: 'Plazo Control + Por Ganar / PV6m',
+        descripcion: 'Proyección del PV promedio de los últimos 6 meses',
+        valor: datosECD.metodologiaD || 0,
+        color: '#9b59b6'
+      },
+      {
+        metodologia: 'ECD(e)',
+        formula: 'Plazo Control + Por Ganar / PV12m',
+        descripcion: 'Proyección del PV promedio de los últimos 12 meses',
+        valor: datosECD.metodologiaE || 0,
+        color: '#1abc9c'
+      },
+      {
+        metodologia: 'ECD(f)',
+        formula: 'Plazo Control + Por Ganar / EV1m',
+        descripcion: 'Proyección del EV promedio de los últimos 1 mes',
+        valor: datosECD.metodologiaF || 0,
+        color: '#34495e'
+      },
+      {
+        metodologia: 'ECD(g)',
+        formula: 'Plazo Control + Por Ganar / EV3m',
+        descripcion: 'Proyección del EV promedio de los últimos 3 meses',
+        valor: datosECD.metodologiaG || 0,
+        color: '#e67e22'
+      },
+      {
+        metodologia: 'ECD(h)',
+        formula: 'Plazo Control + Por Ganar / EV6m',
+        descripcion: 'Proyección del EV promedio de los últimos 6 meses',
+        valor: datosECD.metodologiaH || 0,
+        color: '#8e44ad'
+      },
+      {
+        metodologia: 'ECD(i)',
+        formula: 'Plazo Control + Por Ganar / EV12m',
+        descripcion: 'Proyección del EV promedio de los últimos 12 meses',
+        valor: datosECD.metodologiaI || 0,
+        color: '#16a085'
+      },
+      {
+        metodologia: 'ECD(j)',
+        formula: 'Plazo Control + Por Ganar / AC3m',
+        descripcion: 'Proyección del AC promedio de los últimos 3 meses',
+        valor: datosECD.metodologiaJ || 0,
+        color: '#e74c3c'
+      },
+      {
+        metodologia: 'ECD(k)',
+        formula: 'Plazo Control + Por Ganar / AC6m',
+        descripcion: 'Proyección del AC promedio de los últimos 6 meses',
+        valor: datosECD.metodologiaK || 0,
+        color: '#c0392b'
+      }
+    ];
+  };
+
+  // Generar tabla ECD dinámicamente cuando cambien los datos
+  const tablaECD = generarTablaECD();
+
+  // Usar las estadísticas calculadas dinámicamente desde cargarMetodologiasECD
+  const estadisticasTabla = {
+    promedio: datosECD?.promedio || 0,
+    maximo: datosECD?.maximo || 0,
+    minimo: datosECD?.minimo || 0
+  };
+
+  return createPortal(
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        maxWidth: '900px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
+          color: 'white',
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}>
+              📅
+            </div>
+            <div>
+              <h2 style={{ margin: '0', fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Arial, sans-serif' }}>
+                Metodologías ECD
+              </h2>
+              <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.9rem', opacity: '0.9', fontFamily: 'Arial, sans-serif' }}>
+                {fechaCorte}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{
+          padding: '24px',
+          overflowY: 'auto',
+          flex: 1
+        }}>
+          {/* Estadísticas Resumen - Las 5 tarjetas KPI exactas de Vectores.js */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Meses Promedio</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#8e44ad' }}>
+                {estadisticasTabla.promedio && !isNaN(estadisticasTabla.promedio) 
+                  ? `${Math.round(estadisticasTabla.promedio)} meses` 
+                  : 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Meses Máximo</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#e74c3c' }}>
+                {estadisticasTabla.maximo && !isNaN(estadisticasTabla.maximo) 
+                  ? `${Math.round(estadisticasTabla.maximo)} meses` 
+                  : 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Meses Mínimo</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#27ae60' }}>
+                {estadisticasTabla.minimo && !isNaN(estadisticasTabla.minimo) 
+                  ? `${Math.round(estadisticasTabla.minimo)} meses` 
+                  : 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Plazo Control</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#3498db' }}>
+                {Math.round(datosECD?.plazoControl || 0)} meses
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #e9ecef'
+            }}>
+              <div style={{ fontSize: '0.9rem', color: '#6c757d', fontWeight: '600' }}>Duración Planificada</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#8e44ad' }}>
+                {duracionPlanificada} meses
+              </div>
+            </div>
+          </div>
+
+          {/* Información Adicional */}
+          <div style={{
+            marginTop: '20px',
+            padding: '16px',
+            backgroundColor: '#f3e5f5',
+            borderRadius: '8px',
+            border: '1px solid #ce93d8'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#4a148c', fontSize: '1rem' }}>
+              📅 Interpretación de las Fechas Estimadas
+            </h4>
+            <ul style={{ margin: '0', paddingLeft: '20px', color: '#4a148c', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              <li><strong>Fecha Promedio:</strong> Fecha más probable de finalización del proyecto</li>
+              <li><strong>Fecha Máxima:</strong> Escenario pesimista - preparación para posibles retrasos</li>
+              <li><strong>Fecha Mínima:</strong> Escenario optimista - potencial de finalización anticipada</li>
+              <li><strong>Rango:</strong> Nivel de incertidumbre en la estimación temporal</li>
+              <li><strong>Plazo Control:</strong> Meses transcurridos desde el inicio del proyecto</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // --- COMPONENTE MODAL METODOLOGÍAS IEAC ---
 const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 }) => {
   // Función para formatear moneda
@@ -254,80 +561,6 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
             </div>
           </div>
 
-          {/* Tabla de Metodologías */}
-          <div style={{
-            backgroundColor: '#f8f9fa',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            border: '1px solid #dee2e6'
-          }}>
-            <div style={{
-              backgroundColor: '#e67e22',
-              color: 'white',
-              padding: '16px 20px',
-              fontWeight: '600',
-              fontSize: '1.1rem'
-            }}>
-              Detalle de las 9 Metodologías IEAC
-            </div>
-            
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '0.9rem'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f1f3f4' }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Metodología</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Fórmula</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Descripción</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600', borderBottom: '2px solid #dee2e6' }}>Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {datosIEAC.map((item, index) => (
-                    <tr key={index} style={{
-                      backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa',
-                      borderBottom: '1px solid #dee2e6'
-                    }}>
-                      <td style={{ padding: '12px 16px', fontWeight: '600', color: item.color }}>
-                        {item.metodologia}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                        {item.formula}
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#6c757d', fontSize: '0.85rem' }}>
-                        {item.descripcion}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: item.color }}>
-                        {formatearMoneda(item.valor)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Información Adicional */}
-          <div style={{
-            marginTop: '20px',
-            padding: '16px',
-            backgroundColor: '#e8f4fd',
-            borderRadius: '8px',
-            border: '1px solid #bee5eb'
-          }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#0c5460', fontSize: '1rem' }}>
-              📊 Interpretación de los Resultados
-            </h4>
-            <ul style={{ margin: '0', paddingLeft: '20px', color: '#0c5460', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              <li><strong>Promedio:</strong> Estimación más probable del costo final del proyecto</li>
-              <li><strong>Máximo:</strong> Escenario pesimista - preparación para posibles sobrecostos</li>
-              <li><strong>Mínimo:</strong> Escenario optimista - potencial de ahorro significativo</li>
-              <li><strong>Por Ganar:</strong> Trabajo restante por completar (BAC - EV)</li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>,
@@ -5807,6 +6040,13 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const [mostrarModalIEAC, setMostrarModalIEAC] = useState(false);
   const [porGanar, setPorGanar] = useState(0);
 
+  // Estados para Metodologías ECD
+  const [datosECD, setDatosECD] = useState(null);
+  const [cargandoECD, setCargandoECD] = useState(false);
+  const [mostrarModalECD, setMostrarModalECD] = useState(false);
+  const [duracionPlanificada, setDuracionPlanificada] = useState(12);
+
+
 
   // Estados para la distribución beta
   const [parametrosBeta, setParametrosBeta] = useState({ alpha: 2.5, beta: 1.5 });
@@ -6205,6 +6445,499 @@ const ReporteLineasBases = ({ proyectoId }) => {
     }
   };
 
+  // Función para cargar Metodologías ECD (EXACTA copia de Vectores.js)
+  const cargarMetodologiasECD = async () => {
+    console.log('🔍 DEBUG cargarMetodologiasECD - proyectoId:', proyectoId, 'fechaCorte:', fechaCorte);
+
+    if (!proyectoId || !fechaCorte) {
+      console.log('⚠️ No se puede cargar ECD: proyectoId o fechaCorte faltantes');
+      return;
+    }
+
+    setCargandoECD(true);
+    console.log('🚀 Cargando Metodologías ECD para fecha de corte:', fechaCorte);
+    
+    try {
+      // Convertir fechaCorte de YYYY-MM a YYYY-MM-DD (primer día del mes)
+      const fechaFiltroCompleta = `${fechaCorte}-01`;
+      
+      // Calcular ECD(a) dinámicamente usando la nueva API
+      let ecdA = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_a.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdA = parseFloat(data.ecd_a) || 0;
+          console.log('✅ ECD(a) calculado dinámicamente:', ecdA, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(a) dinámico:', error);
+      }
+
+      // Calcular ECD(b) dinámicamente usando la nueva API
+      let ecdB = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_b.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdB = parseFloat(data.ecd_b) || 0;
+          console.log('✅ ECD(b) calculado dinámicamente:', ecdB, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(b) dinámico:', error);
+      }
+
+      // Calcular ECD(c) dinámicamente usando la nueva API
+      let ecdC = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_c.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdC = parseFloat(data.ecd_c) || 0;
+          console.log('✅ ECD(c) calculado dinámicamente:', ecdC, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(c) dinámico:', error);
+      }
+
+      // Calcular ECD(d) dinámicamente usando la nueva API
+      let ecdD = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_d.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdD = parseFloat(data.ecd_d) || 0;
+          console.log('✅ ECD(d) calculado dinámicamente:', ecdD, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(d) dinámico:', error);
+      }
+
+      // Calcular ECD(e) dinámicamente usando la nueva API
+      let ecdE = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_e.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdE = parseFloat(data.ecd_e) || 0;
+          console.log('✅ ECD(e) calculado dinámicamente:', ecdE, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(e) dinámico:', error);
+      }
+
+      // Calcular ECD(f) dinámicamente usando la nueva API
+      let ecdF = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_f.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdF = parseFloat(data.ecd_f) || 0;
+          console.log('✅ ECD(f) calculado dinámicamente:', ecdF, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(f) dinámico:', error);
+      }
+
+      // Calcular ECD(g) dinámicamente usando la nueva API
+      let ecdG = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_g.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdG = parseFloat(data.ecd_g) || 0;
+          console.log('✅ ECD(g) calculado dinámicamente:', ecdG, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(g) dinámico:', error);
+      }
+
+      // Calcular ECD(h) dinámicamente usando la nueva API
+      let ecdH = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_h.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdH = parseFloat(data.ecd_h) || 0;
+          console.log('✅ ECD(h) calculado dinámicamente:', ecdH, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(h) dinámico:', error);
+      }
+
+      // Calcular ECD(i) dinámicamente usando la nueva API
+      let ecdI = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_i.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdI = parseFloat(data.ecd_i) || 0;
+          console.log('✅ ECD(i) calculado dinámicamente:', ecdI, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(i) dinámico:', error);
+      }
+
+      // Calcular ECD(j) dinámicamente usando la nueva API
+      let ecdJ = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_j.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdJ = parseFloat(data.ecd_j) || 0;
+          console.log('✅ ECD(j) calculado dinámicamente:', ecdJ, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(j) dinámico:', error);
+      }
+
+      // Calcular ECD(k) dinámicamente usando la nueva API
+      let ecdK = 0;
+      try {
+        const response = await fetch(`${API_BASE}/calcular_ecd_k.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          ecdK = parseFloat(data.ecd_k) || 0;
+          console.log('✅ ECD(k) calculado dinámicamente:', ecdK, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error calculando ECD(k) dinámico:', error);
+      }
+
+      // Obtener Plazo Control dinámicamente
+      let plazoControl = 0;
+      try {
+        const response = await fetch(`${API_BASE}/gestion_proyecto/consultas/periodo.php?proyecto_id=${proyectoId}&fecha_hasta=${fechaFiltroCompleta}`);
+        const data = await response.json();
+        
+        if (data.success && data.datos && data.datos.length > 0) {
+          plazoControl = data.datos.length;
+          console.log('✅ Plazo Control obtenido dinámicamente:', plazoControl, 'meses');
+        }
+      } catch (error) {
+        console.error('❌ Error obteniendo Plazo Control:', error);
+      }
+
+      // Calcular estadísticas basándose en los valores reales (EXACTO como Vectores.js)
+      const valoresValidos = [ecdA, ecdB, ecdC, ecdD, ecdE, ecdF, ecdG, ecdH, ecdI, ecdJ, ecdK]
+        .filter(valor => valor && !isNaN(valor) && isFinite(valor) && valor > 0);
+      
+      const promedio = valoresValidos.length > 0 
+        ? valoresValidos.reduce((sum, val) => sum + val, 0) / valoresValidos.length 
+        : plazoControl + 6; // Fallback: 6 meses adicionales
+      
+      const maximo = valoresValidos.length > 0 ? Math.max(...valoresValidos) : plazoControl + 12;
+      const minimo = valoresValidos.length > 0 ? Math.min(...valoresValidos) : plazoControl + 1;
+
+      // Crear objeto con todas las metodologías ECD y estadísticas
+      const metodologiasECD = {
+        // Metodologías individuales
+        metodologiaA: ecdA,
+        metodologiaB: ecdB,
+        metodologiaC: ecdC,
+        metodologiaD: ecdD,
+        metodologiaE: ecdE,
+        metodologiaF: ecdF,
+        metodologiaG: ecdG,
+        metodologiaH: ecdH,
+        metodologiaI: ecdI,
+        metodologiaJ: ecdJ,
+        metodologiaK: ecdK,
+        
+        // Estadísticas calculadas dinámicamente
+        promedio: promedio,
+        maximo: maximo,
+        minimo: minimo,
+        
+        // Plazo Control
+        plazoControl: plazoControl
+      };
+      
+      setDatosECD(metodologiasECD);
+      console.log('✅ Metodologías ECD cargadas:', metodologiasECD);
+      console.log('📊 Valores calculados:', {
+        ecdA, ecdB, ecdC, ecdD, ecdE, ecdF, ecdG, ecdH, ecdI, ecdJ, ecdK,
+        promedio, maximo, minimo, plazoControl
+      });
+      
+    } catch (error) {
+      console.error('❌ Error cargando Metodologías ECD:', error);
+      console.error('🔍 Error completo:', error.message);
+      setDatosECD(null);
+    } finally {
+      setCargandoECD(false);
+    }
+  };
+
+  // Función para cargar duración planificada
+  const cargarDuracionPlanificada = async () => {
+    if (!proyectoId) {
+      console.log('⚠️ No se puede cargar duración planificada: proyectoId faltante');
+      return;
+    }
+
+    try {
+      // Usar la misma API que Vectores.js: av_fisico_api.php
+      const response = await fetch(`${API_BASE}/av_fisico_api.php?proyecto_id=${proyectoId}`);
+      const data = await response.json();
+      
+      if (data.success && data.data && data.data.length > 0) {
+        // Contar períodos únicos usando la misma lógica que Vectores.js
+        const periodosUnicos = [...new Set(
+          data.data
+            .filter(dato => dato.periodo)
+            .map(dato => dato.periodo.substring(0, 7)) // YYYY-MM
+        )].length;
+        
+        setDuracionPlanificada(periodosUnicos);
+        console.log('✅ Duración Planificada obtenida:', periodosUnicos);
+      } else {
+        // Valor por defecto si no se puede obtener
+        setDuracionPlanificada(12);
+        console.log('⚠️ Usando duración planificada por defecto: 12 meses');
+      }
+    } catch (error) {
+      console.error('❌ Error cargando duración planificada:', error);
+      setDuracionPlanificada(12); // Valor por defecto
+    }
+  };
+
+  // Función para calcular indicadores EVM dinámicamente (EXACTA copia de Vectores.js)
+  const calcularIndicadoresEVMDinamicos = async () => {
+    if (!proyectoId || !fechaCorte) {
+      console.log('⚠️ No se pueden calcular indicadores EVM: proyectoId o fechaCorte faltantes');
+      return null;
+    }
+
+    try {
+      // Obtener datos EXACTAMENTE como en Vectores.js
+      const [realResponse, apiResponse] = await Promise.all([
+        fetch(`${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=real_parcial`),
+        fetch(`${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=api_parcial`)
+      ]);
+
+      const [realData, apiData] = await Promise.all([
+        realResponse.json(),
+        apiResponse.json()
+      ]);
+
+      if (!realData.success || !apiData.success) {
+        console.log('⚠️ No se pudieron obtener datos para calcular EVM');
+        return null;
+      }
+
+      // Los datos vienen en data.datos (igual que en Vectores.js)
+      const datosReal = realData.datos || [];
+      const datosApi = apiData.datos || [];
+
+      console.log('📊 Datos obtenidos:', {
+        real: datosReal.length,
+        api: datosApi.length
+      });
+
+      // Calcular totales acumulados hasta la fecha de seguimiento (EXACTO como Vectores.js)
+      const calcularTotalAcumulado = (datos, fechaLimite) => {
+        return datos
+          .filter(row => row.periodo <= fechaLimite)
+          .reduce((total, row) => total + (Number(row.monto) || 0), 0);
+      };
+
+      // Calcular totales para el presupuesto completo (sin filtro de fecha)
+      const calcularTotalCompleto = (datos) => {
+        return datos.reduce((total, row) => total + (Number(row.monto) || 0), 0);
+      };
+
+      // Obtener valores en la fecha de seguimiento (EXACTO como Vectores.js)
+      const AC = calcularTotalAcumulado(datosReal, fechaCorte); // Actual Cost (Costo Real acumulado)
+      const PV = calcularTotalAcumulado(datosApi, fechaCorte);  // Planned Value (Costo Planeado API acumulado)
+      const BAC = calcularTotalCompleto(datosApi); // Budget at Completion (Presupuesto total dinámico)
+
+      console.log('💰 BAC CALCULADO DINÁMICAMENTE:', {
+        bac: BAC,
+        bacMillones: (BAC / 1000000).toFixed(2) + 'M',
+        registrosApiParcial: datosApi.length,
+        fechaCorte: fechaCorte
+      });
+
+      // EV = Valor del trabajo realmente completado
+      // En EVM, EV = BAC × % de avance físico real acumulado
+      // Obtener el porcentaje de avance físico desde la tabla av_fisico_real
+      let porcentajeAvanceFisico = 0;
+      
+      try {
+        console.log('🔍 OBTENIENDO AVANCE FÍSICO DINÁMICO para fecha:', fechaCorte);
+        
+        // Obtener avance físico real desde la API
+        const avanceResponse = await fetch(`${API_BASE}/obtener_avance_fisico.php?proyecto_id=${proyectoId}&fecha=${fechaCorte}`);
+        
+        // Verificar si la respuesta es válida
+        if (!avanceResponse.ok) {
+          console.log('⚠️ Respuesta HTTP no válida:', avanceResponse.status, avanceResponse.statusText);
+          throw new Error(`HTTP ${avanceResponse.status}: ${avanceResponse.statusText}`);
+        }
+        
+        // Verificar el content-type
+        const contentType = avanceResponse.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const textResponse = await avanceResponse.text();
+          console.log('⚠️ Respuesta no es JSON:', textResponse.substring(0, 200));
+          throw new Error('La respuesta no es JSON válido');
+        }
+        
+        const avanceData = await avanceResponse.json();
+        console.log('🔍 Respuesta avance físico:', avanceData);
+        
+        if (avanceData.success && avanceData.avance_fisico !== null) {
+          porcentajeAvanceFisico = avanceData.avance_fisico / 100; // Convertir de porcentaje a decimal
+          console.log('✅ AVANCE FÍSICO DINÁMICO OBTENIDO:', {
+            fecha: fechaCorte,
+            porcentajeAvanceFisico: porcentajeAvanceFisico,
+            porcentajeFormateado: (porcentajeAvanceFisico * 100).toFixed(2) + '%',
+            fuente: 'av_fisico_real.api_acum'
+          });
+        } else {
+          console.log('⚠️ No se pudo obtener avance físico, usando fallback');
+          // Fallback: calcular EV usando NPC como proxy
+          const npcResponse = await fetch(`${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=npc_parcial`);
+          const npcData = await npcResponse.json();
+          if (npcData.success) {
+            const datosNpc = npcData.datos || [];
+            const NPC = calcularTotalAcumulado(datosNpc, fechaCorte);
+            porcentajeAvanceFisico = BAC > 0 ? NPC / BAC : 0;
+            console.log('🔄 Usando NPC como fallback para EV:', {
+              NPC: NPC,
+              BAC: BAC,
+              porcentajeCalculado: (porcentajeAvanceFisico * 100).toFixed(2) + '%'
+            });
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error obteniendo avance físico:', error);
+        console.log('🔄 Usando fallback directo con NPC...');
+        
+        // Fallback directo: usar NPC
+        try {
+          const npcResponse = await fetch(`${API_BASE}/datos_financieros.php?proyecto_id=${proyectoId}&tabla=npc_parcial`);
+          const npcData = await npcResponse.json();
+          if (npcData.success) {
+            const datosNpc = npcData.datos || [];
+            const NPC = calcularTotalAcumulado(datosNpc, fechaCorte);
+            porcentajeAvanceFisico = BAC > 0 ? NPC / BAC : 0;
+            console.log('✅ Fallback NPC exitoso:', {
+              NPC: NPC,
+              BAC: BAC,
+              porcentajeCalculado: (porcentajeAvanceFisico * 100).toFixed(2) + '%'
+            });
+          }
+        } catch (fallbackError) {
+          console.error('❌ Error en fallback NPC:', fallbackError);
+          porcentajeAvanceFisico = 0;
+        }
+      }
+
+      // Calcular EV = BAC × % de avance físico
+      const EV = BAC * porcentajeAvanceFisico;
+
+      // Calcular SPI inicialmente
+      let SPI = PV !== 0 ? EV / PV : 0;
+
+      // OBTENER SPI DE LA TARJETA KPI EXISTENTE (NO CALCULARLO)
+      try {
+        console.log('🔍 Buscando SPI en tarjeta KPI...');
+        
+        // Buscar el elemento de la tarjeta KPI que contiene el SPI
+        const spiElement = document.querySelector('[data-kpi="spi"]') || 
+                          document.querySelector('.kpi-spi') ||
+                          document.querySelector('[title*="SPI"]') ||
+                          document.querySelector('[title*="spi"]') ||
+                          document.querySelector('div:contains("SPI")') ||
+                          document.querySelector('span:contains("SPI")');
+        
+        if (spiElement) {
+          const spiText = spiElement.textContent || spiElement.innerText;
+          console.log('🔍 Texto encontrado en elemento SPI:', spiText);
+          
+          // Buscar número decimal en el texto
+          const spiMatch = spiText.match(/(\d+\.?\d*)/);
+          if (spiMatch) {
+            const spiKPI = parseFloat(spiMatch[1]);
+            if (spiKPI > 0) {
+              SPI = spiKPI;
+              console.log('✅ SPI obtenido de tarjeta KPI:', SPI);
+            }
+          }
+        }
+        
+        // Si no se encuentra en el DOM, usar el cálculo como fallback
+        if (SPI === (PV !== 0 ? EV / PV : 0)) {
+          console.log('⚠️ SPI no encontrado en KPI, usando cálculo:', SPI);
+        }
+      } catch (error) {
+        console.error('❌ Error obteniendo SPI de KPI:', error);
+        console.log('⚠️ Fallback a cálculo de SPI:', SPI);
+      }
+
+      console.log('📊 Indicadores EVM calculados (SPI de KPI):', {
+        fechaCorte,
+        AC: AC.toFixed(2),
+        PV: PV.toFixed(2),
+        EV: EV.toFixed(2),
+        BAC: BAC.toFixed(2),
+        SPI: SPI.toFixed(3),
+        porcentajeAvanceFisico: (porcentajeAvanceFisico * 100).toFixed(2) + '%',
+        fuenteSPI: SPI !== (PV !== 0 ? EV / PV : 0) ? 'KPI' : 'Calculado'
+      });
+
+      return {
+        AC,
+        PV,
+        EV,
+        BAC,
+        SPI,
+        porcentajeAvanceFisico
+      };
+
+    } catch (error) {
+      console.error('❌ Error calculando indicadores EVM:', error);
+      return null;
+    }
+  };
+
+
+  // Función para obtener Plazo Control dinámicamente (EXACTA como Vectores.js)
+  const obtenerPlazoControl = async (fechaSeguimiento) => {
+    try {
+      const response = await fetch(`${API_BASE}/gestion_proyecto/consultas/periodo.php?proyecto_id=${proyectoId}&fecha_hasta=${fechaSeguimiento}`);
+      const data = await response.json();
+      
+      if (data.success && data.datos && data.datos.length > 0) {
+        const plazoControl = data.datos.length;
+        console.log('✅ Plazo Control obtenido dinámicamente:', {
+          fecha: fechaSeguimiento,
+          plazoControl: plazoControl,
+          totalRegistros: data.datos.length
+        });
+        return plazoControl;
+      } else {
+        console.log('❌ No se encontraron períodos para calcular Plazo Control');
+        return 0;
+      }
+    } catch (error) {
+      console.error('❌ Error obteniendo Plazo Control:', error);
+      return 0;
+    }
+  };
 
   // Función para obtener la fórmula de cada metodología IEAC
   const getFormulaIEAC = (letra) => {
@@ -6414,6 +7147,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFinancieroIncurrido(); // Cargar datos de av_financiero_incurrido
       cargarIEACAvg(); // Cargar datos de IEAC (avg)
       cargarMetodologiasIEAC(); // Cargar Metodologías IEAC
+      cargarMetodologiasECD(); // Cargar Metodologías ECD
+      cargarDuracionPlanificada(); // Cargar duración planificada
     } else {
       console.log('⚠️ proyectoId no está disponible');
     }
@@ -6421,6 +7156,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
 
   // Recargar períodos y datos cuando cambien los filtros de fecha
   useEffect(() => {
+    console.log('🔄 useEffect [fechaDesde, fechaHasta, fechaCorte] ejecutándose...');
+    console.log('Fecha Desde:', fechaDesde, 'Fecha Hasta:', fechaHasta, 'Fecha Corte:', fechaCorte);
     if (proyectoId) {
       cargarPeriodos();
       cargarAvFisicoPlan();
@@ -6430,6 +7167,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFinancieroIncurrido();
       cargarIEACAvg();
       cargarMetodologiasIEAC(); // Recargar Metodologías IEAC cuando cambie la fecha de corte
+      cargarMetodologiasECD(); // Recargar Metodologías ECD cuando cambie la fecha de corte
+      cargarDuracionPlanificada(); // Recargar duración planificada cuando cambie la fecha de corte
     }
   }, [fechaDesde, fechaHasta, fechaCorte]);
 
@@ -6875,6 +7614,29 @@ const ReporteLineasBases = ({ proyectoId }) => {
             🎯 Metodologías IEAC
           </button>
 
+          {/* Botón Metodologías ECD */}
+          {console.log('🔍 DEBUG ECD Button:', { cargandoECD, datosECD, metodologiaA: datosECD?.metodologiaA })}
+          <button
+            onClick={() => setMostrarModalECD(true)}
+            disabled={cargandoECD || !datosECD || datosECD.metodologiaA === 0 || datosECD.metodologiaA === null}
+            style={{
+              background: datosECD && datosECD.metodologiaA ? '#8e44ad' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              cursor: datosECD && datosECD.metodologiaA ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              marginTop: '20px',
+              marginLeft: '10px',
+              opacity: datosECD && datosECD.metodologiaA ? 1 : 0.6
+            }}
+            title={datosECD && datosECD.metodologiaA ? "Ver Metodologías ECD" : "Cargando datos ECD..."}
+          >
+            📅 Metodologías ECD
+          </button>
+
+
 
         </div>
       </div>
@@ -7284,6 +8046,17 @@ const ReporteLineasBases = ({ proyectoId }) => {
           onClose={() => setMostrarModalIEAC(false)} 
         />
       )}
+
+      {/* Modal Metodologías ECD */}
+      {mostrarModalECD && datosECD && datosECD.metodologiaA && (
+        <ModalMetodologiasECD 
+          datosECD={datosECD} 
+          fechaCorte={fechaCorte} 
+          duracionPlanificada={duracionPlanificada}
+          onClose={() => setMostrarModalECD(false)} 
+        />
+      )}
+
 
 
     </div>
