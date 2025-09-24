@@ -6039,12 +6039,20 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const [cargandoIEAC, setCargandoIEAC] = useState(false);
   const [mostrarModalIEAC, setMostrarModalIEAC] = useState(false);
   const [porGanar, setPorGanar] = useState(0);
+  
+  // Estados para marcado dinámico de filas basado en IEAC
+  const [montoMinimoIEAC, setMontoMinimoIEAC] = useState(null);
+  const [montoMaximoIEAC, setMontoMaximoIEAC] = useState(null);
 
   // Estados para Metodologías ECD
   const [datosECD, setDatosECD] = useState(null);
   const [cargandoECD, setCargandoECD] = useState(false);
   const [mostrarModalECD, setMostrarModalECD] = useState(false);
   const [duracionPlanificada, setDuracionPlanificada] = useState(12);
+  
+  // Estados para marcado dinámico de filas
+  const [mesMinimoECD, setMesMinimoECD] = useState(null);
+  const [mesMaximoECD, setMesMaximoECD] = useState(null);
 
 
 
@@ -6054,6 +6062,10 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const [mostrarConfiguracionBeta, setMostrarConfiguracionBeta] = useState(false);
   const [distribucionBeta, setDistribucionBeta] = useState([]);
   const [ieacAvgTotal, setIeacAvgTotal] = useState(0);
+
+  // Estados para IEAC estratégico
+  const [datosIEACStrategico, setDatosIEACStrategico] = useState([]);
+  const [cargandoIEACStrategico, setCargandoIEACStrategico] = useState(false);
 
 
   // Cargar datos de las tablas
@@ -6436,12 +6448,67 @@ const ReporteLineasBases = ({ proyectoId }) => {
       }
       
       setDatosIEAC(datosIEAC);
+      
+      // Calcular y guardar valores mínimo y máximo para marcado de filas
+      const valores = datosIEAC.map(item => item.valor).filter(v => v > 0);
+      const minimo = valores.length > 0 ? Math.min(...valores) : 0;
+      const maximo = valores.length > 0 ? Math.max(...valores) : 0;
+      
+      setMontoMinimoIEAC(minimo);
+      setMontoMaximoIEAC(maximo);
+      
       console.log('✅ Metodologías IEAC cargadas:', datosIEAC.length);
+      console.log('🎯 Valores IEAC para marcado de filas:', {
+        montoMinimo: minimo,
+        montoMaximo: maximo,
+        formateado: {
+          minimo: `USD ${(minimo / 1000000).toFixed(2)}M`,
+          maximo: `USD ${(maximo / 1000000).toFixed(2)}M`
+        }
+      });
       
     } catch (error) {
       console.error('❌ Error cargando Metodologías IEAC:', error);
     } finally {
       setCargandoIEAC(false);
+    }
+  };
+
+  // Función para cargar datos estratégicos de IEAC desde la API
+  const cargarIEACStrategico = async () => {
+    if (!proyectoId || !fechaCorte || !datosECD) {
+      return;
+    }
+
+    setCargandoIEACStrategico(true);
+    
+    try {
+      // CORRECCIÓN: Pasar el Mes Promedio ECD y Monto Máximo IEAC calculados por el frontend
+      const mesPromedioECD = Math.ceil(datosECD.promedio || 66); // Usar Math.ceil para redondear hacia arriba
+      const montoMaximoIEACValor = montoMaximoIEAC || 330510000; // Usar el valor máximo IEAC del modal
+      const url = `${API_BASE}/gestion_proyecto/consultas/ieac_estrategico.php?proyecto_id=${proyectoId}&fecha_corte=${fechaCorte}&alpha=${parametrosBeta.alpha}&beta=${parametrosBeta.beta}&mes_promedio_ecd=${mesPromedioECD}&monto_maximo_ieac=${montoMaximoIEACValor}`;
+      
+      console.log(`🚀 Cargando IEAC estratégico con Mes Promedio ECD: ${mesPromedioECD} (original: ${datosECD.promedio})`);
+      console.log(`💰 Monto Máximo IEAC: ${montoMaximoIEACValor}`);
+      console.log(`🔗 URL API:`, url);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.success && data.datos) {
+        console.log(`✅ IEAC estratégico cargado: ${data.datos.length} registros`);
+        console.log(`📅 Primer período:`, data.datos[0]?.periodo_original);
+        console.log(`📅 Último período:`, data.datos[data.datos.length - 1]?.periodo_original);
+        setDatosIEACStrategico(data.datos);
+      } else {
+        console.log(`❌ Error cargando IEAC estratégico:`, data);
+        setDatosIEACStrategico([]);
+      }
+    } catch (error) {
+      console.error('Error cargando IEAC estratégico:', error);
+      setDatosIEACStrategico([]);
+    } finally {
+      setCargandoIEACStrategico(false);
     }
   };
 
@@ -6665,10 +6732,19 @@ const ReporteLineasBases = ({ proyectoId }) => {
       };
       
       setDatosECD(metodologiasECD);
+      
+      // Guardar valores para marcado dinámico de filas
+      setMesMinimoECD(Math.round(minimo));
+      setMesMaximoECD(Math.round(maximo));
+      
       console.log('✅ Metodologías ECD cargadas:', metodologiasECD);
       console.log('📊 Valores calculados:', {
         ecdA, ecdB, ecdC, ecdD, ecdE, ecdF, ecdG, ecdH, ecdI, ecdJ, ecdK,
         promedio, maximo, minimo, plazoControl
+      });
+      console.log('🎯 Valores para marcado de filas:', {
+        mesMinimo: Math.round(minimo),
+        mesMaximo: Math.round(maximo)
       });
       
     } catch (error) {
@@ -7149,6 +7225,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarMetodologiasIEAC(); // Cargar Metodologías IEAC
       cargarMetodologiasECD(); // Cargar Metodologías ECD
       cargarDuracionPlanificada(); // Cargar duración planificada
+      cargarIEACStrategico(); // Cargar datos estratégicos de IEAC
     } else {
       console.log('⚠️ proyectoId no está disponible');
     }
@@ -7169,8 +7246,41 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarMetodologiasIEAC(); // Recargar Metodologías IEAC cuando cambie la fecha de corte
       cargarMetodologiasECD(); // Recargar Metodologías ECD cuando cambie la fecha de corte
       cargarDuracionPlanificada(); // Recargar duración planificada cuando cambie la fecha de corte
+      cargarIEACStrategico(); // Recargar datos estratégicos de IEAC cuando cambie la fecha de corte
     }
   }, [fechaDesde, fechaHasta, fechaCorte]);
+
+  // Cargar IEAC estratégico cuando cambien los datos ECD
+  useEffect(() => {
+    if (datosECD && fechaCorte) {
+      cargarIEACStrategico();
+    }
+  }, [datosECD, fechaCorte]);
+
+  // Recargar IEAC estratégico cuando cambien los parámetros Beta
+  useEffect(() => {
+    if (proyectoId && fechaCorte && datosECD) {
+      console.log('🔄 Parámetros Beta cambiaron, recargando IEAC estratégico...', parametrosBeta);
+      cargarIEACStrategico();
+    }
+  }, [parametrosBeta.alpha, parametrosBeta.beta]);
+
+  // Recargar IEAC estratégico cuando se carguen los datos IEAC (para tener montoMaximoIEAC)
+  useEffect(() => {
+    if (proyectoId && fechaCorte && datosECD && montoMaximoIEAC) {
+      console.log('🔄 Datos IEAC cargados, recargando IEAC estratégico con monto máximo:', montoMaximoIEAC);
+      cargarIEACStrategico();
+    }
+  }, [montoMaximoIEAC]);
+
+  // DEBUG: Verificar cuando se cargan los datos estratégicos
+  useEffect(() => {
+    if (datosIEACStrategico.length > 0) {
+      console.log('✅ Datos IEAC estratégicos cargados:', datosIEACStrategico.length, 'registros');
+      console.log('📅 Último período estratégico:', datosIEACStrategico[datosIEACStrategico.length - 1]?.periodo_original);
+      console.log('🎯 Valor último período:', datosIEACStrategico[datosIEACStrategico.length - 1]?.ieac_avg_strategico);
+    }
+  }, [datosIEACStrategico]);
 
   // Recalcular distribución beta cuando cambien los parámetros
   useEffect(() => {
@@ -7239,6 +7349,48 @@ const ReporteLineasBases = ({ proyectoId }) => {
 
   // Función para obtener el valor de IEAC (avg) correspondiente a un período
   const obtenerIEACAvgPorPeriodo = (periodoOriginal) => {
+    // DEBUG ESPECÍFICO para Febrero 2027
+    if (periodoOriginal === '2027-02-01') {
+      console.log(`🔍 DEBUG Febrero 2027 - Buscando dato estratégico...`);
+      console.log(`📊 Datos estratégicos disponibles:`, datosIEACStrategico.length);
+      console.log(`📅 Datos estratégicos:`, datosIEACStrategico);
+      
+      const datoEstrategicoFebrero = datosIEACStrategico.find(item => item.periodo_original === periodoOriginal);
+      console.log(`🎯 Dato estratégico encontrado para Febrero:`, datoEstrategicoFebrero);
+    }
+
+    // Primero verificar si hay datos estratégicos para este período
+    const datoEstrategico = datosIEACStrategico.find(item => item.periodo_original === periodoOriginal);
+    if (datoEstrategico && datoEstrategico.es_estrategico) {
+      console.log(`🎯 IEAC estratégico para período ${periodoOriginal}:`, datoEstrategico.ieac_avg_strategico);
+      return datoEstrategico.ieac_avg_strategico;
+    }
+
+    // DEBUG: Verificar si no se encuentra dato estratégico
+    console.log(`🔍 No se encontró dato estratégico para período ${periodoOriginal}`);
+    console.log(`📊 Datos estratégicos disponibles:`, datosIEACStrategico.length, 'registros');
+    if (datosIEACStrategico.length > 0) {
+      console.log(`📅 Último período estratégico:`, datosIEACStrategico[datosIEACStrategico.length - 1]?.periodo_original);
+    }
+
+    // CORRECCIÓN: Si no hay datos estratégicos y tenemos datos ECD, verificar si el período está después del Mes Promedio ECD
+    if (datosECD && datosECD.promedio) {
+      // Encontrar el número de mes para este período
+      const periodoIndex = periodos.findIndex(p => p.periodo_original === periodoOriginal);
+      const numeroMes = periodoIndex + 1;
+      
+      // CORRECCIÓN: Usar Math.ceil para asegurar que incluya el mes redondeado hacia arriba
+      const mesPromedioRedondeado = Math.ceil(datosECD.promedio);
+      
+      // Si el período está después del Mes Promedio ECD redondeado, devolver null (cero/vacío)
+      if (numeroMes > mesPromedioRedondeado) {
+        console.log(`🚫 Período ${periodoOriginal} (mes ${numeroMes}) está después del Mes Promedio ECD redondeado (${mesPromedioRedondeado}). Devolviendo null.`);
+        console.log(`📊 Valor original ECD promedio: ${datosECD.promedio}, redondeado: ${mesPromedioRedondeado}`);
+        return null;
+      }
+    }
+
+    // Si no hay datos estratégicos, usar la lógica original SOLO para períodos dentro del rango ECD
     const dato = datosIEACAvg.find(item => item.periodo_original === periodoOriginal);
     console.log(`🔍 Buscando IEAC (avg) para período ${periodoOriginal}:`, dato);
     
@@ -7423,8 +7575,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const obtenerDatosFiltrados = () => {
     console.log(`🔍 Aplicando lógica de fecha de corte: ${fechaCorte}`);
     
-    // Retornar todos los períodos cargados desde la API como datos de la tabla
-    return periodos.map(periodo => {
+    // Crear array base con todos los períodos cargados desde la API
+    let datosBase = periodos.map(periodo => {
       // Aplicar lógica de fecha de corte para las columnas específicas
       const apiAcumReal = obtenerApiAcumRealConCorte(periodo.periodo_original, periodo.periodo_mes);
       const apiAcumProyectado = obtenerApiAcumProyectadoConCorte(periodo.periodo_original, periodo.periodo_mes);
@@ -7448,6 +7600,44 @@ const ReporteLineasBases = ({ proyectoId }) => {
         ieac_avg: ieacAvg
       };
     });
+
+        // Si tenemos valores de ECD y es mayor que la duración planificada, agregar meses adicionales
+        const mesLimiteECD = Math.max(
+          mesMaximoECD || 0, 
+          datosECD?.promedio ? Math.ceil(datosECD.promedio) : 0 // CORRECCIÓN: Usar Math.ceil para redondear hacia arriba
+        );
+    
+    if (mesLimiteECD && mesLimiteECD > datosBase.length) {
+      console.log(`📈 ECD límite (${mesLimiteECD}) es mayor que períodos actuales (${datosBase.length}). Agregando meses adicionales...`);
+      
+      // Obtener el último período para calcular los siguientes
+      const ultimoPeriodo = datosBase[datosBase.length - 1];
+      const ultimaFecha = new Date(ultimoPeriodo.periodo_original);
+      
+      // Agregar meses adicionales hasta el límite de ECD
+      for (let mes = datosBase.length + 1; mes <= mesLimiteECD; mes++) {
+        const nuevaFecha = new Date(ultimaFecha);
+        nuevaFecha.setMonth(ultimaFecha.getMonth() + (mes - datosBase.length));
+        
+        const nuevoPeriodo = {
+          periodo: formatearPeriodo(nuevaFecha.toISOString().split('T')[0]),
+          periodo_original: nuevaFecha.toISOString().split('T')[0],
+          periodo_inicio: nuevaFecha.toISOString().split('T')[0],
+          periodo_mes: mes,
+          api_acum: null, // Sin datos planificados para meses adicionales
+          monto_total: null,
+          api_acum_real: null,
+          api_acum_proyectado: null,
+          incurrido_total: null,
+          ieac_avg: null
+        };
+        
+        datosBase.push(nuevoPeriodo);
+        console.log(`➕ Agregado mes ${mes}: ${nuevoPeriodo.periodo}`);
+      }
+    }
+
+    return datosBase;
   };
 
   // Función para formatear el período en formato mes-año (MM-YYYY)
@@ -7491,6 +7681,47 @@ const ReporteLineasBases = ({ proyectoId }) => {
     }
   };
 
+  // Función para determinar el estilo de marcado de filas basado en ECD
+  const obtenerEstiloFila = (numeroMes) => {
+    if (!mesMinimoECD || !mesMaximoECD || !numeroMes) {
+      return {}; // Sin marcado si no hay datos ECD
+    }
+
+    // Marcar fila si el mes está entre el mínimo y máximo de ECD
+    if (numeroMes >= mesMinimoECD && numeroMes <= mesMaximoECD) {
+      return {
+        backgroundColor: '#fff3cd', // Amarillo claro para rango ECD
+        borderLeft: '4px solid #ffc107', // Borde amarillo a la izquierda
+        fontWeight: 'bold'
+      };
+    }
+
+    return {}; // Sin marcado para filas fuera del rango
+  };
+
+  // Función para determinar si una fila es un mes adicional agregado por ECD
+  const esMesAdicionalECD = (numeroMes) => {
+    return periodos && numeroMes > periodos.length;
+  };
+
+  // Función para determinar el estilo de marcado de filas basado en IEAC
+  const obtenerEstiloFilaIEAC = (montoTotal) => {
+    if (!montoMinimoIEAC || !montoMaximoIEAC || !montoTotal) {
+      return {}; // Sin marcado si no hay datos IEAC o monto
+    }
+
+    // Marcar fila si el monto está entre el mínimo y máximo de IEAC
+    if (montoTotal >= montoMinimoIEAC && montoTotal <= montoMaximoIEAC) {
+      return {
+        backgroundColor: '#e8f5e8', // Verde claro para rango IEAC
+        borderLeft: '4px solid #28a745', // Borde verde a la izquierda
+        fontWeight: 'bold'
+      };
+    }
+
+    return {}; // Sin marcado para filas fuera del rango
+  };
+
   // Función para obtener la fecha actual formateada
   const obtenerFechaActual = () => {
     const hoy = new Date();
@@ -7508,6 +7739,61 @@ const ReporteLineasBases = ({ proyectoId }) => {
         <h2 style={{ color: '#16355D', margin: 0 }}>
           Líneas Bases - Real/Proyectado
         </h2>
+      </div>
+
+      {/* Simbología de colores */}
+      <div style={{
+        marginBottom: '20px',
+        padding: '15px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px',
+        border: '1px solid #dee2e6'
+      }}>
+        <h5 style={{ 
+          margin: '0 0 10px 0', 
+          color: '#16355D', 
+          fontSize: '1rem',
+          fontWeight: 'bold'
+        }}>
+          🎨 Simbología de Colores
+        </h5>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '10px',
+          fontSize: '0.9rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              backgroundColor: '#fff3cd',
+              border: '2px solid #ffc107',
+              borderRadius: '4px'
+            }}></div>
+            <span><strong>ECD:</strong> Rango de meses estimados</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              backgroundColor: '#e8f5e8',
+              border: '2px solid #28a745',
+              borderRadius: '4px'
+            }}></div>
+            <span><strong>IEAC:</strong> Rango de montos estimados</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              backgroundColor: '#ffeaa7',
+              border: '2px solid #e17055',
+              borderRadius: '4px'
+            }}></div>
+            <span><strong>Intersección:</strong> Ambos criterios (quiebre)</span>
+          </div>
+        </div>
       </div>
 
       {/* Filtros de fecha */}
@@ -7974,10 +8260,38 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 </td>
               </tr>
             ) : obtenerDatosFiltrados().length > 0 ? (
-              obtenerDatosFiltrados().map((row, index) => (
+              obtenerDatosFiltrados().map((row, index) => {
+                // Obtener el número de mes de la primera columna (index + 1)
+                const numeroMes = index + 1;
+                const estiloFilaECD = obtenerEstiloFila(numeroMes);
+                const estiloFilaIEAC = obtenerEstiloFilaIEAC(row.monto_total);
+                
+                // Determinar si la fila cumple ambos criterios (ECD e IEAC)
+                const cumpleECD = Object.keys(estiloFilaECD).length > 0;
+                const cumpleIEAC = Object.keys(estiloFilaIEAC).length > 0;
+                
+                let estiloFilaFinal = {};
+                
+                if (cumpleECD && cumpleIEAC) {
+                  // Fila que cumple ambos criterios - color especial (naranja)
+                  estiloFilaFinal = {
+                    backgroundColor: '#ffeaa7', // Naranja claro para intersección
+                    borderLeft: '4px solid #e17055', // Borde naranja
+                    fontWeight: 'bold'
+                  };
+                } else if (cumpleECD) {
+                  // Solo cumple criterio ECD - amarillo
+                  estiloFilaFinal = estiloFilaECD;
+                } else if (cumpleIEAC) {
+                  // Solo cumple criterio IEAC - verde
+                  estiloFilaFinal = estiloFilaIEAC;
+                }
+                
+                return (
                 <tr key={index} style={{ 
                   background: index % 2 === 0 ? '#f8f9fa' : '#fff',
-                  borderBottom: '1px solid #dee2e6'
+                  borderBottom: '1px solid #dee2e6',
+                  ...estiloFilaFinal // Aplicar marcado dinámico basado en ECD e IEAC
                 }}>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e9ecef' }}>
                     {index + 1}
@@ -8019,7 +8333,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
                     -
                   </td>
                 </tr>
-              ))
+                );
+              })
         ) : (
               <tr>
                 <td colSpan="13" style={{ 
