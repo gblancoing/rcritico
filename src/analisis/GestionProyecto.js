@@ -6827,6 +6827,14 @@ const ReporteLineasBases = ({ proyectoId }) => {
   const [datosAvFinancieroIncurrido, setDatosAvFinancieroIncurrido] = useState([]);
   const [cargandoAvFinancieroIncurrido, setCargandoAvFinancieroIncurrido] = useState(false);
   
+  // Estados para datos de vc_project_9c (Costo Ganado)
+  const [datosVcProject9c, setDatosVcProject9c] = useState([]);
+  const [cargandoVcProject9c, setCargandoVcProject9c] = useState(false);
+  
+  // Estados para datos de financiero_sap (Grupo A del Costo Ganado)
+  const [datosFinancieroSap, setDatosFinancieroSap] = useState([]);
+  const [cargandoFinancieroSap, setCargandoFinancieroSap] = useState(false);
+  
   // Estado para los datos de IEAC (avg)
   const [datosIEACAvg, setDatosIEACAvg] = useState([]);
   const [cargandoIEACAvg, setCargandoIEACAvg] = useState(false);
@@ -6913,107 +6921,128 @@ const ReporteLineasBases = ({ proyectoId }) => {
     return null;
   };
 
-  // Función para calcular el Costo Ganado (EV) según criterios de prioridad oficiales
+  // Función para calcular el Costo Ganado (EV) usando la nueva metodología con 3 grupos
   const calcularCostoGanado = (numeroMes, periodoOriginal, row) => {
-    console.log('🔍 DEBUG calcularCostoGanado:', {
+    console.log('🔍 DEBUG calcularCostoGanado NUEVO:', {
       numeroMes,
       periodoOriginal,
       plazoControlECD,
-      valorBAC,
-      row: row
+      datosVcProject9c: datosVcProject9c.length,
+      datosAvFisicoPlan: datosAvFisicoPlan.length,
+      datosAvFisicoReal: datosAvFisicoReal.length,
+      datosFinancieroSap: datosFinancieroSap ? datosFinancieroSap.length : 0
     });
     
-    // Verificar si tenemos los datos necesarios básicos
-    if (!plazoControlECD || !valorBAC) {
-      console.log('❌ Faltan datos necesarios:', {
-        plazoControlECD: !!plazoControlECD,
-        valorBAC: !!valorBAC
-      });
-      return null;
+    // Solo calcular hasta el plazo control
+    if (!plazoControlECD || numeroMes > plazoControlECD) {
+      console.log('❌ DEBUG calcularCostoGanado - Fuera del plazo control');
+      return undefined;
     }
     
-    // Verificar si el mes actual está dentro del rango (desde mes 1 hasta Plazo Control)
-    if (numeroMes >= 1 && numeroMes <= plazoControlECD) {
-      console.log('✅ Mes dentro del rango:', numeroMes, '<=', plazoControlECD);
+    // GRUPO A: financiero_sap (versión más reciente) - EM + MO + IC + IE + SC
+    // Usar los datos de financiero_sap que ya están cargados
+    let grupoA = 0;
+    if (datosFinancieroSap && datosFinancieroSap.length > 0) {
+      // Filtrar por período y obtener la versión más reciente
+      const datosPeriodo = datosFinancieroSap.filter(item => item.periodo === periodoOriginal);
       
-      // PRIORIDAD 1: Suma (Qty reales * PU Pto)
-      // Solo si el sistema puede hacer el cálculo (requiere datos detallados)
-      if (row && row.cantidad_real && row.precio_unitario) {
-        const EV_Prioridad1 = row.cantidad_real * row.precio_unitario;
-        console.log('✅ EV Prioridad 1 (Detalla):', {
-          cantidad_real: row.cantidad_real,
-          precio_unitario: row.precio_unitario,
-          EV: EV_Prioridad1,
-          formateado: formatearMoneda(EV_Prioridad1)
-        });
-        return EV_Prioridad1;
-      }
-      
-      // PRIORIDAD 2: $ Prog/%Av. Prog * %Av. Real
-      // Factor P = (%Av.Finan.Prog / %Av.Prog), Factor R = (%Av.Finan.Real / %Av.Real)
-      if (row && row.monto_total && row.api_acum && row.api_acum_real && row.incurrido_total) {
-        const porcentajeAvanceProg = parseFloat(row.api_acum);
-        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
-        const montoProgramado = parseFloat(row.monto_total);
-        const montoReal = parseFloat(row.incurrido_total);
-        
-        if (porcentajeAvanceProg > 0) {
-          const factorP = (montoProgramado / porcentajeAvanceProg) / (montoProgramado / porcentajeAvanceProg);
-          const factorR = porcentajeAvanceReal > 0 ? (montoReal / porcentajeAvanceReal) / (montoReal / porcentajeAvanceReal) : 1;
+      if (datosPeriodo.length > 0) {
+        // Ordenar por descripción para obtener la versión más reciente
+        const versionMasReciente = datosPeriodo.sort((a, b) => {
+          // Extraer año y mes de la descripción
+          const getYear = (desc) => {
+            const yearMatch = desc.match(/(\d{4})/);
+            return yearMatch ? parseInt(yearMatch[1]) : 0;
+          };
           
-          // Verificar condiciones: Factor P y R < 1,0 o >1,0
-          if ((factorP < 1.0 || factorP > 1.0) && (factorR < 1.0 || factorR > 1.0)) {
-            const EV_Prioridad2 = (montoProgramado / porcentajeAvanceProg) * porcentajeAvanceReal;
-            console.log('✅ EV Prioridad 2 (Simplificación primer orden):', {
-              montoProgramado,
-              porcentajeAvanceProg,
-              porcentajeAvanceReal,
-              factorP,
-              factorR,
-              EV: EV_Prioridad2,
-              formateado: formatearMoneda(EV_Prioridad2)
-            });
-            return EV_Prioridad2;
-          }
+          const getMonth = (desc) => {
+            if (desc.includes('Enero')) return 1;
+            if (desc.includes('Febrero')) return 2;
+            if (desc.includes('Marzo')) return 3;
+            if (desc.includes('Abril')) return 4;
+            if (desc.includes('Mayo')) return 5;
+            if (desc.includes('Junio')) return 6;
+            if (desc.includes('Julio')) return 7;
+            if (desc.includes('Agosto')) return 8;
+            if (desc.includes('Septiembre')) return 9;
+            if (desc.includes('Octubre')) return 10;
+            if (desc.includes('Noviembre')) return 11;
+            if (desc.includes('Diciembre')) return 12;
+            return 0;
+          };
+          
+          const yearA = getYear(a.descripcion);
+          const yearB = getYear(b.descripcion);
+          const monthA = getMonth(a.descripcion);
+          const monthB = getMonth(b.descripcion);
+          
+          // Ordenar por año DESC, luego por mes DESC
+          if (yearA !== yearB) return yearB - yearA;
+          return monthB - monthA;
+        })[0];
+        
+        // Sumar EM + MO + IC + IE + SC
+        grupoA = (parseFloat(versionMasReciente.EM) || 0) +
+                (parseFloat(versionMasReciente.MO) || 0) +
+                (parseFloat(versionMasReciente.IC) || 0) +
+                (parseFloat(versionMasReciente.IE) || 0) +
+                (parseFloat(versionMasReciente.SC) || 0);
+        
+        // Aplicar fórmula: grupoA / % av. Programado * % av. real
+        const avFisicoPlanData = datosAvFisicoPlan.find(item => item.periodo === periodoOriginal);
+        const avFisicoRealData = datosAvFisicoReal.find(item => item.periodo === periodoOriginal);
+        
+        const porcentajeAvanceProgramado = avFisicoPlanData ? parseFloat(avFisicoPlanData.ie_parcial) : 0;
+        const porcentajeAvanceReal = avFisicoRealData ? parseFloat(avFisicoRealData.ie_parcial) : 0;
+        
+        if (porcentajeAvanceProgramado > 0) {
+          grupoA = (grupoA / porcentajeAvanceProgramado) * porcentajeAvanceReal;
         }
       }
-      
-      // PRIORIDAD 3: %Av.Real * BAC
-      // Factor P y R diferentes tendencias
-      if (row && row.api_acum_real) {
-        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
-        const EV_Prioridad3 = valorBAC * porcentajeAvanceReal;
-        console.log('✅ EV Prioridad 3 (Simplificación segundo orden):', {
-          porcentajeAvanceReal,
-          valorBAC,
-          EV: EV_Prioridad3,
-          formateado: formatearMoneda(EV_Prioridad3)
-        });
-        return EV_Prioridad3;
-      }
-      
-      // PRIORIDAD 4: Indirectos (depende del API) 50%Avance + 50%Plazo
-      // Para casos donde no hay datos suficientes
-      if (row && row.api_acum_real) {
-        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
-        const porcentajePlazo = numeroMes / plazoControlECD; // Progreso temporal
-        const EV_Prioridad4 = valorBAC * ((porcentajeAvanceReal * 0.5) + (porcentajePlazo * 0.5));
-        console.log('✅ EV Prioridad 4 (Simplificación tercer orden):', {
-          porcentajeAvanceReal,
-          porcentajePlazo,
-          valorBAC,
-          EV: EV_Prioridad4,
-          formateado: formatearMoneda(EV_Prioridad4)
-        });
-        return EV_Prioridad4;
-      }
-      
-      console.log('❌ No se pudo calcular EV con ningún criterio de prioridad');
-    } else {
-      console.log('❌ Mes fuera del rango:', numeroMes, 'fuera de 1-', plazoControlECD);
     }
     
-    return null;
+    // GRUPO B: AD (50% avance + 50% plazo)
+    let grupoB = 0;
+    const datosAD = datosVcProject9c.find(item => 
+      item.periodo === periodoOriginal && item.cat_vp === 'AD'
+    );
+    
+    if (datosAD) {
+      const baseAD = parseFloat(datosAD.base) || 0;
+      const avFisicoRealData = datosAvFisicoReal.find(item => item.periodo === periodoOriginal);
+      const porcentajeAvanceReal = avFisicoRealData ? parseFloat(avFisicoRealData.api_acum) : 0;
+      
+      // Calcular total de períodos y período actual
+      const totalPeriodos = datosAvFisicoPlan.length;
+      const periodoActual = datosAvFisicoPlan.findIndex(item => item.periodo === periodoOriginal) + 1;
+      
+      grupoB = baseAD * (0.5 * porcentajeAvanceReal + 0.5 * (periodoActual / totalPeriodos));
+    }
+    
+    // GRUPO C: CL + CT (suma de incurrido)
+    let grupoC = 0;
+    const datosCLCT = datosVcProject9c.filter(item => 
+      item.periodo === periodoOriginal && 
+      (item.cat_vp === 'CL' || item.cat_vp === 'CT')
+    );
+    
+    grupoC = datosCLCT.reduce((sum, item) => {
+      return sum + (parseFloat(item.incurrido) || 0);
+    }, 0);
+    
+    // COSTO GANADO TOTAL (suma de los 3 grupos)
+    const costoGanado = grupoA + grupoB + grupoC;
+    
+    console.log('✅ DEBUG calcularCostoGanado - Cálculo exitoso:', {
+      periodo: periodoOriginal,
+      grupoA,
+      grupoB,
+      grupoC,
+      costoGanado,
+      formula: `GrupoA(${grupoA}) + GrupoB(${grupoB}) + GrupoC(${grupoC}) = ${costoGanado}`
+    });
+    
+    return costoGanado;
   };
 
 
@@ -7191,6 +7220,92 @@ const ReporteLineasBases = ({ proyectoId }) => {
       setDatosAvFisicoReal([]);
     } finally {
       setCargandoAvFisicoReal(false);
+    }
+  };
+
+  // Función para cargar datos de vc_project_9c (Costo Ganado)
+  const cargarVcProject9c = async () => {
+    console.log('🚀 INICIANDO cargarVcProject9c con proyectoId:', proyectoId);
+    if (!proyectoId) {
+      console.log('❌ No hay proyectoId, cancelando carga');
+      return;
+    }
+    
+    setCargandoVcProject9c(true);
+    try {
+      let url = `${API_BASE}/gestion_proyecto/consultas/vc_project_9c.php?proyecto_id=${proyectoId}`;
+      
+      // Agregar filtros de fecha si están presentes
+      if (fechaDesde) {
+        url += `&fecha_desde=${fechaDesde}`;
+      }
+      if (fechaHasta) {
+        url += `&fecha_hasta=${fechaHasta}`;
+      }
+      
+      console.log('🔍 Consultando vc_project_9c');
+      console.log('📋 URL completa:', url);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('📊 Datos vc_project_9c recibidos:', data);
+      
+      if (data.success && data.data) {
+        setDatosVcProject9c(data.data);
+        console.log('✅ Datos vc_project_9c cargados exitosamente:', data.data.length, 'registros');
+      } else {
+        console.log('⚠️ No se encontraron datos vc_project_9c o error en la respuesta');
+        setDatosVcProject9c([]);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando datos vc_project_9c:', error);
+      setDatosVcProject9c([]);
+    } finally {
+      setCargandoVcProject9c(false);
+    }
+  };
+
+  // Función para cargar datos de financiero_sap (Grupo A del Costo Ganado)
+  const cargarFinancieroSap = async () => {
+    console.log('🚀 INICIANDO cargarFinancieroSap con proyectoId:', proyectoId);
+    if (!proyectoId) {
+      console.log('❌ No hay proyectoId, cancelando carga');
+      return;
+    }
+    
+    setCargandoFinancieroSap(true);
+    try {
+      let url = `${API_BASE}/vectores/financiero_sap.php?proyecto_id=${proyectoId}`;
+      
+      // Agregar filtros de fecha si están presentes
+      if (fechaDesde) {
+        url += `&fecha_desde=${fechaDesde}`;
+      }
+      if (fechaHasta) {
+        url += `&fecha_hasta=${fechaHasta}`;
+      }
+      
+      console.log('🔍 Consultando financiero_sap');
+      console.log('📋 URL completa:', url);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('📊 Datos financiero_sap recibidos:', data);
+      
+      if (data.success && data.data) {
+        setDatosFinancieroSap(data.data);
+        console.log('✅ Datos financiero_sap cargados exitosamente:', data.data.length, 'registros');
+      } else {
+        console.log('⚠️ No se encontraron datos financiero_sap o error en la respuesta');
+        setDatosFinancieroSap([]);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando datos financiero_sap:', error);
+      setDatosFinancieroSap([]);
+    } finally {
+      setCargandoFinancieroSap(false);
     }
   };
 
@@ -8206,6 +8321,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFisicoReal(); // Cargar datos de av_fisico_real
       cargarAvFisicoProyectado(); // Cargar datos de av_fisico_proyectado
       cargarAvFinancieroIncurrido(); // Cargar datos de av_financiero_incurrido
+      cargarVcProject9c(); // Cargar datos de vc_project_9c (Costo Ganado)
+      cargarFinancieroSap(); // Cargar datos de financiero_sap (Grupo A del Costo Ganado)
       cargarIEACAvg(); // Cargar datos de IEAC (avg)
       cargarMetodologiasIEAC(); // Cargar Metodologías IEAC
       cargarMetodologiasECD(); // Cargar Metodologías ECD
@@ -8227,6 +8344,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
       cargarAvFisicoReal();
       cargarAvFisicoProyectado();
       cargarAvFinancieroIncurrido();
+      cargarVcProject9c(); // Recargar datos de vc_project_9c cuando cambie la fecha de corte
+      cargarFinancieroSap(); // Recargar datos de financiero_sap cuando cambie la fecha de corte
       cargarIEACAvg();
       cargarMetodologiasIEAC(); // Recargar Metodologías IEAC cuando cambie la fecha de corte
       cargarMetodologiasECD(); // Recargar Metodologías ECD cuando cambie la fecha de corte
