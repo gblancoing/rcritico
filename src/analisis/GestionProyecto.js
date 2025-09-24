@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -5972,6 +5973,802 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
   );
 };
 
+// Componente para el gráfico de curva S
+const GraficoCurvaS = ({ 
+  datosTabla, 
+  proyectoId, 
+  mesMinimoECD, 
+  mesMaximoECD, 
+  montoMinimoIEAC, 
+  montoMaximoIEAC, 
+  valorBAC, 
+  plazoControlECD, 
+  datosAvFisicoReal 
+}) => {
+  const [datosGrafico, setDatosGrafico] = useState([]);
+  const [cargandoGrafico, setCargandoGrafico] = useState(false);
+  
+  // Estados para filtros de líneas
+  const [filtrosActivos, setFiltrosActivos] = useState({
+    avFisicoPlanificado: true,
+    avFinancieroPlanificado: true,
+    avFisicoReal: true,
+    avFisicoProyectado: true,
+    avFinancieroReal: true,
+    ieacAvg: true,
+    ieacMin: true,
+    ieacMax: true,
+    eacInformado: true,
+    eacProyectado: true,
+    costoGanado: true
+  });
+
+  const [modoOscuro, setModoOscuro] = useState(true); // true = fondo negro, false = fondo blanco
+
+  // Función para alternar filtros
+  const alternarFiltro = (filtro) => {
+    setFiltrosActivos(prev => ({
+      ...prev,
+      [filtro]: !prev[filtro]
+    }));
+  };
+
+  // Función para preparar los datos para el gráfico
+  const prepararDatosGrafico = (datos) => {
+    if (!datos || datos.length === 0) return [];
+
+    return datos.map((row, index) => {
+      const numeroMes = index + 1;
+      
+      // Convertir porcentajes a valores monetarios usando BAC
+      const porcentajeAvFisicoPlanificado = row.api_acum ? parseFloat(row.api_acum) : null;
+      const porcentajeAvFisicoReal = row.api_acum_real ? parseFloat(row.api_acum_real) : null;
+      const porcentajeAvFisicoProyectado = row.api_acum_proyectado ? parseFloat(row.api_acum_proyectado) : null;
+      
+      // Convertir a valores monetarios: porcentaje * BAC (solo si hay porcentaje válido)
+      const avFisicoPlanificadoMonetario = (valorBAC && porcentajeAvFisicoPlanificado !== null) ? porcentajeAvFisicoPlanificado * valorBAC : undefined;
+      const avFisicoRealMonetario = (valorBAC && porcentajeAvFisicoReal !== null) ? porcentajeAvFisicoReal * valorBAC : undefined;
+      const avFisicoProyectadoMonetario = (valorBAC && porcentajeAvFisicoProyectado !== null) ? porcentajeAvFisicoProyectado * valorBAC : undefined;
+      
+      // Calcular valores IEAC
+      const ieacMinValue = calcularIEACMin(numeroMes);
+      const ieacMaxValue = calcularIEACMax(numeroMes);
+      
+      // Calcular datos específicos para el área de la nube
+      let ieacCloudArea = undefined;
+      if (ieacMinValue !== undefined && ieacMaxValue !== undefined) {
+        ieacCloudArea = ieacMaxValue - ieacMinValue;
+      }
+      
+      return {
+        mes: numeroMes,
+        periodo: row.periodo,
+        avFisicoPlanificado: avFisicoPlanificadoMonetario,
+        avFinancieroPlanificado: row.monto_total ? parseFloat(row.monto_total) : undefined,
+        avFisicoReal: avFisicoRealMonetario,
+        avFisicoProyectado: avFisicoProyectadoMonetario,
+        avFinancieroReal: row.incurrido_total ? parseFloat(row.incurrido_total) : undefined,
+        ieacAvg: row.ieac_avg ? parseFloat(row.ieac_avg) : undefined,
+        ieacMin: ieacMinValue,
+        ieacMax: ieacMaxValue,
+        // Datos específicos para el área de la nube
+        ieacCloudArea: ieacCloudArea,
+        eacInformado: calcularEACInformado(numeroMes),
+        eacProyectado: calcularEACProyectado(numeroMes),
+        costoGanado: calcularCostoGanado(numeroMes, row.periodo, row)
+      };
+    });
+  };
+
+  // Función para calcular IEAC Min
+  const calcularIEACMin = (numeroMes) => {
+    console.log('🔍 DEBUG calcularIEACMin:', {
+      numeroMes,
+      mesMinimoECD,
+      mesMaximoECD,
+      montoMinimoIEAC,
+      enRango: numeroMes >= mesMinimoECD && numeroMes <= mesMaximoECD
+    });
+    
+    if (!mesMinimoECD || !mesMaximoECD || !montoMinimoIEAC) {
+      console.log('❌ DEBUG calcularIEACMin - Valores faltantes');
+      return undefined;
+    }
+    if (numeroMes >= mesMinimoECD && numeroMes <= mesMaximoECD) {
+      console.log('✅ DEBUG calcularIEACMin - Valor aplicado:', montoMinimoIEAC);
+      return montoMinimoIEAC;
+    }
+    console.log('❌ DEBUG calcularIEACMin - Fuera de rango');
+    return undefined;
+  };
+
+  // Función para calcular IEAC Max
+  const calcularIEACMax = (numeroMes) => {
+    if (!mesMinimoECD || !mesMaximoECD || !montoMaximoIEAC) {
+      return undefined;
+    }
+    if (numeroMes >= mesMinimoECD && numeroMes <= mesMaximoECD) {
+      return montoMaximoIEAC;
+    }
+    return undefined;
+  };
+
+  // Función para calcular EAC Informado
+  const calcularEACInformado = (numeroMes) => {
+    if (!plazoControlECD || !mesMaximoECD || !valorBAC) {
+      return undefined;
+    }
+    if (numeroMes >= plazoControlECD && numeroMes <= mesMaximoECD) {
+      return valorBAC;
+    }
+    return undefined;
+  };
+
+  // Función para calcular EAC Proyectado
+  const calcularEACProyectado = (numeroMes) => {
+    if (!plazoControlECD || !valorBAC) {
+      return undefined;
+    }
+    if (numeroMes >= 1 && numeroMes <= plazoControlECD) {
+      return valorBAC;
+    }
+    return undefined;
+  };
+
+  // Función para calcular Costo Ganado (Earned Value)
+  const calcularCostoGanado = (numeroMes, periodoOriginal, row) => {
+    if (!plazoControlECD || !valorBAC) {
+      return undefined;
+    }
+    
+    if (numeroMes >= 1 && numeroMes <= plazoControlECD) {
+      // PRIORIDAD 1: Suma (Qty reales * PU Pto)
+      if (row && row.cantidad_real && row.precio_unitario) {
+        return row.cantidad_real * row.precio_unitario;
+      }
+      
+      // PRIORIDAD 2: $ Prog/%Av. Prog * %Av. Real
+      if (row && row.monto_total && row.api_acum && row.api_acum_real && row.incurrido_total) {
+        const porcentajeAvanceProg = parseFloat(row.api_acum);
+        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
+        const montoProgramado = parseFloat(row.monto_total);
+        const montoReal = parseFloat(row.incurrido_total);
+        
+        if (porcentajeAvanceProg > 0) {
+          const factorP = (montoProgramado / porcentajeAvanceProg) / (montoProgramado / porcentajeAvanceProg);
+          const factorR = porcentajeAvanceReal > 0 ? (montoReal / porcentajeAvanceReal) / (montoReal / porcentajeAvanceReal) : 1;
+          
+          if ((factorP < 1.0 || factorP > 1.0) && (factorR < 1.0 || factorR > 1.0)) {
+            return (montoProgramado / porcentajeAvanceProg) * porcentajeAvanceReal;
+          }
+        }
+      }
+      
+      // PRIORIDAD 3: %Av.Real * BAC
+      if (row && row.api_acum_real) {
+        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
+        return valorBAC * porcentajeAvanceReal;
+      }
+      
+      // PRIORIDAD 4: Indirectos (depende del API) 50%Avance + 50%Plazo
+      if (row && row.api_acum_real) {
+        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
+        const porcentajePlazo = numeroMes / plazoControlECD;
+        return valorBAC * ((porcentajeAvanceReal * 0.5) + (porcentajePlazo * 0.5));
+      }
+    }
+    
+    return undefined;
+  };
+
+  // Función para calcular el rango del eje Y
+  const calcularRangoEjeY = () => {
+    if (!valorBAC) return { min: 0, max: 1000000 };
+    
+    // Agregar 20% de margen por encima del BAC
+    const margen = valorBAC * 0.2;
+    const maximo = valorBAC + margen;
+    
+    // Redondear hacia arriba para tener números más limpios
+    const maximoRedondeado = Math.ceil(maximo / 100000) * 100000; // Redondear a centenas de miles
+    
+    return {
+      min: 0,
+      max: maximoRedondeado
+    };
+  };
+
+  const rangoEjeY = calcularRangoEjeY();
+
+  // Actualizar datos del gráfico cuando cambien los datos de la tabla
+  useEffect(() => {
+    console.log('🔍 DEBUG GraficoCurvaS - datosTabla:', datosTabla);
+    console.log('🔍 DEBUG GraficoCurvaS - valorBAC:', valorBAC);
+    console.log('🔍 DEBUG GraficoCurvaS - proyectoId:', proyectoId);
+    
+    if (datosTabla && datosTabla.length > 0) {
+      setCargandoGrafico(true);
+      const datosPreparados = prepararDatosGrafico(datosTabla);
+      console.log('🔍 DEBUG GraficoCurvaS - datosPreparados:', datosPreparados);
+      setDatosGrafico(datosPreparados);
+      setCargandoGrafico(false);
+    } else {
+      console.log('❌ DEBUG GraficoCurvaS - No hay datosTabla o está vacío');
+    }
+  }, [datosTabla, valorBAC]);
+
+  if (cargandoGrafico) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '400px',
+        fontSize: '16px',
+        color: '#16355D'
+      }}>
+        Cargando gráfico de curva S...
+      </div>
+    );
+  }
+
+  if (!datosGrafico || datosGrafico.length === 0) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '400px',
+        fontSize: '16px',
+        color: '#666'
+      }}>
+        No hay datos disponibles para el gráfico
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ 
+      width: '100%', 
+      marginTop: '20px'
+    }}>
+      {/* Card Header */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderTopLeftRadius: '8px',
+        borderTopRightRadius: '8px',
+        border: '1px solid #e5e7eb',
+        borderBottom: 'none',
+        padding: '20px 24px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start'
+      }}>
+        <div>
+          <h3 style={{ 
+            margin: '0 0 8px 0',
+            color: '#111827',
+            fontSize: '18px',
+            fontWeight: '600',
+            lineHeight: '1.2'
+          }}>
+            Gráfico de Curva S
+          </h3>
+          <p style={{
+            margin: '0',
+            color: '#6b7280',
+            fontSize: '14px',
+            lineHeight: '1.4'
+          }}>
+            Proyecto {proyectoId} - Análisis de avance físico y financiero
+          </p>
+        </div>
+        
+        {/* Toggle Modo Oscuro/Claro */}
+        <button
+          onClick={() => setModoOscuro(!modoOscuro)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 12px',
+            backgroundColor: modoOscuro ? '#1f2937' : '#f3f4f6',
+            color: modoOscuro ? '#ffffff' : '#374151',
+            border: `1px solid ${modoOscuro ? '#374151' : '#d1d5db'}`,
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '500',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.backgroundColor = modoOscuro ? '#374151' : '#e5e7eb';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.backgroundColor = modoOscuro ? '#1f2937' : '#f3f4f6';
+          }}
+        >
+          {modoOscuro ? (
+            <>
+              🌙 Modo Oscuro
+            </>
+          ) : (
+            <>
+              ☀️ Modo Claro
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Card Content */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderLeft: '1px solid #e5e7eb',
+        borderRight: '1px solid #e5e7eb',
+        padding: '24px'
+      }}>
+        {/* Panel de Filtros */}
+        <div style={{
+          marginBottom: '24px',
+          padding: '16px',
+          backgroundColor: '#f9fafb',
+          borderRadius: '6px',
+          border: '1px solid #e5e7eb'
+        }}>
+          <h4 style={{ 
+            marginBottom: '16px', 
+            color: '#111827',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}>
+            🔍 Filtros de Líneas
+          </h4>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '12px'
+          }}>
+            {/* Grupo: Avances Planificados */}
+            <div style={{ marginBottom: '8px' }}>
+              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+                📊 Avances Planificados
+              </h5>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.avFisicoPlanificado}
+                  onChange={() => alternarFiltro('avFisicoPlanificado')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#FF0000' }}>●</span> Av. Físico Planificado
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.avFinancieroPlanificado}
+                  onChange={() => alternarFiltro('avFinancieroPlanificado')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#FF0000' }}>●</span> Av. Financiero Planificado
+              </label>
+            </div>
+
+            {/* Grupo: Avances Reales */}
+            <div style={{ marginBottom: '8px' }}>
+              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+                📈 Avances Reales
+              </h5>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.avFisicoReal}
+                  onChange={() => alternarFiltro('avFisicoReal')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#00FF00' }}>●</span> Av. Físico Real
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.avFinancieroReal}
+                  onChange={() => alternarFiltro('avFinancieroReal')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#00FF00' }}>●</span> Av. Financiero Real
+              </label>
+            </div>
+
+            {/* Grupo: Proyecciones */}
+            <div style={{ marginBottom: '8px' }}>
+              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+                🔮 Proyecciones
+              </h5>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.avFisicoProyectado}
+                  onChange={() => alternarFiltro('avFisicoProyectado')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#000000' }}>●</span> Av. Físico Proyectado
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.costoGanado}
+                  onChange={() => alternarFiltro('costoGanado')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#800080' }}>●</span> Costo Ganado
+              </label>
+            </div>
+
+            {/* Grupo: IEAC */}
+            <div style={{ marginBottom: '8px' }}>
+              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+                💰 IEAC
+              </h5>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.ieacAvg}
+                  onChange={() => alternarFiltro('ieacAvg')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#00FFFF' }}>●</span> IEAC Avg
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.ieacMin}
+                  onChange={() => alternarFiltro('ieacMin')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#8B4513' }}>●</span> IEAC Min
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.ieacMax}
+                  onChange={() => alternarFiltro('ieacMax')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#8B4513' }}>●</span> IEAC Max
+              </label>
+            </div>
+
+            {/* Grupo: EAC */}
+            <div style={{ marginBottom: '8px' }}>
+              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+                🎯 EAC
+              </h5>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.eacInformado}
+                  onChange={() => alternarFiltro('eacInformado')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#000000' }}>●</span> EAC Informado
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosActivos.eacProyectado}
+                  onChange={() => alternarFiltro('eacProyectado')}
+                  style={{ marginRight: '8px', accentColor: '#3b82f6' }}
+                />
+                <span style={{ color: '#000000' }}>●</span> EAC Proyectado
+              </label>
+            </div>
+          </div>
+
+          {/* Botones de acción rápida */}
+          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setFiltrosActivos({
+                avFisicoPlanificado: true,
+                avFinancieroPlanificado: true,
+                avFisicoReal: true,
+                avFisicoProyectado: true,
+                avFinancieroReal: true,
+                ieacAvg: true,
+                ieacMin: true,
+                ieacMax: true,
+                eacInformado: true,
+                eacProyectado: true,
+                costoGanado: true
+              })}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              ✅ Mostrar Todas
+            </button>
+            <button
+              onClick={() => setFiltrosActivos({
+                avFisicoPlanificado: false,
+                avFinancieroPlanificado: false,
+                avFisicoReal: false,
+                avFisicoProyectado: false,
+                avFinancieroReal: false,
+                ieacAvg: false,
+                ieacMin: false,
+                ieacMax: false,
+                eacInformado: false,
+                eacProyectado: false,
+                costoGanado: false
+              })}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              ❌ Ocultar Todas
+            </button>
+          </div>
+        </div>
+
+        {/* Chart Container */}
+        <div style={{ 
+          height: '600px',
+          backgroundColor: modoOscuro ? '#000000' : '#ffffff',
+          borderRadius: '6px',
+          padding: '16px',
+          border: modoOscuro ? '1px solid #374151' : '1px solid #e5e7eb'
+        }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart 
+              data={datosGrafico} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+            >
+              <CartesianGrid vertical={false} stroke={modoOscuro ? '#374151' : '#f3f4f6'} />
+              <XAxis 
+                dataKey="mes" 
+                stroke={modoOscuro ? '#ffffff' : '#6b7280'}
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tickFormatter={(value) => `Mes ${value}`}
+              />
+              <YAxis 
+                stroke={modoOscuro ? '#ffffff' : '#6b7280'}
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tickFormatter={(value) => `${value.toLocaleString()}`}
+                domain={[rangoEjeY.min, rangoEjeY.max]}
+                ticks={[
+                  rangoEjeY.min,
+                  rangoEjeY.max * 0.25,
+                  rangoEjeY.max * 0.5,
+                  rangoEjeY.max * 0.75,
+                  rangoEjeY.max
+                ]}
+              />
+              <Tooltip 
+                formatter={(value, name) => {
+                  return [`$${value?.toLocaleString() || '-'}`, name];
+                }}
+                labelFormatter={(label) => `Mes ${label}`}
+                contentStyle={{
+                  backgroundColor: modoOscuro ? '#1f2937' : '#ffffff',
+                  border: modoOscuro ? '1px solid #374151' : '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  boxShadow: modoOscuro ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
+                  color: modoOscuro ? '#ffffff' : '#111827'
+                }}
+                cursor={false}
+              />
+              <Legend 
+                wrapperStyle={{ 
+                  paddingTop: '20px',
+                  fontSize: '12px'
+                }}
+              />
+              
+              {/* Área transparente entre IEAC Min e IEAC Max - Solución profesional */}
+              {/* Área base (IEAC Min) */}
+              <Area
+                type="monotone"
+                dataKey="ieacMin"
+                stackId="ieacCloud"
+                stroke="none"
+                fill={modoOscuro ? "#000000" : "#ffffff"}
+                fillOpacity={1}
+                baseValue={0}
+              />
+              {/* Área de la nube (diferencia entre IEAC Max e IEAC Min) */}
+              <Area
+                type="monotone"
+                dataKey="ieacCloudArea"
+                stackId="ieacCloud"
+                stroke="none"
+                fill={modoOscuro ? "rgba(139, 69, 19, 0.25)" : "rgba(139, 69, 19, 0.2)"}
+                fillOpacity={0.4}
+                baseValue={0}
+              />
+              
+              {/* Líneas del gráfico */}
+              {filtrosActivos.avFisicoPlanificado && (
+                <Line 
+                  type="monotone" 
+                  dataKey="avFisicoPlanificado" 
+                  stroke="#ef4444" 
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  name="Av. Físico Planificado (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.avFinancieroPlanificado && (
+                <Line 
+                  type="monotone" 
+                  dataKey="avFinancieroPlanificado" 
+                  stroke="#ef4444" 
+                  strokeWidth={2}
+                  name="Av. Financiero Planificado (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.avFisicoReal && (
+                <Line 
+                  type="monotone" 
+                  dataKey="avFisicoReal" 
+                  stroke="#10b981" 
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  name="Av. Físico Real (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.avFisicoProyectado && (
+                <Line 
+                  type="monotone" 
+                  dataKey="avFisicoProyectado" 
+                  stroke="#374151" 
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  name="Av. Físico Proyectado (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.avFinancieroReal && (
+                <Line 
+                  type="monotone" 
+                  dataKey="avFinancieroReal" 
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  name="Av. Financiero Real (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.ieacAvg && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ieacAvg" 
+                  stroke="#06b6d4" 
+                  strokeWidth={2}
+                  name="IEAC Avg (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.ieacMin && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ieacMin" 
+                  stroke="#a16207" 
+                  strokeWidth={2}
+                  name="IEAC Min (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.ieacMax && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ieacMax" 
+                  stroke="#a16207" 
+                  strokeWidth={2}
+                  name="IEAC Max (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.eacInformado && (
+                <Line 
+                  type="monotone" 
+                  dataKey="eacInformado" 
+                  stroke="#374151" 
+                  strokeWidth={2}
+                  name="EAC Informado (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.eacProyectado && (
+                <Line 
+                  type="monotone" 
+                  dataKey="eacProyectado" 
+                  stroke="#374151" 
+                  strokeDasharray="2 2"
+                  strokeWidth={2}
+                  name="EAC Proyectado (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+              
+              {filtrosActivos.costoGanado && (
+                <Line 
+                  type="monotone" 
+                  dataKey="costoGanado" 
+                  stroke="#8b5cf6" 
+                  strokeWidth={2}
+                  name="Costo Ganado (USD)"
+                  dot={false}
+                  connectNulls={false}
+                />
+              )}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Card Footer */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderBottomLeftRadius: '8px',
+        borderBottomRightRadius: '8px',
+        border: '1px solid #e5e7eb',
+        borderTop: 'none',
+        padding: '16px 24px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+          <div style={{ color: '#6b7280' }}>
+            📊 Análisis de curva S con métricas de Earned Value Management (EVM)
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Componente para el reporte de Líneas Bases - Real/Proyectado
 const ReporteLineasBases = ({ proyectoId }) => {
   // Estados para las 5 tablas
@@ -6043,6 +6840,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
   // Estados para marcado dinámico de filas basado en IEAC
   const [montoMinimoIEAC, setMontoMinimoIEAC] = useState(null);
   const [montoMaximoIEAC, setMontoMaximoIEAC] = useState(null);
+  const [valorBAC, setValorBAC] = useState(null);
 
   // Estados para Metodologías ECD
   const [datosECD, setDatosECD] = useState(null);
@@ -6053,6 +6851,170 @@ const ReporteLineasBases = ({ proyectoId }) => {
   // Estados para marcado dinámico de filas
   const [mesMinimoECD, setMesMinimoECD] = useState(null);
   const [mesMaximoECD, setMesMaximoECD] = useState(null);
+  const [plazoControlECD, setPlazoControlECD] = useState(null);
+  
+  // Función para calcular el valor de IEAC Min basado en el rango de meses ECD
+  const calcularIEACMin = (numeroMes) => {
+    // Verificar si tenemos los datos necesarios
+    if (!mesMinimoECD || !mesMaximoECD || !montoMinimoIEAC) {
+      return null;
+    }
+    
+    // Verificar si el mes actual está dentro del rango
+    if (numeroMes >= mesMinimoECD && numeroMes <= mesMaximoECD) {
+      return montoMinimoIEAC;
+    }
+    
+    return null;
+  };
+
+  // Función para calcular el valor de IEAC Max basado en el rango de meses ECD
+  const calcularIEACMax = (numeroMes) => {
+    // Verificar si tenemos los datos necesarios
+    if (!mesMinimoECD || !mesMaximoECD || !montoMaximoIEAC) {
+      return null;
+    }
+    
+    // Verificar si el mes actual está dentro del rango
+    if (numeroMes >= mesMinimoECD && numeroMes <= mesMaximoECD) {
+      return montoMaximoIEAC;
+    }
+    
+    return null;
+  };
+
+  // Función para calcular el valor de EAC Informado basado en el rango desde Plazo Control hasta Meses Máximo
+  const calcularEACInformado = (numeroMes) => {
+    // Verificar si tenemos los datos necesarios
+    if (!plazoControlECD || !mesMaximoECD || !valorBAC) {
+      return null;
+    }
+    
+    // Verificar si el mes actual está dentro del rango (desde Plazo Control hasta Meses Máximo)
+    if (numeroMes >= plazoControlECD && numeroMes <= mesMaximoECD) {
+      return valorBAC;
+    }
+    
+    return null;
+  };
+
+  // Función para calcular el valor de EAC Proyectado basado en el rango desde mes 1 hasta Plazo Control
+  const calcularEACProyectado = (numeroMes) => {
+    // Verificar si tenemos los datos necesarios
+    if (!plazoControlECD || !valorBAC) {
+      return null;
+    }
+    
+    // Verificar si el mes actual está dentro del rango (desde mes 1 hasta Plazo Control)
+    if (numeroMes >= 1 && numeroMes <= plazoControlECD) {
+      return valorBAC;
+    }
+    
+    return null;
+  };
+
+  // Función para calcular el Costo Ganado (EV) según criterios de prioridad oficiales
+  const calcularCostoGanado = (numeroMes, periodoOriginal, row) => {
+    console.log('🔍 DEBUG calcularCostoGanado:', {
+      numeroMes,
+      periodoOriginal,
+      plazoControlECD,
+      valorBAC,
+      row: row
+    });
+    
+    // Verificar si tenemos los datos necesarios básicos
+    if (!plazoControlECD || !valorBAC) {
+      console.log('❌ Faltan datos necesarios:', {
+        plazoControlECD: !!plazoControlECD,
+        valorBAC: !!valorBAC
+      });
+      return null;
+    }
+    
+    // Verificar si el mes actual está dentro del rango (desde mes 1 hasta Plazo Control)
+    if (numeroMes >= 1 && numeroMes <= plazoControlECD) {
+      console.log('✅ Mes dentro del rango:', numeroMes, '<=', plazoControlECD);
+      
+      // PRIORIDAD 1: Suma (Qty reales * PU Pto)
+      // Solo si el sistema puede hacer el cálculo (requiere datos detallados)
+      if (row && row.cantidad_real && row.precio_unitario) {
+        const EV_Prioridad1 = row.cantidad_real * row.precio_unitario;
+        console.log('✅ EV Prioridad 1 (Detalla):', {
+          cantidad_real: row.cantidad_real,
+          precio_unitario: row.precio_unitario,
+          EV: EV_Prioridad1,
+          formateado: formatearMoneda(EV_Prioridad1)
+        });
+        return EV_Prioridad1;
+      }
+      
+      // PRIORIDAD 2: $ Prog/%Av. Prog * %Av. Real
+      // Factor P = (%Av.Finan.Prog / %Av.Prog), Factor R = (%Av.Finan.Real / %Av.Real)
+      if (row && row.monto_total && row.api_acum && row.api_acum_real && row.incurrido_total) {
+        const porcentajeAvanceProg = parseFloat(row.api_acum);
+        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
+        const montoProgramado = parseFloat(row.monto_total);
+        const montoReal = parseFloat(row.incurrido_total);
+        
+        if (porcentajeAvanceProg > 0) {
+          const factorP = (montoProgramado / porcentajeAvanceProg) / (montoProgramado / porcentajeAvanceProg);
+          const factorR = porcentajeAvanceReal > 0 ? (montoReal / porcentajeAvanceReal) / (montoReal / porcentajeAvanceReal) : 1;
+          
+          // Verificar condiciones: Factor P y R < 1,0 o >1,0
+          if ((factorP < 1.0 || factorP > 1.0) && (factorR < 1.0 || factorR > 1.0)) {
+            const EV_Prioridad2 = (montoProgramado / porcentajeAvanceProg) * porcentajeAvanceReal;
+            console.log('✅ EV Prioridad 2 (Simplificación primer orden):', {
+              montoProgramado,
+              porcentajeAvanceProg,
+              porcentajeAvanceReal,
+              factorP,
+              factorR,
+              EV: EV_Prioridad2,
+              formateado: formatearMoneda(EV_Prioridad2)
+            });
+            return EV_Prioridad2;
+          }
+        }
+      }
+      
+      // PRIORIDAD 3: %Av.Real * BAC
+      // Factor P y R diferentes tendencias
+      if (row && row.api_acum_real) {
+        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
+        const EV_Prioridad3 = valorBAC * porcentajeAvanceReal;
+        console.log('✅ EV Prioridad 3 (Simplificación segundo orden):', {
+          porcentajeAvanceReal,
+          valorBAC,
+          EV: EV_Prioridad3,
+          formateado: formatearMoneda(EV_Prioridad3)
+        });
+        return EV_Prioridad3;
+      }
+      
+      // PRIORIDAD 4: Indirectos (depende del API) 50%Avance + 50%Plazo
+      // Para casos donde no hay datos suficientes
+      if (row && row.api_acum_real) {
+        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
+        const porcentajePlazo = numeroMes / plazoControlECD; // Progreso temporal
+        const EV_Prioridad4 = valorBAC * ((porcentajeAvanceReal * 0.5) + (porcentajePlazo * 0.5));
+        console.log('✅ EV Prioridad 4 (Simplificación tercer orden):', {
+          porcentajeAvanceReal,
+          porcentajePlazo,
+          valorBAC,
+          EV: EV_Prioridad4,
+          formateado: formatearMoneda(EV_Prioridad4)
+        });
+        return EV_Prioridad4;
+      }
+      
+      console.log('❌ No se pudo calcular EV con ningún criterio de prioridad');
+    } else {
+      console.log('❌ Mes fuera del rango:', numeroMes, 'fuera de 1-', plazoControlECD);
+    }
+    
+    return null;
+  };
 
 
 
@@ -6185,7 +7147,11 @@ const ReporteLineasBases = ({ proyectoId }) => {
 
   // Función para cargar datos de av_fisico_real (api_acum)
   const cargarAvFisicoReal = async () => {
-    if (!proyectoId) return;
+    console.log('🚀 INICIANDO cargarAvFisicoReal con proyectoId:', proyectoId);
+    if (!proyectoId) {
+      console.log('❌ No hay proyectoId, cancelando carga');
+      return;
+    }
     
     setCargandoAvFisicoReal(true);
     try {
@@ -6215,6 +7181,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       if (data.success && data.datos) {
         setDatosAvFisicoReal(data.datos);
         console.log('✅ Datos de av_fisico_real cargados:', data.datos.length, 'registros');
+        console.log('🔍 Estructura de datos av_fisico_real:', data.datos.slice(0, 2)); // Mostrar primeros 2 registros
       } else {
         setDatosAvFisicoReal([]);
         console.log('⚠️ No se encontraron datos de av_fisico_real');
@@ -6396,6 +7363,12 @@ const ReporteLineasBases = ({ proyectoId }) => {
           porGanarCalculado = parseFloat(dataPorGanar.debug?.por_ganar) || 0;
           console.log('✅ Por Ganar obtenido desde calcular_ieac_a.php:', porGanarCalculado, 'en millones:', (porGanarCalculado / 1000000).toFixed(2) + 'M');
           console.log('🔍 Debug completo:', dataPorGanar.debug);
+          
+          // Obtener BAC del debug de la API
+          const bacCalculado = parseFloat(dataPorGanar.debug?.bac) || 0;
+          setValorBAC(bacCalculado);
+          console.log('✅ BAC obtenido desde calcular_ieac_a.php:', bacCalculado, 'en millones:', (bacCalculado / 1000000).toFixed(2) + 'M');
+          console.log('🔍 Debug completo BAC:', dataPorGanar.debug);
         } else {
           console.error('❌ Error en datos Por Ganar:', dataPorGanar);
         }
@@ -6453,6 +7426,17 @@ const ReporteLineasBases = ({ proyectoId }) => {
       const valores = datosIEAC.map(item => item.valor).filter(v => v > 0);
       const minimo = valores.length > 0 ? Math.min(...valores) : 0;
       const maximo = valores.length > 0 ? Math.max(...valores) : 0;
+      
+      console.log('🎯 DEBUG IEAC Min/Max calculation:', {
+        datosIEAC: datosIEAC.length,
+        valores: valores,
+        minimo: minimo,
+        maximo: maximo,
+        formateado: {
+          minimo: `USD ${(minimo / 1000000).toFixed(2)}M`,
+          maximo: `USD ${(maximo / 1000000).toFixed(2)}M`
+        }
+      });
       
       setMontoMinimoIEAC(minimo);
       setMontoMaximoIEAC(maximo);
@@ -6736,6 +7720,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
       // Guardar valores para marcado dinámico de filas
       setMesMinimoECD(Math.round(minimo));
       setMesMaximoECD(Math.round(maximo));
+      setPlazoControlECD(plazoControl);
       
       console.log('✅ Metodologías ECD cargadas:', metodologiasECD);
       console.log('📊 Valores calculados:', {
@@ -8289,27 +9274,25 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 
                 return (
                 <tr key={index} style={{ 
-                  background: index % 2 === 0 ? '#f8f9fa' : '#fff',
-                  borderBottom: '1px solid #dee2e6',
-                  ...estiloFilaFinal // Aplicar marcado dinámico basado en ECD e IEAC
+                  borderBottom: '1px solid #dee2e6'
                 }}>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold', backgroundColor: '#e9ecef' }}>
+                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold' }}>
                     {index + 1}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', fontWeight: 'bold' }}>
                     {row.periodo}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    {row.api_acum ? `${(parseFloat(row.api_acum) * 100).toFixed(2)}%` : '-'}
+                    {row.api_acum ? `${(parseFloat(row.api_acum) * 100).toFixed(2)}` : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
                     {row.monto_total ? formatearMoneda(row.monto_total) : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    {row.api_acum_real ? `${(parseFloat(row.api_acum_real) * 100).toFixed(2)}%` : '-'}
+                    {row.api_acum_real ? `${(parseFloat(row.api_acum_real) * 100).toFixed(2)}` : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    {row.api_acum_proyectado ? `${(parseFloat(row.api_acum_proyectado) * 100).toFixed(2)}%` : '-'}
+                    {row.api_acum_proyectado ? `${(parseFloat(row.api_acum_proyectado) * 100).toFixed(2)}` : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
                     {row.incurrido_total ? formatearMoneda(row.incurrido_total) : '-'}
@@ -8318,19 +9301,19 @@ const ReporteLineasBases = ({ proyectoId }) => {
                     {row.ieac_avg ? formatearMoneda(row.ieac_avg) : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    -
+                    {calcularIEACMin(numeroMes) ? formatearMoneda(calcularIEACMin(numeroMes)) : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    -
+                    {calcularIEACMax(numeroMes) ? formatearMoneda(calcularIEACMax(numeroMes)) : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    -
+                    {calcularEACInformado(numeroMes) ? formatearMoneda(calcularEACInformado(numeroMes)) : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    -
+                    {calcularEACProyectado(numeroMes) ? formatearMoneda(calcularEACProyectado(numeroMes)) : '-'}
                   </td>
                   <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                    -
+                    {calcularCostoGanado(numeroMes, row.periodo, row) ? formatearMoneda(calcularCostoGanado(numeroMes, row.periodo, row)) : '-'}
                   </td>
                 </tr>
                 );
@@ -8351,6 +9334,19 @@ const ReporteLineasBases = ({ proyectoId }) => {
           </tbody>
           </table>
       </div>
+
+      {/* Gráfico de Curva S */}
+      <GraficoCurvaS 
+        datosTabla={obtenerDatosFiltrados()} 
+        proyectoId={proyectoId}
+        mesMinimoECD={mesMinimoECD}
+        mesMaximoECD={mesMaximoECD}
+        montoMinimoIEAC={montoMinimoIEAC}
+        montoMaximoIEAC={montoMaximoIEAC}
+        valorBAC={valorBAC}
+        plazoControlECD={plazoControlECD}
+        datosAvFisicoReal={datosAvFisicoReal}
+      />
 
       {/* Modal Metodologías IEAC */}
       {mostrarModalIEAC && datosIEAC && datosIEAC.length > 0 && (
