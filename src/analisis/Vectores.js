@@ -187,6 +187,8 @@ const Vectores = ({ proyectoId }) => {
   const graficoAcumuladosRef = useRef();
   // Nuevo estado para controlar la carga de datos del informe
   const [cargandoInforme, setCargandoInforme] = useState(false);
+  const [modalAnalisisCascada, setModalAnalisisCascada] = useState({ visible: false, categoria: '', tipo: '', monto: 0 });
+  const [soloDesviacionesPositivas, setSoloDesviacionesPositivas] = useState(true);
   // --- NUEVO: Tabla Transpuesta ---
   const [vectorTranspuesta, setVectorTranspuesta] = useState('real_parcial');
 
@@ -1334,6 +1336,178 @@ const Vectores = ({ proyectoId }) => {
       fetchIfEmpty(tablaApiAcumulada, 'api_acumulada', setTablaApiAcumulada),
     ]);
     setCargandoInforme(false);
+  };
+
+  // Función para obtener análisis detallado de cascada
+  const obtenerAnalisisCascada = (categoria, tipo) => {
+    const key = normalizar(categoria);
+    let tablaBase, tablaReal, nombreTipo;
+    
+    if (tipo === 'V0') {
+      tablaBase = tablaV0Acumulada;
+      tablaReal = tablaRealAcumulado;
+      nombreTipo = 'V0';
+    } else {
+      tablaBase = tablaApiAcumulada;
+      tablaReal = tablaRealAcumulado;
+      nombreTipo = 'API';
+    }
+
+    // Debug: mostrar información de las tablas
+    console.log('=== DEBUG ANÁLISIS CASCADA ===');
+    console.log('Categoría:', categoria, '| Key normalizada:', key);
+    console.log('Tipo:', tipo, '| Nombre tipo:', nombreTipo);
+    console.log('Tabla base disponible:', tablaBase.length, 'registros');
+    console.log('Tabla real disponible:', tablaReal.length, 'registros');
+    console.log('Fecha desde:', fechaDesde, '| Fecha hasta:', fechaHasta);
+
+    // Filtrar datos por categoría y rango de fechas
+    const datosBase = tablaBase.filter(row => 
+      normalizar(row.detalle_factorial || 'Sin Detalle') === key && 
+      (!fechaDesde || row.periodo >= fechaDesde) && 
+      (!fechaHasta || row.periodo <= fechaHasta)
+    );
+    
+    const datosReal = tablaReal.filter(row => 
+      normalizar(row.detalle_factorial || 'Sin Detalle') === key && 
+      (!fechaDesde || row.periodo >= fechaDesde) && 
+      (!fechaHasta || row.periodo <= fechaHasta)
+    );
+
+    console.log('Datos base encontrados:', datosBase.length);
+    console.log('Datos real encontrados:', datosReal.length);
+    console.log('Primeros 3 datos base:', datosBase.slice(0, 3));
+    console.log('Primeros 3 datos real:', datosReal.slice(0, 3));
+
+    // Ordenar por período
+    datosBase.sort((a, b) => new Date(a.periodo) - new Date(b.periodo));
+    datosReal.sort((a, b) => new Date(a.periodo) - new Date(b.periodo));
+
+    // Calcular diferencias por período
+    const analisisPeriodos = [];
+    const todosLosPeriodos = [...new Set([...datosBase.map(d => d.periodo), ...datosReal.map(d => d.periodo)])]
+      .sort((a, b) => new Date(a) - new Date(b));
+
+    todosLosPeriodos.forEach(periodo => {
+      const montoBase = datosBase.find(d => d.periodo === periodo)?.monto || 0;
+      const montoReal = datosReal.find(d => d.periodo === periodo)?.monto || 0;
+      const diferencia = Number(montoReal) - Number(montoBase);
+      
+      analisisPeriodos.push({
+        periodo,
+        montoBase: Number(montoBase),
+        montoReal: Number(montoReal),
+        diferencia,
+        diferenciaPorcentaje: Number(montoBase) > 0 ? (diferencia / Number(montoBase)) * 100 : 0
+      });
+    });
+
+    // Calcular totales
+    const totalBase = datosBase.length > 0 ? Number(datosBase.reduce((a, b) => a.periodo > b.periodo ? a : b).monto) : 0;
+    const totalReal = datosReal.length > 0 ? Number(datosReal.reduce((a, b) => a.periodo > b.periodo ? a : b).monto) : 0;
+    const diferenciaTotal = totalReal - totalBase;
+
+    // Encontrar períodos con mayores aumentos
+    const periodosConAumentos = analisisPeriodos.filter(p => p.diferencia > 0)
+      .sort((a, b) => b.diferencia - a.diferencia);
+
+    // Generar análisis automático
+    const generarConclusiones = () => {
+      // Si no hay datos, mostrar información de debug
+      if (datosBase.length === 0 && datosReal.length === 0) {
+        // Obtener algunas categorías de ejemplo para debug
+        const categoriasEjemplo = [...new Set([
+          ...tablaBase.map(r => r.detalle_factorial || 'Sin Detalle'),
+          ...tablaReal.map(r => r.detalle_factorial || 'Sin Detalle')
+        ])].slice(0, 5);
+
+        return `🔍 **Información de Debug**:\n\n` +
+               `• Categoría buscada: "${categoria}"\n` +
+               `• Key normalizada: "${key}"\n` +
+               `• Tabla ${nombreTipo} disponible: ${tablaBase.length} registros\n` +
+               `• Tabla Real disponible: ${tablaReal.length} registros\n` +
+               `• Filtro de fechas: ${fechaDesde ? fechaDesde : 'Sin filtro'} - ${fechaHasta ? fechaHasta : 'Sin filtro'}\n\n` +
+               `**Categorías encontradas en las tablas:**\n` +
+               `${categoriasEjemplo.length > 0 ? categoriasEjemplo.map(c => `• "${c}"`).join('\n') : '• Ninguna categoría encontrada'}\n\n` +
+               `**Posibles causas:**\n` +
+               `• Los datos aún no se han cargado (cargandoInforme: ${cargandoInforme})\n` +
+               `• La categoría no existe en las tablas\n` +
+               `• Los datos están filtrados por fechas\n` +
+               `• Problema en la normalización de nombres\n` +
+               `• El proyecto no tiene datos financieros\n\n` +
+               `**Sugerencias:**\n` +
+               `• Verificar que los datos estén cargados\n` +
+               `• Revisar el nombre de la categoría\n` +
+               `• Ajustar el filtro de fechas si es necesario\n` +
+               `• Verificar que el proyecto tenga datos importados`;
+      }
+
+      if (diferenciaTotal <= 0) return "No hay desviación positiva en esta categoría.";
+
+      const conclusiones = [];
+      
+      // Análisis por magnitud
+      if (diferenciaTotal > totalBase * 0.5) {
+        conclusiones.push("⚠️ **Desviación significativa**: El gasto real supera en más del 50% al planificado.");
+      } else if (diferenciaTotal > totalBase * 0.2) {
+        conclusiones.push("⚠️ **Desviación moderada**: El gasto real supera entre 20-50% al planificado.");
+      } else {
+        conclusiones.push("✅ **Desviación controlada**: El gasto real supera menos del 20% al planificado.");
+      }
+
+      // Análisis temporal
+      if (periodosConAumentos.length > 0) {
+        const primerAumento = periodosConAumentos[periodosConAumentos.length - 1];
+        const mayorAumento = periodosConAumentos[0];
+        
+        conclusiones.push(`📅 **Primer aumento**: ${new Date(primerAumento.periodo).toLocaleDateString('es-CL')} (+$${(primerAumento.diferencia/1000000).toFixed(1)}M)`);
+        conclusiones.push(`📈 **Mayor aumento**: ${new Date(mayorAumento.periodo).toLocaleDateString('es-CL')} (+$${(mayorAumento.diferencia/1000000).toFixed(1)}M)`);
+      }
+
+      // Análisis de tendencia
+      const ultimosPeriodos = analisisPeriodos.slice(-3);
+      const tendenciaCreciente = ultimosPeriodos.every((p, i) => 
+        i === 0 || p.diferencia >= ultimosPeriodos[i-1].diferencia
+      );
+      
+      if (tendenciaCreciente) {
+        conclusiones.push("📊 **Tendencia**: Los aumentos muestran una tendencia creciente en los últimos períodos.");
+      } else {
+        conclusiones.push("📊 **Tendencia**: Los aumentos muestran variabilidad en los últimos períodos.");
+      }
+
+      // Interpretación del significado
+      conclusiones.push("💡 **Interpretación**: Este aumento puede indicar:");
+      conclusiones.push("   • Avance más rápido que lo planificado (positivo)");
+      conclusiones.push("   • Necesidad de pagos anticipados por adelantos en obra");
+      conclusiones.push("   • Posible sobrecosto o desviación del presupuesto original");
+
+      return conclusiones.join('\n\n');
+    };
+
+    return {
+      categoria,
+      tipo: nombreTipo,
+      analisisPeriodos,
+      totalBase,
+      totalReal,
+      diferenciaTotal,
+      periodosConAumentos,
+      conclusiones: generarConclusiones()
+    };
+  };
+
+  // Función para abrir modal de análisis
+  const abrirAnalisisCascada = async (categoria, tipo, monto) => {
+    // Asegurar que los datos estén cargados antes de abrir el modal
+    await cargarDatosInforme();
+    
+    setModalAnalisisCascada({
+      visible: true,
+      categoria,
+      tipo,
+      monto
+    });
   };
 
   // Función para preparar datos para gráfico cascada
@@ -6383,6 +6557,368 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
     );
   };
 
+  // --- COMPONENTE POPUP ANÁLISIS DE CASCADA ---
+  const PopupAnalisisCascada = ({ categoria, tipo, monto, onClose }) => {
+    const analisis = obtenerAnalisisCascada(categoria, tipo);
+    
+    const formatearMoneda = (valor) => `$${(valor / 1000000).toFixed(1)}M`;
+    const formatearFecha = (fecha) => new Date(fecha).toLocaleDateString('es-CL');
+
+    // Si está cargando, mostrar indicador
+    if (cargandoInforme) {
+      return (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          fontFamily: 'Arial, sans-serif'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            width: '300px',
+            padding: '40px',
+            textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}>
+            <div style={{
+              fontSize: '2rem',
+              marginBottom: '16px'
+            }}>
+              ⏳
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', color: '#0a3265' }}>
+              Cargando datos...
+            </h3>
+            <p style={{ margin: '0', color: '#6c757d', fontSize: '0.9rem' }}>
+              Preparando análisis para {categoria}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        background: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000,
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          width: '80%',
+          maxWidth: '800px',
+          maxHeight: '80%',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1ecb4f 0%, #17a85a 100%)',
+            color: 'white',
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.2rem'
+              }}>
+                📊
+              </div>
+              <div>
+              <h2 style={{ margin: '0', fontSize: '1.1rem', fontWeight: '600' }}>
+                Análisis Detallado de Cascada
+              </h2>
+              <p style={{ margin: '0.2rem 0 0 0', opacity: 0.9, fontSize: '0.8rem' }}>
+                {categoria} - {tipo} ({formatearMoneda(monto)})
+              </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                color: 'white',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.3)'}
+              onMouseOut={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{
+            padding: '20px',
+            overflowY: 'auto',
+            flex: 1,
+            transform: 'scale(0.8)',
+            transformOrigin: 'top left',
+            width: '125%',
+            height: '125%'
+          }}>
+            {/* Resumen */}
+            <div style={{
+              background: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ margin: '0 0 12px 0', color: '#0a3265', fontSize: '0.95rem' }}>📈 Resumen Ejecutivo</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#6c757d', fontSize: '0.8rem' }}>Total Planificado ({tipo})</p>
+                  <p style={{ margin: '0', color: '#0a3265', fontSize: '1rem', fontWeight: '600' }}>
+                    {formatearMoneda(analisis.totalBase)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#6c757d', fontSize: '0.8rem' }}>Total Real</p>
+                  <p style={{ margin: '0', color: '#0a3265', fontSize: '1rem', fontWeight: '600' }}>
+                    {formatearMoneda(analisis.totalReal)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#6c757d', fontSize: '0.8rem' }}>Diferencia</p>
+                  <p style={{ 
+                    margin: '0', 
+                    fontSize: '1rem', 
+                    fontWeight: '600',
+                    color: analisis.diferenciaTotal > 0 ? '#1ecb4f' : analisis.diferenciaTotal < 0 ? '#ff4444' : '#666'
+                  }}>
+                    {analisis.diferenciaTotal > 0 ? '+' : ''}{formatearMoneda(analisis.diferenciaTotal)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', color: '#6c757d', fontSize: '0.8rem' }}>% Desviación</p>
+                  <p style={{ 
+                    margin: '0', 
+                    fontSize: '1rem', 
+                    fontWeight: '600',
+                    color: analisis.diferenciaTotal > 0 ? '#1ecb4f' : analisis.diferenciaTotal < 0 ? '#ff4444' : '#666'
+                  }}>
+                    {analisis.totalBase > 0 ? ((analisis.diferenciaTotal / analisis.totalBase) * 100).toFixed(1) : 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de Períodos */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: '0', color: '#0a3265', fontSize: '0.95rem' }}>📅 Evolución por Períodos</h3>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+                    {(() => {
+                      const periodosFiltrados = analisis.analisisPeriodos.filter(periodo => !soloDesviacionesPositivas || periodo.diferencia > 0);
+                      const totalPeriodos = analisis.analisisPeriodos.length;
+                      return `${periodosFiltrados.length} de ${totalPeriodos} períodos`;
+                    })()}
+                  </span>
+                  <label style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={soloDesviacionesPositivas}
+                      onChange={(e) => setSoloDesviacionesPositivas(e.target.checked)}
+                      style={{ marginRight: '4px' }}
+                    />
+                    Solo desviaciones positivas
+                  </label>
+                </div>
+              </div>
+              <div style={{
+                background: 'white',
+                border: '1px solid #e9ecef',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8f9fa' }}>
+                      <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #e9ecef', color: '#0a3265', fontSize: '0.85rem' }}>Período</th>
+                      <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #e9ecef', color: '#0a3265', fontSize: '0.85rem' }}>Planificado</th>
+                      <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #e9ecef', color: '#0a3265', fontSize: '0.85rem' }}>Real</th>
+                      <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #e9ecef', color: '#0a3265', fontSize: '0.85rem' }}>Diferencia</th>
+                      <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #e9ecef', color: '#0a3265', fontSize: '0.85rem' }}>%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analisis.analisisPeriodos
+                      .filter(periodo => !soloDesviacionesPositivas || periodo.diferencia > 0)
+                      .map((periodo, index) => (
+                      <tr key={index} style={{ 
+                        background: index % 2 === 0 ? 'white' : '#f8f9fa',
+                        borderBottom: index < analisis.analisisPeriodos.length - 1 ? '1px solid #e9ecef' : 'none'
+                      }}>
+                        <td style={{ padding: '8px', color: '#495057', fontSize: '0.8rem' }}>{formatearFecha(periodo.periodo)}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#495057', fontSize: '0.8rem' }}>
+                          {formatearMoneda(periodo.montoBase)}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#495057', fontSize: '0.8rem' }}>
+                          {formatearMoneda(periodo.montoReal)}
+                        </td>
+                        <td style={{ 
+                          padding: '8px', 
+                          textAlign: 'right', 
+                          fontWeight: '600',
+                          fontSize: '0.8rem',
+                          color: periodo.diferencia > 0 ? '#1ecb4f' : periodo.diferencia < 0 ? '#ff4444' : '#666'
+                        }}>
+                          {periodo.diferencia > 0 ? '+' : ''}{formatearMoneda(periodo.diferencia)}
+                        </td>
+                        <td style={{ 
+                          padding: '8px', 
+                          textAlign: 'right',
+                          fontSize: '0.8rem',
+                          color: periodo.diferencia > 0 ? '#1ecb4f' : periodo.diferencia < 0 ? '#ff4444' : '#666'
+                        }}>
+                          {periodo.diferenciaPorcentaje > 0 ? '+' : ''}{periodo.diferenciaPorcentaje.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Períodos con Mayores Aumentos */}
+            {analisis.periodosConAumentos.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#0a3265', fontSize: '0.95rem' }}>🚨 Períodos con Mayores Aumentos</h3>
+                <div style={{
+                  background: 'white',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '8px',
+                  padding: '16px'
+                }}>
+                  {analisis.periodosConAumentos.slice(0, 5).map((periodo, index) => (
+                    <div key={index} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      borderBottom: index < 4 ? '1px solid #f8f9fa' : 'none'
+                    }}>
+                      <div>
+                        <span style={{ fontWeight: '600', color: '#0a3265' }}>
+                          {formatearFecha(periodo.periodo)}
+                        </span>
+                        <span style={{ marginLeft: '8px', color: '#6c757d', fontSize: '0.9rem' }}>
+                          ({formatearMoneda(periodo.montoBase)} → {formatearMoneda(periodo.montoReal)})
+                        </span>
+                      </div>
+                      <span style={{ 
+                        fontWeight: '600', 
+                        color: '#1ecb4f',
+                        fontSize: '1.1rem'
+                      }}>
+                        +{formatearMoneda(periodo.diferencia)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Información de Debug si no hay datos */}
+            {analisis.analisisPeriodos.length === 0 && (
+              <div style={{
+                background: '#fff3cd',
+                border: '1px solid #ffeaa7',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '20px'
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', color: '#856404', fontSize: '0.95rem' }}>🔍 Información de Debug</h3>
+                <div style={{ 
+                  color: '#856404', 
+                  lineHeight: '1.2',
+                  whiteSpace: 'pre-line',
+                  fontSize: '0.8rem'
+                }}>
+                  <strong>Categorías disponibles en las tablas:</strong><br/>
+                  {(() => {
+                    const categoriasDisponibles = [...new Set([
+                      ...tablaRealAcumulado.map(r => r.detalle_factorial || 'Sin Detalle'),
+                      ...tablaApiAcumulada.map(r => r.detalle_factorial || 'Sin Detalle'),
+                      ...tablaV0Acumulada.map(r => r.detalle_factorial || 'Sin Detalle')
+                    ])].sort();
+                    return categoriasDisponibles.slice(0, 10).join('\n') + 
+                           (categoriasDisponibles.length > 10 ? `\n... y ${categoriasDisponibles.length - 10} más` : '');
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Conclusiones */}
+            <div style={{
+              background: analisis.analisisPeriodos.length === 0 ? '#fff3cd' : '#e8f5e8',
+              border: analisis.analisisPeriodos.length === 0 ? '1px solid #ffeaa7' : '1px solid #c3e6c3',
+              borderRadius: '8px',
+              padding: '16px'
+            }}>
+              <h3 style={{ 
+                margin: '0 0 12px 0', 
+                color: analisis.analisisPeriodos.length === 0 ? '#856404' : '#0a3265', 
+                fontSize: '0.95rem' 
+              }}>
+                {analisis.analisisPeriodos.length === 0 ? '🔍 Información de Debug' : '💡 Análisis y Conclusiones'}
+              </h3>
+              <div style={{ 
+                color: analisis.analisisPeriodos.length === 0 ? '#856404' : '#2c3e50', 
+                lineHeight: '1.2',
+                whiteSpace: 'pre-line',
+                fontSize: '0.8rem'
+              }}>
+                {analisis.conclusiones}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // --- COMPONENTE POPUP METODOLOGÍAS IEAC ---
   const PopupMetodologiasIEAC = ({ indicadores, fechaSeguimiento, onClose }) => {
     const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
@@ -8405,11 +8941,52 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                         <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoV0 > 0 ? montoV0.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
                         <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoNPC > 0 ? montoNPC.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
                         <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoAPI > 0 ? montoAPI.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
-                        <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: cascadaV0 > 0 ? '#1ecb4f' : cascadaV0 < 0 ? '#ff4444' : '#666', borderLeft: '3px solid #e53935' }}>
+                        <td style={{ 
+                          padding: '6px 12px', 
+                          textAlign: 'center', 
+                          fontWeight: 700, 
+                          color: cascadaV0 > 0 ? '#1ecb4f' : cascadaV0 < 0 ? '#ff4444' : '#666', 
+                          borderLeft: '3px solid #e53935',
+                          cursor: cascadaV0 > 0 ? 'pointer' : 'default',
+                          background: cascadaV0 > 0 ? 'rgba(30, 203, 79, 0.1)' : 'transparent',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={cascadaV0 > 0 ? () => abrirAnalisisCascada(cat, 'V0', cascadaV0) : undefined}
+                        onMouseOver={cascadaV0 > 0 ? (e) => {
+                          e.target.style.background = 'rgba(30, 203, 79, 0.2)';
+                          e.target.style.transform = 'scale(1.02)';
+                        } : undefined}
+                        onMouseOut={cascadaV0 > 0 ? (e) => {
+                          e.target.style.background = 'rgba(30, 203, 79, 0.1)';
+                          e.target.style.transform = 'scale(1)';
+                        } : undefined}
+                        title={cascadaV0 > 0 ? 'Haz clic para ver análisis detallado' : ''}>
                           {montoReal > 0 || montoV0 > 0 ? cascadaV0.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
+                          {cascadaV0 > 0 && <span style={{ marginLeft: '4px', fontSize: '0.8em' }}>🔍</span>}
                         </td>
-                        <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: cascadaAPI > 0 ? '#1ecb4f' : cascadaAPI < 0 ? '#ff4444' : '#666' }}>
+                        <td style={{ 
+                          padding: '6px 12px', 
+                          textAlign: 'center', 
+                          fontWeight: 700, 
+                          color: cascadaAPI > 0 ? '#1ecb4f' : cascadaAPI < 0 ? '#ff4444' : '#666',
+                          cursor: cascadaAPI > 0 ? 'pointer' : 'default',
+                          background: cascadaAPI > 0 ? 'rgba(30, 203, 79, 0.1)' : 'transparent',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={cascadaAPI > 0 ? () => abrirAnalisisCascada(cat, 'API', cascadaAPI) : undefined}
+                        onMouseOver={cascadaAPI > 0 ? (e) => {
+                          e.target.style.background = 'rgba(30, 203, 79, 0.2)';
+                          e.target.style.transform = 'scale(1.02)';
+                        } : undefined}
+                        onMouseOut={cascadaAPI > 0 ? (e) => {
+                          e.target.style.background = 'rgba(30, 203, 79, 0.1)';
+                          e.target.style.transform = 'scale(1)';
+                        } : undefined}
+                        title={cascadaAPI > 0 ? 'Haz clic para ver análisis detallado' : ''}>
                           {montoReal > 0 || montoAPI > 0 ? cascadaAPI.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
+                          {cascadaAPI > 0 && <span style={{ marginLeft: '4px', fontSize: '0.8em' }}>🔍</span>}
                         </td>
                       </tr>
                     );
@@ -8865,11 +9442,52 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoV0 > 0 ? montoV0.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoNPC > 0 ? montoNPC.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>{montoAPI > 0 ? montoAPI.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: cascadaV0 > 0 ? '#1ecb4f' : cascadaV0 < 0 ? '#ff4444' : '#666', borderLeft: '3px solid #e53935' }}>
+                      <td style={{ 
+                        padding: '6px 12px', 
+                        textAlign: 'center', 
+                        fontWeight: 700, 
+                        color: cascadaV0 > 0 ? '#1ecb4f' : cascadaV0 < 0 ? '#ff4444' : '#666', 
+                        borderLeft: '3px solid #e53935',
+                        cursor: cascadaV0 > 0 ? 'pointer' : 'default',
+                        background: cascadaV0 > 0 ? 'rgba(30, 203, 79, 0.1)' : 'transparent',
+                        borderRadius: '4px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={cascadaV0 > 0 ? () => abrirAnalisisCascada(cat, 'V0', cascadaV0) : undefined}
+                      onMouseOver={cascadaV0 > 0 ? (e) => {
+                        e.target.style.background = 'rgba(30, 203, 79, 0.2)';
+                        e.target.style.transform = 'scale(1.02)';
+                      } : undefined}
+                      onMouseOut={cascadaV0 > 0 ? (e) => {
+                        e.target.style.background = 'rgba(30, 203, 79, 0.1)';
+                        e.target.style.transform = 'scale(1)';
+                      } : undefined}
+                      title={cascadaV0 > 0 ? 'Haz clic para ver análisis detallado' : ''}>
                         {montoReal > 0 || montoV0 > 0 ? cascadaV0.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
+                        {cascadaV0 > 0 && <span style={{ marginLeft: '4px', fontSize: '0.8em' }}>🔍</span>}
                       </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'center', fontWeight: 700, color: cascadaAPI > 0 ? '#1ecb4f' : cascadaAPI < 0 ? '#ff4444' : '#666' }}>
+                      <td style={{ 
+                        padding: '6px 12px', 
+                        textAlign: 'center', 
+                        fontWeight: 700, 
+                        color: cascadaAPI > 0 ? '#1ecb4f' : cascadaAPI < 0 ? '#ff4444' : '#666',
+                        cursor: cascadaAPI > 0 ? 'pointer' : 'default',
+                        background: cascadaAPI > 0 ? 'rgba(30, 203, 79, 0.1)' : 'transparent',
+                        borderRadius: '4px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={cascadaAPI > 0 ? () => abrirAnalisisCascada(cat, 'API', cascadaAPI) : undefined}
+                      onMouseOver={cascadaAPI > 0 ? (e) => {
+                        e.target.style.background = 'rgba(30, 203, 79, 0.2)';
+                        e.target.style.transform = 'scale(1.02)';
+                      } : undefined}
+                      onMouseOut={cascadaAPI > 0 ? (e) => {
+                        e.target.style.background = 'rgba(30, 203, 79, 0.1)';
+                        e.target.style.transform = 'scale(1)';
+                      } : undefined}
+                      title={cascadaAPI > 0 ? 'Haz clic para ver análisis detallado' : ''}>
                         {montoReal > 0 || montoAPI > 0 ? cascadaAPI.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'}
+                        {cascadaAPI > 0 && <span style={{ marginLeft: '4px', fontSize: '0.8em' }}>🔍</span>}
                       </td>
                     </tr>
                   );
@@ -9853,6 +10471,16 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
           fechaSeguimiento={fechaSeguimiento}
           duracionPlanificada={duracionPlanificada}
           onClose={() => setPopupECDVisible(false)}
+        />
+      )}
+
+      {/* Popup de Análisis de Cascada */}
+      {modalAnalisisCascada.visible && (
+        <PopupAnalisisCascada
+          categoria={modalAnalisisCascada.categoria}
+          tipo={modalAnalisisCascada.tipo}
+          monto={modalAnalisisCascada.monto}
+          onClose={() => setModalAnalisisCascada({ visible: false, categoria: '', tipo: '', monto: 0 })}
         />
       )}
 

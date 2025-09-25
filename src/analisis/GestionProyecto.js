@@ -8,6 +8,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { API_BASE } from '../config';
+import { handleGenerarPDFAutomatico } from './pdfAutomatico';
 
 // Estilos CSS para animaciones del modal y mensajes
 const modalStyles = `
@@ -5978,12 +5979,14 @@ const GraficoCurvaS = ({
   datosTabla, 
   proyectoId, 
   mesMinimoECD, 
-  mesMaximoECD, 
+  mesMaximoECD,
   montoMinimoIEAC, 
   montoMaximoIEAC, 
   valorBAC, 
   plazoControlECD, 
-  datosAvFisicoReal 
+  datosAvFisicoReal,
+  datosCostoGanado,
+  cargandoCostoGanado
 }) => {
   const [datosGrafico, setDatosGrafico] = useState([]);
   const [cargandoGrafico, setCargandoGrafico] = useState(false);
@@ -6011,6 +6014,22 @@ const GraficoCurvaS = ({
       ...prev,
       [filtro]: !prev[filtro]
     }));
+  };
+
+  // Función para formatear montos en formato de moneda USD
+  const formatearMoneda = (monto) => {
+    if (monto === null || monto === undefined) return '-';
+    
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'decimal',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(monto);
+    } catch (error) {
+      console.error('Error formateando moneda:', error);
+      return monto?.toString() || '-';
+    }
   };
 
   // Función para preparar los datos para el gráfico
@@ -6116,45 +6135,70 @@ const GraficoCurvaS = ({
   };
 
   // Función para calcular Costo Ganado (Earned Value)
+  // Función para convertir período de formato tabla a formato API
+  const convertirPeriodoAFormatoAPI = (periodo) => {
+    if (!periodo) return null;
+    
+    // Si ya está en formato API (YYYY-MM-DD), devolverlo tal como está
+    if (periodo.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return periodo;
+    }
+    
+    // Si está en formato MM-YYYY, convertir a YYYY-MM-01
+    if (periodo.match(/^\d{2}-\d{4}$/)) {
+      const [mes, año] = periodo.split('-');
+      return `${año}-${mes}-01`;
+    }
+    
+    // Si está en formato YYYY-MM, agregar -01
+    if (periodo.match(/^\d{4}-\d{2}$/)) {
+      return `${periodo}-01`;
+    }
+    
+    return null;
+  };
+
+  // Función para calcular el Costo Ganado usando la API corregida
   const calcularCostoGanado = (numeroMes, periodoOriginal, row) => {
-    if (!plazoControlECD || !valorBAC) {
+    console.log('🔍 DEBUG calcularCostoGanado - GRAFICO CON API:', {
+      numeroMes,
+      periodoOriginal,
+      plazoControlECD,
+      datosCostoGanado: Object.keys(datosCostoGanado || {}).length,
+      cargandoCostoGanado,
+      datosCostoGanadoCompleto: datosCostoGanado
+    });
+    
+    // Verificar si tenemos los datos necesarios básicos
+    if (!plazoControlECD) {
+      console.log('❌ Faltan datos necesarios: plazoControlECD');
       return undefined;
     }
     
+    // Verificar si el mes actual está dentro del rango (desde mes 1 hasta Plazo Control)
     if (numeroMes >= 1 && numeroMes <= plazoControlECD) {
-      // PRIORIDAD 1: Suma (Qty reales * PU Pto)
-      if (row && row.cantidad_real && row.precio_unitario) {
-        return row.cantidad_real * row.precio_unitario;
-      }
+      console.log('✅ Mes dentro del rango:', numeroMes, '<=', plazoControlECD);
       
-      // PRIORIDAD 2: $ Prog/%Av. Prog * %Av. Real
-      if (row && row.monto_total && row.api_acum && row.api_acum_real && row.incurrido_total) {
-        const porcentajeAvanceProg = parseFloat(row.api_acum);
-        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
-        const montoProgramado = parseFloat(row.monto_total);
-        const montoReal = parseFloat(row.incurrido_total);
-        
-        if (porcentajeAvanceProg > 0) {
-          const factorP = (montoProgramado / porcentajeAvanceProg) / (montoProgramado / porcentajeAvanceProg);
-          const factorR = porcentajeAvanceReal > 0 ? (montoReal / porcentajeAvanceReal) / (montoReal / porcentajeAvanceReal) : 1;
-          
-          if ((factorP < 1.0 || factorP > 1.0) && (factorR < 1.0 || factorR > 1.0)) {
-            return (montoProgramado / porcentajeAvanceProg) * porcentajeAvanceReal;
-          }
-        }
-      }
+      // Buscar el valor del Costo Ganado para este período
+      const periodoFormatoAPI = convertirPeriodoAFormatoAPI(periodoOriginal);
+      console.log('🔄 Conversión de período:', {
+        original: periodoOriginal,
+        formatoAPI: periodoFormatoAPI
+      });
       
-      // PRIORIDAD 3: %Av.Real * BAC
-      if (row && row.api_acum_real) {
-        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
-        return valorBAC * porcentajeAvanceReal;
-      }
-      
-      // PRIORIDAD 4: Indirectos (depende del API) 50%Avance + 50%Plazo
-      if (row && row.api_acum_real) {
-        const porcentajeAvanceReal = parseFloat(row.api_acum_real);
-        const porcentajePlazo = numeroMes / plazoControlECD;
-        return valorBAC * ((porcentajeAvanceReal * 0.5) + (porcentajePlazo * 0.5));
+      if (datosCostoGanado && datosCostoGanado[periodoFormatoAPI]) {
+        const costoGanado = parseFloat(datosCostoGanado[periodoFormatoAPI]);
+        console.log('✅ Costo Ganado encontrado:', {
+          periodo: periodoOriginal,
+          periodoFormatoAPI: periodoFormatoAPI,
+          costoGanado,
+          formateado: formatearMoneda(costoGanado)
+        });
+        return costoGanado;
+      } else {
+        console.log('❌ No se encontró Costo Ganado para el período:', periodoFormatoAPI);
+        console.log('🔍 Períodos disponibles:', Object.keys(datosCostoGanado || {}));
+        return undefined;
       }
     }
     
@@ -8732,6 +8776,38 @@ const ReporteLineasBases = ({ proyectoId }) => {
     return `${año}-${mes}-${dia}`;
   };
 
+  // Función wrapper para generar PDF automático
+  const generarPDFAutomatico = async () => {
+    try {
+      console.log('Iniciando generación de PDF automático...');
+      console.log('Datos disponibles:', {
+        datosIEAC: datosIEAC?.length || 0,
+        datosECD: datosECD?.metodologiaA || 0,
+        proyectoId,
+        fechaCorte,
+        valorBAC,
+        plazoControlECD,
+        datosTabla: obtenerDatosFiltrados()?.length || 0,
+        datosCostoGanado: Object.keys(datosCostoGanado || {}).length
+      });
+      
+      await handleGenerarPDFAutomatico(
+        datosIEAC, 
+        datosECD, 
+        proyectoId, 
+        fechaCorte, 
+        valorBAC, 
+        plazoControlECD, 
+        obtenerDatosFiltrados(), 
+        datosCostoGanado,
+        jsPDF
+      );
+    } catch (error) {
+      console.error('Error en generarPDFAutomatico:', error);
+      alert('Error al generar el reporte PDF. Por favor, intente nuevamente.');
+    }
+  };
+
 
 
     return (
@@ -8742,62 +8818,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
         </h2>
       </div>
 
-      {/* Simbología de colores */}
-      <div style={{
-        marginBottom: '20px',
-        padding: '15px',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '8px',
-        border: '1px solid #dee2e6'
-      }}>
-        <h5 style={{ 
-          margin: '0 0 10px 0', 
-          color: '#16355D', 
-          fontSize: '1rem',
-          fontWeight: 'bold'
-        }}>
-          🎨 Simbología de Colores
-        </h5>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '10px',
-          fontSize: '0.9rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: '#fff3cd',
-              border: '2px solid #ffc107',
-              borderRadius: '4px'
-            }}></div>
-            <span><strong>ECD:</strong> Rango de meses estimados</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: '#e8f5e8',
-              border: '2px solid #28a745',
-              borderRadius: '4px'
-            }}></div>
-            <span><strong>IEAC:</strong> Rango de montos estimados</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: '#ffeaa7',
-              border: '2px solid #e17055',
-              borderRadius: '4px'
-            }}></div>
-            <span><strong>Intersección:</strong> Ambos criterios (quiebre)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros de fecha */}
+      {/* Botones de Metodologías */}
       <div style={{ 
         background: '#f8f9fa', 
         padding: '15px', 
@@ -8807,37 +8828,6 @@ const ReporteLineasBases = ({ proyectoId }) => {
       }}>
         
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#16355D', fontWeight: 'bold' }}>Desde:</label>
-            <input
-              type="month"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid #007bff',
-                fontSize: '14px',
-                minWidth: '150px'
-              }}
-            />
-          </div>
-          
-          <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#16355D', fontWeight: 'bold' }}>Hasta:</label>
-            <input
-              type="month"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid #007bff',
-                fontSize: '14px',
-                minWidth: '150px'
-              }}
-            />
-          </div>
           
           <div>
             <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#dc3545', fontWeight: 'bold' }}>
@@ -8902,7 +8892,6 @@ const ReporteLineasBases = ({ proyectoId }) => {
           </button>
 
           {/* Botón Metodologías ECD */}
-          {console.log('🔍 DEBUG ECD Button:', { cargandoECD, datosECD, metodologiaA: datosECD?.metodologiaA })}
           <button
             onClick={() => setMostrarModalECD(true)}
             disabled={cargandoECD || !datosECD || datosECD.metodologiaA === 0 || datosECD.metodologiaA === null}
@@ -8923,10 +8912,31 @@ const ReporteLineasBases = ({ proyectoId }) => {
             📅 Metodologías ECD
           </button>
 
-
+          {/* Botón Reporte PDF Automático */}
+          <button
+            onClick={generarPDFAutomatico}
+            disabled={cargandoIEAC || cargandoECD || !datosIEAC || !datosECD || datosIEAC.length === 0 || datosECD.metodologiaA === 0}
+            style={{
+              background: (datosIEAC && datosIEAC.length > 0 && datosECD && datosECD.metodologiaA) ? '#28a745' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              cursor: (datosIEAC && datosIEAC.length > 0 && datosECD && datosECD.metodologiaA) ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              marginTop: '20px',
+              marginLeft: '10px',
+              opacity: (datosIEAC && datosIEAC.length > 0 && datosECD && datosECD.metodologiaA) ? 1 : 0.6
+            }}
+            title={(datosIEAC && datosIEAC.length > 0 && datosECD && datosECD.metodologiaA) ? "Generar Reporte PDF Automático" : "Cargando datos..."}
+          >
+            📊 Reporte PDF Automático
+          </button>
 
         </div>
       </div>
+
+
 
       {/* Configuración de Distribución Beta */}
       <div className="configuracion-beta" style={{ 
@@ -9362,6 +9372,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
         valorBAC={valorBAC}
         plazoControlECD={plazoControlECD}
         datosAvFisicoReal={datosAvFisicoReal}
+        datosCostoGanado={datosCostoGanado}
+        cargandoCostoGanado={cargandoCostoGanado}
       />
 
       {/* Modal Metodologías IEAC */}
