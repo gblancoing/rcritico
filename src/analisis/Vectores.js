@@ -150,7 +150,9 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
 );
 
 const Vectores = ({ proyectoId }) => {
-  const [seleccion, setSeleccion] = useState('real_parcial'); // Por defecto 'Real Parcial'
+  // Vector fijo en 'real_parcial' - no se puede cambiar
+  const seleccion = 'real_parcial';
+  const [, setSeleccion] = useState('real_parcial'); // Función inactiva
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [excelData, setExcelData] = useState([]);
   const [importando, setImportando] = useState(false);
@@ -10419,13 +10421,13 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
       <div style={{ marginTop: 32 }}>
         {renderContenido()}
       </div>
-      {/* Sidebar solo visible en esta página */}
-      <SidebarDerecho
+      {/* Sidebar solo visible en esta página - OCULTO */}
+      {/* <SidebarDerecho
         seleccion={seleccion}
         setSeleccion={setSeleccion}
         sidebarVisible={sidebarVisible}
         setSidebarVisible={setSidebarVisible}
-      />
+      /> */}
       {/* Tarjeta flotante de información del proyecto */}
       <div style={{
         position: 'fixed',

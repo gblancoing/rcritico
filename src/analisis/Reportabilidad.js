@@ -466,7 +466,9 @@ const Reportabilidad = ({ proyectoId }) => {
   };
 
   const [hasta20, setHasta20] = useState('2025-08'); // NUEVO: Filtro principal con agosto 2025 por defecto
-  const [filtroVector, setFiltroVector] = useState('');
+  // Vector fijo en 'Real' para el filtro
+  const filtroVector = 'Real'; 
+  const [, setFiltroVector] = useState('Real'); // Función inactiva
 
   // Función para mapear los valores según Hasta 2.0
   const mapearValoresDesdeHasta20 = (hasta20Value) => {

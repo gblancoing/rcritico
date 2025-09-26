@@ -8,9 +8,19 @@ import { API_BASE } from '../config';
   const [datos, setDatos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Función para obtener el mes anterior en formato MM-YYYY
+  const obtenerMesAnterior = () => {
+    const hoy = new Date();
+    const mesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const año = mesAnterior.getFullYear();
+    const mes = String(mesAnterior.getMonth() + 1).padStart(2, '0');
+    return `${año}-${mes}`;
+  };
+  
   const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [vectorSeleccionado, setVectorSeleccionado] = useState('real_parcial');
+  const [fechaHasta, setFechaHasta] = useState(obtenerMesAnterior());
+  const vectorSeleccionado = 'real_parcial'; // Fijo en Real Parcial - no editable
+  const [, setVectorSeleccionado] = useState('real_parcial'); // Función inactiva
   const [presupuestoTipo, setPresupuestoTipo] = useState('v0'); // v0, npc, api
   const [tipoPresupuesto, setTipoPresupuesto] = useState('V0'); // V0, NPC, API
   const [mostrarAyuda, setMostrarAyuda] = useState(false);
@@ -209,7 +219,7 @@ import { API_BASE } from '../config';
     return distribucion;
   };
 
-  // Función para obtener datos filtrados por fecha
+  // Función para obtener datos filtrados por mes
   const obtenerDatosFiltrados = (datosTabla) => {
     if (!Array.isArray(datosTabla)) return [];
     
@@ -217,14 +227,13 @@ import { API_BASE } from '../config';
     
     return datosTabla.filter(item => {
       const fechaItem = new Date(item.periodo);
-      const desde = fechaDesde ? new Date(fechaDesde) : null;
-      let hasta = fechaHasta ? new Date(fechaHasta) : null;
-      if (hasta) {
-        // Aseguramos que la fecha hasta incluya todo el día
-        hasta.setHours(23, 59, 59, 999);
-      }
-      if (desde && fechaItem < desde) return false;
-      if (hasta && fechaItem > hasta) return false;
+      const añoItem = fechaItem.getFullYear();
+      const mesItem = String(fechaItem.getMonth() + 1).padStart(2, '0');
+      const periodItem = `${añoItem}-${mesItem}`;
+      
+      // Comparar con filtros de mes
+      if (fechaDesde && periodItem < fechaDesde) return false;
+      if (fechaHasta && periodItem > fechaHasta) return false;
       return true;
     });
   };
@@ -613,8 +622,19 @@ import { API_BASE } from '../config';
 
   
   
-  return (
-    <div className={`resumen-financiero ${mostrarAyuda ? 'panel-abierto' : ''}`}>
+   return (
+     <div 
+       className={`resumen-financiero ${mostrarAyuda ? 'panel-abierto' : ''}`}
+       style={{
+         transform: 'scale(0.8)',
+         transformOrigin: 'top left',
+         width: '125%',
+         maxWidth: '100vw', // Nunca exceder el viewport width
+         minHeight: '125vh',
+         overflow: 'auto', // Scroll si es necesario
+         boxSizing: 'border-box'
+       }}
+     >
 
       {/* Header con filtros */}
       <div className="resumen-header">
@@ -635,7 +655,8 @@ import { API_BASE } from '../config';
         </div>
         
         <div className="resumen-filtros">
-          <div className="filtro-grupo">
+          {/* Vector selector hidden - fixed to real_parcial */}
+          {/* <div className="filtro-grupo">
             <label>Vector:</label>
             <select 
               value={vectorSeleccionado} 
@@ -651,12 +672,12 @@ import { API_BASE } from '../config';
               <option value="api_parcial">API Parcial</option>
               <option value="api_acumulada">API Acumulado</option>
             </select>
-          </div>
+          </div> */}
           
           <div className="filtro-grupo">
             <label>Desde:</label>
             <input 
-              type="date" 
+              type="month" 
               value={fechaDesde} 
               onChange={(e) => setFechaDesde(e.target.value)}
               className="filtro-date"
@@ -666,7 +687,7 @@ import { API_BASE } from '../config';
           <div className="filtro-grupo">
             <label>Hasta:</label>
             <input 
-              type="date" 
+              type="month" 
               value={fechaHasta} 
               onChange={(e) => setFechaHasta(e.target.value)}
               className="filtro-date"
@@ -775,7 +796,7 @@ import { API_BASE } from '../config';
           </div>
           <div className="kpi-content">
             <h3>Eficiencia</h3>
-            <div className="kpi-valor">{kpis.eficiencia}%</div>
+            <div className="kpi-valor">{kpis.eficiencia.toFixed(1)}%</div>
             <div className="kpi-subtitle">(Cumplimiento del Presupuesto)</div>
           </div>
         </div>
@@ -1205,22 +1226,29 @@ import { API_BASE } from '../config';
       <div className="graficos-container">
                  {/* Distribución por Categoría VP */}
          <div className="grafico-card">
-           <h3><i className="fa fa-pie-chart"></i> Distribución por Categoría VP - {vectorSeleccionado.replace('_', ' ').toUpperCase()}</h3>
+           <h3><i className="fa fa-pie-chart"></i> Distribución por Categoría VP - REAL PARCIAL vs API PARCIAL</h3>
            
            {/* Gráfico de Barras */}
            <div className="distribucion-vp">
              {(() => {
+               // Calcular distribución API PARCIAL
+               const datosApiParcial = datos.api_parcial || [];
+               const datosApiFiltrados = obtenerDatosFiltrados(datosApiParcial);
+               const distribucionApi = calcularDistribucionVPCorrecta(datosApiFiltrados, 'api_parcial', datos);
+               const totalApi = Object.values(distribucionApi).reduce((sum, valor) => sum + valor, 0);
+               
                // Log para verificar los valores de distribución
                console.log('=== DISTRIBUCIÓN VP ===');
-               console.log('Total para distribución:', datosVisualizacion.total);
-               Object.entries(datosVisualizacion.distribucion).forEach(([cat, val]) => {
-                 console.log(`${cat}: ${val}`);
-               });
-               console.log('======================');
+               console.log('Total REAL PARCIAL:', datosVisualizacion.total);
+               console.log('Total API PARCIAL:', totalApi);
                
                return Object.entries(datosVisualizacion.distribucion).map(([categoria, monto]) => {
                  const porcentaje = (monto / datosVisualizacion.total) * 100;
                  const categoriaInfo = categoriasVP[categoria] || { nombre: categoria, color: '#666', descripcion: 'Categoría no definida' };
+                 
+                 // Obtener datos API para la misma categoría
+                 const montoApi = distribucionApi[categoria] || 0;
+                 const porcentajeApi = (montoApi / totalApi) * 100;
                
                return (
                  <div 
@@ -1231,23 +1259,157 @@ import { API_BASE } from '../config';
                      setMostrarAyuda(true);
                    }}
                    style={{ cursor: 'pointer' }}
-                   data-tooltip={`${categoriaInfo.nombre} (${categoria}): ${categoriaInfo.descripcion} | Monto: ${formatearMonedaUSD(monto)} (${porcentaje.toFixed(1)}% del total) | Haz clic para ver detalles`}
+                   data-tooltip={`${categoriaInfo.nombre} (${categoria}): ${categoriaInfo.descripcion} | Real: ${formatearMonedaUSD(monto)} (${porcentaje.toFixed(1)}%) | API: ${formatearMonedaUSD(montoApi)} (${porcentajeApi.toFixed(1)}%) | Haz clic para ver detalles`}
                  >
-                   <div className="categoria-header">
-                     <span className="categoria-nombre">{categoriaInfo.nombre}</span>
-                     <span className="categoria-codigo">({categoria})</span>
-                     <span className="categoria-monto">{formatearMonedaUSD(monto)}</span>
+                   <div style={{ marginBottom: '15px', padding: '12px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+                     {/* Título de la categoría */}
+                     <div style={{ 
+                       fontSize: '14px', 
+                       fontWeight: 'bold', 
+                       color: '#2c3e50', 
+                       marginBottom: '10px',
+                       display: 'flex',
+                       justifyContent: 'space-between',
+                       alignItems: 'center'
+                     }}>
+                       <span>{categoriaInfo.nombre} ({categoria})</span>
+                       {/* Banderita de comparación */}
+                       <div style={{ 
+                         display: 'flex', 
+                         alignItems: 'center',
+                         gap: '4px'
+                       }}>
+                         {(() => {
+                           const comparacion = monto > montoApi ? (
+                             <div style={{ 
+                               display: 'flex', 
+                               alignItems: 'center',
+                               gap: '4px',
+                               padding: '2px 6px',
+                               background: '#fff5f5',
+                               border: '1px solid #f56565',
+                               borderRadius: '4px'
+                             }}>
+                               <i className="fa fa-flag" style={{ color: '#e53e3e', fontSize: '12px' }}></i>
+                               <span style={{ color: '#e53e3e', fontSize: '10px', fontWeight: 'bold' }}>SOBRECOSTO</span>
+                             </div>
+                           ) : monto < montoApi ? (
+                             <div style={{ 
+                               display: 'flex', 
+                               alignItems: 'center',
+                               gap: '4px',
+                               padding: '2px 6px',
+                               background: '#f0fff4',
+                               border: '1px solid #38a169',
+                               borderRadius: '4px'
+                             }}>
+                               <i className="fa fa-flag" style={{ color: '#38a169', fontSize: '12px' }}></i>
+                               <span style={{ color: '#38a169', fontSize: '10px', fontWeight: 'bold' }}>DENTRO DE LO PLANIFICADO</span>
+                             </div>
+                           ) : null;
+                           return comparacion;
+                         })()}
+                       </div>
+                     </div>
+
+                     {/* Real Parcial */}
+                     <div style={{ marginBottom: '10px', paddingLeft: '8px' }}>
+                       <div style={{ 
+                         display: 'flex', 
+                         alignItems: 'center', 
+                         justifyContent: 'space-between',
+                         marginBottom: '4px'
+                       }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                           <i className="fa fa-chart-line" style={{ color: '#1976d2', fontSize: '12px' }}></i>
+                           <span style={{ 
+                             color: '#1976d2', 
+                             fontWeight: '600', 
+                             fontSize: '12px'
+                           }}>Real Parcial</span>
+                         </div>
+                         <span style={{ 
+                           color: '#1976d2', 
+                           fontWeight: 'bold',
+                           fontSize: '12px'
+                         }}>
+                           {formatearMonedaUSD(monto)} ({porcentaje.toFixed(1)}%)
+                         </span>
+                       </div>
+                       <div style={{ fontSize: '11px', color: '#666', marginLeft: '18px', marginBottom: '4px' }}>
+                         (monto gastado a la fecha)
+                       </div>
+                       {/* Barra de progreso REAL PARCIAL */}
+                       <div style={{ 
+                         marginLeft: '18px',
+                         width: 'calc(100% - 18px)', 
+                         height: '8px', 
+                         background: '#e3f2fd', 
+                         borderRadius: '4px', 
+                         overflow: 'hidden',
+                         border: '1px solid #1976d2'
+                       }}>
+                         <div 
+                           style={{ 
+                             width: `${porcentaje}%`, 
+                             background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
+                             height: '100%',
+                             borderRadius: '3px',
+                             boxShadow: '0 1px 3px rgba(25, 118, 210, 0.3)'
+                           }}
+                         ></div>
+                       </div>
+                     </div>
+
+                     {/* API Parcial */}
+                     <div style={{ paddingLeft: '8px' }}>
+                       <div style={{ 
+                         display: 'flex', 
+                         alignItems: 'center', 
+                         justifyContent: 'space-between',
+                         marginBottom: '4px'
+                       }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                           <i className="fa fa-project-diagram" style={{ color: '#009639', fontSize: '12px' }}></i>
+                           <span style={{ 
+                             color: '#009639', 
+                             fontWeight: '600', 
+                             fontSize: '12px'
+                           }}>API Parcial</span>
+                         </div>
+                         <span style={{ 
+                           color: '#009639', 
+                           fontWeight: 'bold',
+                           fontSize: '12px'
+                         }}>
+                           {formatearMonedaUSD(montoApi)} ({porcentajeApi.toFixed(1)}%)
+                         </span>
+                       </div>
+                       <div style={{ fontSize: '11px', color: '#666', marginLeft: '18px', marginBottom: '4px' }}>
+                         (monto gastado a la fecha)
+                       </div>
+                       {/* Barra de progreso API PARCIAL */}
+                       <div style={{ 
+                         marginLeft: '18px',
+                         width: 'calc(100% - 18px)', 
+                         height: '8px', 
+                         background: '#e8f5e8', 
+                         borderRadius: '4px', 
+                         overflow: 'hidden',
+                         border: '1px solid #009639'
+                       }}>
+                         <div 
+                           style={{ 
+                             width: `${porcentajeApi}%`, 
+                             background: 'linear-gradient(90deg, #009639 0%, #4caf50 100%)',
+                             height: '100%',
+                             borderRadius: '3px',
+                             boxShadow: '0 1px 3px rgba(0, 150, 57, 0.3)'
+                           }}
+                         ></div>
+                       </div>
+                     </div>
                    </div>
-                   <div className="categoria-bar">
-                     <div 
-                       className="categoria-fill" 
-                       style={{ 
-                         width: `${porcentaje}%`, 
-                         backgroundColor: categoriaInfo.color 
-                       }}
-                     ></div>
-                   </div>
-                   <div className="categoria-porcentaje">{porcentaje.toFixed(1)}%</div>
             </div>
           );
         });
@@ -1332,18 +1494,7 @@ import { API_BASE } from '../config';
         </div>
       </div>
 
-             {/* Gráfico de Línea - Evolución Mensual REAL PARCIAL */}
-       <div className="grafico-card">
-         <h3><i className="fa fa-chart-line"></i> Gráfico de Línea - Evolución Mensual REAL PARCIAL</h3>
-         <div style={{ width: '100%', height: '400px', textAlign: 'center', padding: '20px' }}>
-           <p style={{ color: '#666', fontSize: '16px' }}>
-             📊 Gráfico de línea para mostrar la evolución temporal de los datos REAL PARCIAL
-           </p>
-           <p style={{ color: '#999', fontSize: '14px', marginTop: '10px' }}>
-             (Aquí irá el gráfico de línea una vez resueltas las dependencias)
-           </p>
-         </div>
-       </div>
+             {/* Gráfico de Línea - Evolución Mensual REAL PARCIAL - ELIMINADO */}
 
       {/* Panel de Ayuda */}
       {mostrarAyuda && (
@@ -1352,7 +1503,6 @@ import { API_BASE } from '../config';
           onCerrar={() => setMostrarAyuda(false)}
         />
       )}
-
 
     </div>
   );

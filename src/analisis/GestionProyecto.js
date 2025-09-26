@@ -85,22 +85,10 @@ if (typeof document !== 'undefined') {
   
 // Definir los diferentes tipos de reportes de reportabilidad
 const reportes = [
-  { value: 'lineas_bases', label: 'Líneas Bases - Real/Proyectado' },
-  { value: 'recursos', label: 'Gestión de Recursos' },
-  { value: 'cronograma', label: 'Cronograma y Calendario' },
-  { value: 'riesgos', label: 'Gestión de Riesgos' },
-  { value: 'comunicacion', label: 'Comunicación y Stakeholders' },
-  { value: 'calidad', label: 'Control de Calidad' },
-  { value: 'contratos', label: 'Gestión de Contratos' },
-  { value: 'valor_ganado', label: 'Valor Ganado - Codelco' },
+  { value: 'lineas_bases', label: 'Líneas Bases - Real/Proyectado' }
 ];
 
-const reportesGestion = [
-  { value: 'reporte_ordenes_compra', label: 'Reporte de Órdenes de Compra' },
-  { value: 'reporte_pagos', label: 'Reporte de Pagos' },
-  { value: 'reporte_contratos', label: 'Reporte de Contratos' },
-  { value: 'reporte_staff_dueno', label: 'Reporte de Staff Dueño' },
-];
+const reportesGestion = [];
 
 const ALTURA_BARRA_SUPERIOR = 56;
 const ANCHO_SIDEBAR = 240;
@@ -611,7 +599,7 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
         ▶
       </button>
       <div style={{ marginBottom: 16, marginTop: 16 }}>
-        <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Analisis y Gestión</h4>
+        <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Análisis</h4>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {reportes.map(reporte => (
             <button
@@ -636,32 +624,6 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
         </div>
       </div>
 
-      {/* Nueva sección para Reportes de Gestión */}
-      <div style={{ marginBottom: 16, marginTop: 16 }}>
-        <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Reportes de Gestión</h4>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {reportesGestion.map(reporte => (
-            <button
-              key={reporte.value}
-              onClick={() => setSeleccion(reporte.value)}
-              style={{
-                display: 'block',
-                width: '100%',
-                marginBottom: 6,
-                background: seleccion === reporte.value ? '#FFD000' : '#fff',
-                color: seleccion === reporte.value ? '#16355D' : '#16355D',
-                border: 'none',
-                borderRadius: 4,
-                padding: '8px 0',
-                fontWeight: seleccion === reporte.value ? 'bold' : 'normal',
-                cursor: 'pointer'
-              }}
-            >
-              {reporte.label}
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
     {/* Flecha para mostrar el sidebar cuando está oculto */}
     {!sidebarVisible && (
@@ -6610,7 +6572,9 @@ const GraficoCurvaS = ({
               />
               <Tooltip 
                 formatter={(value, name) => {
-                  return [`$${value?.toLocaleString() || '-'}`, name];
+                  if (value === null || value === undefined) return [`$0.0M`, name];
+                  const valorEnMillones = (value / 1000000).toFixed(1);
+                  return [`$${valorEnMillones}M`, name];
                 }}
                 labelFormatter={(label) => `Mes ${label}`}
                 contentStyle={{
