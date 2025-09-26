@@ -6084,8 +6084,17 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
 
 
 
-      {/* Contenido del reporte */}
-      <div style={{ padding: '0 20px' }}>
+      {/* Contenido del reporte con 80% zoom - SIGUIENDO LA METODOLOGÍA GESTIONPROYECTO.JS */}
+      <div style={{ 
+        padding: '0 20px',
+        // Aplicación TÉCNICA del scale y compensating dimensions para aprovechar un centro exact como GestionProyecto.js
+        transform: 'scale(0.8)',
+        transformOrigin: 'top left', 
+        width: '125%',
+        maxWidth: `calc((100vw - ${anchoSidebarIzquierdo}px - ${anchoSidebarDerecho}px - 32px) * 1.25)`, // PLACAR maxWidth RESPECTING sidebar allocations
+        minHeight: '125vh',
+        overflow: 'auto'
+      }}>
         {renderContenidoReporte()}
       </div>
 

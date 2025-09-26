@@ -5808,7 +5808,6 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       position: 'absolute',
       left: anchoSidebarIzquierdo + 32,
       top: ALTURA_BARRA_SUPERIOR,
-      width: `calc(100vw - ${anchoSidebarIzquierdo}px - ${anchoSidebarDerecho}px - 32px)`,
       height: alturaAreaTrabajo,
       margin: 0,
       padding: 0,
@@ -5817,6 +5816,13 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       transition: 'width 0.3s cubic-bezier(.4,1.3,.5,1), left 0.3s cubic-bezier(.4,1.3,.5,1)',
       boxSizing: 'border-box',
       zIndex: 1,
+      // LAS MISMAS PROPIEDADES EXITOSAS de ResumenFinanciero.js -> funcionó PERFECTAS
+      transform: 'scale(0.8)',
+      transformOrigin: 'top left',
+      width: '125%',  
+      maxWidth: '100vw', // Nunca exceder el viewport width
+      minHeight: '125vh',
+      overflow: 'auto'
     }}>
 
 
@@ -5920,8 +5926,10 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         </div>
       )}
 
-      {/* Contenido del reporte */}
-      <div style={{ padding: '0 20px' }}>
+      {/* Contenido del reporte IZ  RENDERER ONLY - no double transforms */}
+      <div style={{ 
+        padding: '0 20px'
+      }}>
         {renderContenidoReporte()}
       </div>
 
