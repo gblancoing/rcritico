@@ -1,0 +1,131 @@
+/* Estilos globales para el navbar - Aplicados al 80% de zoom */
+
+/* Estilos hover para navbar */
+.navbar-link:hover {
+  color: #ffd700 !important;
+}
+
+.logout-btn:hover {
+  background: #ffd700 !important;
+  color: #0a6ebd !important;
+}
+
+/* Estilos base del navbar */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0a6ebd;
+  padding: 0.56rem 1.6rem;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  z-index: 1000;
+  font-size: 0.84rem;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-logo {
+  width: 80px;
+  height: auto;
+  margin-right: 0.96rem;
+  margin-top: 1.6px;
+}
+
+.navbar-title {
+  font-weight: bold;
+  font-size: 1.04rem;
+  letter-spacing: 0.4px;
+}
+
+.navbar-menu {
+  display: flex;
+  gap: 1.6rem;
+}
+
+.navbar-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.84rem;
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-weight: 500;
+  font-size: 0.84rem;
+}
+
+.logout-btn {
+  background: #fff;
+  color: #0a6ebd;
+  border: none;
+  border-radius: 4.8px;
+  padding: 0.32rem 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  font-size: 0.84rem;
+}
+
+/* Responsive design para el navbar */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.45rem 1.2rem;
+    font-size: 0.75rem;
+  }
+  
+  .navbar-title {
+    font-size: 0.9rem;
+  }
+  
+  .navbar-menu {
+    gap: 1.2rem;
+  }
+  
+  .navbar-link {
+    font-size: 0.75rem;
+  }
+  
+  .navbar-logo {
+    width: 70px;
+    margin-right: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    padding: 0.4rem 1rem;
+    font-size: 0.7rem;
+  }
+  
+  .navbar-title {
+    font-size: 0.8rem;
+  }
+  
+  .navbar-menu {
+    gap: 1rem;
+  }
+  
+  .navbar-link {
+    font-size: 0.7rem;
+  }
+  
+  .navbar-logo {
+    width: 60px;
+    margin-right: 0.6rem;
+  }
+}

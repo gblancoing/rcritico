@@ -90,8 +90,8 @@ const reportes = [
 
 const reportesGestion = [];
 
-const ALTURA_BARRA_SUPERIOR = 56;
-const ANCHO_SIDEBAR = 240;
+const ALTURA_BARRA_SUPERIOR = 45; // 56 * 0.8 = 44.8
+const ANCHO_SIDEBAR = 192; // 240 * 0.8 = 192
 
 // --- COMPONENTE MODAL METODOLOGÍAS ECD ---
 const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClose }) => {
@@ -559,101 +559,9 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
 };
 
 
-const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVisible }) => (
-  <>
-    <div
-      style={{
-        position: 'fixed',
-        top: ALTURA_BARRA_SUPERIOR,
-        right: 0,
-        width: ANCHO_SIDEBAR,
-        height: '100vh',
-        background: '#16355D',
-        color: '#fff',
-        boxShadow: '0 0 8px #0003',
-        padding: '80px 16px 16px 16px',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-start',
-        transform: sidebarVisible ? 'translateX(0)' : `translateX(${ANCHO_SIDEBAR}px)`,
-        transition: 'transform 0.3s cubic-bezier(.4,1.3,.5,1)',
-      }}
-    >
-      {/* Botón para ocultar el sidebar */}
-      <button
-        onClick={() => setSidebarVisible(false)}
-        style={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          background: 'none',
-          border: 'none',
-          color: '#FFD000',
-          fontSize: 22,
-          cursor: 'pointer',
-          zIndex: 1100,
-        }}
-        title="Ocultar panel"
-      >
-        ▶
-      </button>
-      <div style={{ marginBottom: 16, marginTop: 16 }}>
-        <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Análisis</h4>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {reportes.map(reporte => (
-            <button
-              key={reporte.value}
-              onClick={() => setSeleccion(reporte.value)}
-              style={{
-                display: 'block',
-                width: '100%',
-                marginBottom: 6,
-                background: seleccion === reporte.value ? '#FFD000' : '#fff',
-                color: seleccion === reporte.value ? '#16355D' : '#16355D',
-                border: 'none',
-                borderRadius: 4,
-                padding: '8px 0',
-                fontWeight: seleccion === reporte.value ? 'bold' : 'normal',
-                cursor: 'pointer'
-              }}
-            >
-              {reporte.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-    </div>
-    {/* Flecha para mostrar el sidebar cuando está oculto */}
-    {!sidebarVisible && (
-      <button
-        onClick={() => setSidebarVisible(true)}
-        style={{
-          position: 'fixed',
-          top: ALTURA_BARRA_SUPERIOR + 12,
-          right: 0,
-          zIndex: 1101,
-          background: '#16355D',
-          color: '#FFD000',
-          border: 'none',
-          borderRadius: '8px 0 0 8px',
-          fontSize: 22,
-          padding: '6px 8px',
-          boxShadow: '0 0 8px #0003',
-          cursor: 'pointer',
-        }}
-        title="Mostrar panel"
-      >
-        ◀
-      </button>
-    )}
-  </>
-);
-
-const Reportabilidad = ({ proyectoId }) => {
+const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
   const [seleccion, setSeleccion] = useState('lineas_bases');
-  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [filtroDescripcion, setFiltroDescripcion] = useState(''); // NUEVO: Filtro por descripción
@@ -669,30 +577,8 @@ const Reportabilidad = ({ proyectoId }) => {
   const [tipoMensaje, setTipoMensaje] = useState('');
   const [descripcionesDisponibles, setDescripcionesDisponibles] = useState([]); // NUEVO: Lista de descripciones
 
-  // Detectar el estado del sidebar izquierdo
-  const [sidebarIzquierdoCollapsed, setSidebarIzquierdoCollapsed] = useState(false);
-  
-  useEffect(() => {
-    const detectarSidebarIzquierdo = () => {
-      const sidebarElement = document.querySelector('.ps-sidebar-root');
-      if (sidebarElement) {
-        const isCollapsed = sidebarElement.classList.contains('ps-collapsed');
-        setSidebarIzquierdoCollapsed(isCollapsed);
-      }
-    };
-    
-    detectarSidebarIzquierdo();
-    
-    const observer = new MutationObserver(detectarSidebarIzquierdo);
-    observer.observe(document.body, { 
-      childList: true, 
-      subtree: true, 
-      attributes: true, 
-      attributeFilter: ['class'] 
-    });
-    
-    return () => observer.disconnect();
-  }, []);
+  // Usar la prop sidebarCollapsed del componente padre
+  const sidebarIzquierdoCollapsed = sidebarCollapsed || false;
 
   // Cargar descripciones cuando cambie el proyecto
   useEffect(() => {
@@ -725,10 +611,9 @@ const Reportabilidad = ({ proyectoId }) => {
     }
   };
 
-  // Calcular ancho dinámico basado en el estado del sidebar izquierdo
-  const anchoSidebarIzquierdo = sidebarIzquierdoCollapsed ? 64 : 260;
-  const anchoSidebarDerecho = sidebarVisible ? ANCHO_SIDEBAR : 0;
-  const anchoAreaTrabajo = `calc(100vw - ${anchoSidebarIzquierdo}px - ${anchoSidebarDerecho}px)`;
+  // Calcular ancho dinámico basado en el estado del sidebar izquierdo (80% zoom)
+  const anchoSidebarIzquierdo = sidebarIzquierdoCollapsed ? 52 : 208; // 65px * 0.8 = 52px, 260px * 0.8 = 208px
+  const anchoAreaTrabajo = `calc(100vw - ${anchoSidebarIzquierdo}px)`;
   const alturaAreaTrabajo = `calc(100vh - ${ALTURA_BARRA_SUPERIOR}px)`;
 
   // Función para cargar datos según el reporte seleccionado
@@ -5806,7 +5691,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
   return (
     <div style={{
       position: 'absolute',
-      left: anchoSidebarIzquierdo + 32,
+      left: anchoSidebarIzquierdo + 25, // 32 * 0.8 = 25.6px
       top: ALTURA_BARRA_SUPERIOR,
       height: alturaAreaTrabajo,
       margin: 0,
@@ -5819,10 +5704,9 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       // LAS MISMAS PROPIEDADES EXITOSAS de ResumenFinanciero.js -> funcionó PERFECTAS
       transform: 'scale(0.8)',
       transformOrigin: 'top left',
-      width: '125%',  
-      maxWidth: '100vw', // Nunca exceder el viewport width
+      width: `calc(100vw - ${anchoSidebarIzquierdo}px)`, // Ancho completo menos sidebar izquierdo
       minHeight: '125vh',
-      overflow: 'auto'
+      overflow: 'visible' // Sin scroll, el contenido fluye naturalmente
     }}>
 
 
@@ -5926,20 +5810,20 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
         </div>
       )}
 
-      {/* Contenido del reporte IZ  RENDERER ONLY - no double transforms */}
+      {/* Contenido del reporte con 80% zoom - SIN SCROLL INTERNO */}
       <div style={{ 
-        padding: '0 20px'
+        padding: '0 16px', // 20px * 0.8 = 16px
+        // Aplicación TÉCNICA del scale y compensating dimensions para aprovechar todo el ancho
+        transform: 'scale(0.8)',
+        transformOrigin: 'top left', 
+        width: '125%',
+        maxWidth: `calc((100vw - ${anchoSidebarIzquierdo}px) * 1.25)`, // Compensar el zoom y usar todo el ancho
+        minHeight: '125vh',
+        overflow: 'visible' // Sin scroll interno, usar solo el scroll del navegador
       }}>
         {renderContenidoReporte()}
       </div>
 
-      {/* Sidebar derecho */}
-      <SidebarDerecho 
-        seleccion={seleccion} 
-        setSeleccion={setSeleccion} 
-        sidebarVisible={sidebarVisible} 
-        setSidebarVisible={setSidebarVisible} 
-      />
     </div>
   );
 };

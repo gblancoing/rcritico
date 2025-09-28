@@ -1,0 +1,173 @@
+/* Sidebar Derecho con zoom al 80% - Estilos estandarizados */
+
+/* Variables CSS para el zoom al 80% */
+:root {
+  --sidebar-derecho-ancho: 192px; /* 240px * 0.8 = 192px */
+  --sidebar-derecho-altura-barra: 45px; /* 56px * 0.8 = 44.8px */
+  --sidebar-derecho-padding: 13px; /* 16px * 0.8 = 12.8px */
+  --sidebar-derecho-margin: 13px; /* 16px * 0.8 = 12.8px */
+  --sidebar-derecho-font-size: 18px; /* 22px * 0.8 = 17.6px */
+  --sidebar-derecho-font-size-small: 14px; /* 18px * 0.8 = 14.4px */
+  --sidebar-derecho-border-radius: 3px; /* 4px * 0.8 = 3.2px */
+  --sidebar-derecho-border-radius-large: 6px; /* 8px * 0.8 = 6.4px */
+  --sidebar-derecho-padding-button: 6px; /* 8px * 0.8 = 6.4px */
+  --sidebar-derecho-margin-button: 5px; /* 6px * 0.8 = 4.8px */
+  --sidebar-derecho-padding-large: 64px; /* 80px * 0.8 = 64px */
+  --sidebar-derecho-padding-medium: 26px; /* 32px * 0.8 = 25.6px */
+}
+
+/* Clase para aplicar zoom al sidebar derecho */
+.sidebar-derecho-zoom {
+  width: var(--sidebar-derecho-ancho) !important;
+  padding: var(--sidebar-derecho-padding-large) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
+}
+
+/* Botón de cerrar sidebar */
+.sidebar-derecho-zoom .sidebar-close-btn {
+  top: 6px !important; /* 8px * 0.8 = 6.4px */
+  right: 6px !important; /* 8px * 0.8 = 6.4px */
+  font-size: var(--sidebar-derecho-font-size) !important;
+}
+
+/* Contenido del sidebar */
+.sidebar-derecho-zoom .sidebar-content {
+  margin-bottom: var(--sidebar-derecho-margin) !important;
+  margin-top: var(--sidebar-derecho-margin) !important;
+}
+
+/* Títulos del sidebar */
+.sidebar-derecho-zoom h4 {
+  color: #FFD000 !important;
+  margin-bottom: 6px !important; /* 8px * 0.8 = 6.4px */
+  font-size: 14px !important; /* 18px * 0.8 = 14.4px */
+  font-weight: 600 !important;
+}
+
+/* Botones del sidebar */
+.sidebar-derecho-zoom .sidebar-btn {
+  display: block !important;
+  width: 100% !important;
+  margin-bottom: var(--sidebar-derecho-margin-button) !important;
+  background: #fff !important;
+  color: #16355D !important;
+  border: none !important;
+  border-radius: var(--sidebar-derecho-border-radius) !important;
+  padding: var(--sidebar-derecho-padding-button) 0 !important;
+  font-weight: normal !important;
+  cursor: pointer !important;
+  font-size: 12px !important; /* 15px * 0.8 = 12px */
+  transition: all 0.2s ease !important;
+}
+
+/* Botón seleccionado */
+.sidebar-derecho-zoom .sidebar-btn.selected {
+  background: #FFD000 !important;
+  color: #16355D !important;
+  font-weight: bold !important;
+}
+
+/* Botón de mostrar sidebar cuando está oculto */
+.sidebar-derecho-zoom .sidebar-show-btn {
+  top: calc(var(--sidebar-derecho-altura-barra) + 10px) !important; /* 56px * 0.8 + 12px * 0.8 = 45px + 10px */
+  right: 0 !important;
+  border-radius: var(--sidebar-derecho-border-radius-large) 0 0 var(--sidebar-derecho-border-radius-large) !important;
+  font-size: var(--sidebar-derecho-font-size) !important;
+  padding: 5px 6px !important; /* 6px * 0.8 = 4.8px, 8px * 0.8 = 6.4px */
+}
+
+/* Transformaciones del sidebar */
+.sidebar-derecho-zoom.sidebar-visible {
+  transform: translateX(0) !important;
+}
+
+.sidebar-derecho-zoom.sidebar-hidden {
+  transform: translateX(calc(100% + 20px)) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-derecho-ancho: 160px; /* 200px * 0.8 = 160px */
+    --sidebar-derecho-padding: 10px; /* 12px * 0.8 = 9.6px */
+  }
+  
+  .sidebar-derecho-zoom h4 {
+    font-size: 12px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-btn {
+    font-size: 11px !important;
+    padding: 5px 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-derecho-ancho: 128px; /* 160px * 0.8 = 128px */
+    --sidebar-derecho-padding: 8px; /* 10px * 0.8 = 8px */
+  }
+  
+  .sidebar-derecho-zoom h4 {
+    font-size: 11px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-btn {
+    font-size: 10px !important;
+    padding: 4px 0 !important;
+    margin-bottom: 3px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-close-btn {
+    top: 4px !important;
+    right: 4px !important;
+    font-size: 16px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-show-btn {
+    font-size: 16px !important;
+    padding: 4px 5px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --sidebar-derecho-ancho: 96px; /* 120px * 0.8 = 96px */
+    --sidebar-derecho-padding: 6px; /* 8px * 0.8 = 6.4px */
+  }
+  
+  .sidebar-derecho-zoom h4 {
+    font-size: 10px !important;
+    margin-bottom: 3px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-btn {
+    font-size: 9px !important;
+    padding: 3px 0 !important;
+    margin-bottom: 2px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-close-btn {
+    top: 3px !important;
+    right: 3px !important;
+    font-size: 14px !important;
+  }
+  
+  .sidebar-derecho-zoom .sidebar-show-btn {
+    font-size: 14px !important;
+    padding: 3px 4px !important;
+  }
+}
+
+/* Override para elementos específicos que usan estilos inline */
+.sidebar-derecho-zoom[style*="width: 240px"] {
+  width: var(--sidebar-derecho-ancho) !important;
+}
+
+.sidebar-derecho-zoom[style*="padding: 80px 16px 16px 16px"] {
+  padding: var(--sidebar-derecho-padding-large) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
+}
+
+.sidebar-derecho-zoom[style*="padding: 32px 16px 16px 16px"] {
+  padding: var(--sidebar-derecho-padding-medium) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
+}

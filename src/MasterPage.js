@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './MasterPage.css';
+import './css/Navbar.css';
+import './css/MasterPageZoom.css';
+import Navbar from './components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from './config';
 
@@ -119,35 +122,14 @@ const MasterPage = ({ user, centros, onLogout }) => {
     centros.length > 0
   ) {
     return (
-      <div className="main-bg">
-        <nav className="navbar">
-          <div className="navbar-left">
-            <img src={process.env.PUBLIC_URL + '/img/logo-codelco.png'} alt="Logo" className="navbar-logo" />
-            <span className="navbar-title">Control Proyectos Financieros - Codelco</span>
-          </div>
-          <div className="navbar-menu">
-            <a className="navbar-link" onClick={() => navigate('/')} style={{cursor: 'pointer'}}>
-              <i className="fa fa-home"></i> Inicio
-            </a>
-            <a className="navbar-link" onClick={handleProyectosClick} style={{cursor: 'pointer'}}>
-              <i className="fa fa-building"></i> Proyectos
-            </a>
-            {(user.rol === 'super_admin' || user.rol === 'admin') && (
-              <a className="navbar-link" onClick={handleUsuariosClick} style={{cursor: 'pointer'}}>
-                <i className="fa fa-users"></i> Usuarios
-              </a>
-            )}
-            {user.rol === 'super_admin' && (
-              <a className="navbar-link" onClick={handleAjusteClick} style={{cursor: 'pointer'}}>
-                <i className="fa fa-cog"></i> Ajuste
-              </a>
-            )}
-          </div>
-          <div className="navbar-user">
-            <i className="fa fa-user-circle"></i> {user.nombre} ({user.rol})
-            <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
-          </div>
-        </nav>
+      <div className="main-bg" style={{
+        background: `linear-gradient(rgba(10, 110, 189, 0.4), rgba(30, 64, 175, 0.4)), url(${process.env.PUBLIC_URL + '/img/muro.jpg'})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+        backgroundRepeat: 'no-repeat'
+      }}>
+        <Navbar user={user} onLogout={handleLogout} />
         <main className="main-content moderno">
           {/* Banner de bienvenida */}
           <div className="banner-bienvenida">
@@ -195,23 +177,14 @@ const MasterPage = ({ user, centros, onLogout }) => {
 
   // Si no tiene centros asignados
   return (
-    <div className="main-bg">
-      <nav className="navbar">
-        <div className="navbar-left">
-          <img src={process.env.PUBLIC_URL + '/img/logo-codelco.png'} alt="Logo" className="navbar-logo" />
-          <span className="navbar-title">Control de Sucursales y Proyectos</span>
-        </div>
-        <div className="navbar-menu">
-          
-          <a href="#" className="navbar-link"><i className="fa fa-users"></i> Usuarios</a>
-          <a href="#" className="navbar-link"><i className="fa fa-building"></i> Proyectos</a>
-       
-        </div>
-        <div className="navbar-user">
-          <i className="fa fa-user-circle"></i> {user.nombre} ({user.rol})
-          <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
-        </div>
-      </nav>
+    <div className="main-bg" style={{
+      background: `linear-gradient(rgba(10, 110, 189, 0.4), rgba(30, 64, 175, 0.4)), url(${process.env.PUBLIC_URL + '/img/muro.jpg'})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundAttachment: 'fixed',
+      backgroundRepeat: 'no-repeat'
+    }}>
+      <Navbar user={user} onLogout={handleLogout} />
       <div className="content-area">
         <div className="content-card">
           <h2>Bienvenido, {user.nombre}</h2>

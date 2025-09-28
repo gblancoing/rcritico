@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './ProyectoPage.css';
+import './css/ContentLayoutZoom.css';
+import './css/Navbar.css';
+import Navbar from './components/Navbar';
 import CustomSidebar from './Sidebar';
 import ResumenFinanciero from './analisis/ResumenFinanciero';
 import ReporteFactorial from './analisis/ReporteFactorial';
@@ -81,54 +84,31 @@ const ProyectoPage = () => {
   const renderAnalisis = () => {
     switch (analisisSeleccionado) {
       case 'resumen':
-        return <ResumenFinanciero proyectoId={proyectoId} />;
+        return <ResumenFinanciero proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'factorial':
-        return <ReporteFactorial proyectoId={proyectoId} />;
+        return <ReporteFactorial proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'fisico':
-        return <ReporteFisicoFinanciero proyectoId={proyectoId} />;
+        return <ReporteFisicoFinanciero proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'eficiencia':
-        return <EficienciaGasto proyectoId={proyectoId} />;
+        return <EficienciaGasto proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'vectores_rp':
-        return <VectoresRealProyectado proyectoId={proyectoId} />;
+        return <VectoresRealProyectado proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'vectores':
-        return <Vectores proyectoId={proyectoId} />;
+        return <Vectores proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'reportabilidad':
-        return <Reportabilidad proyectoId={proyectoId} />;
+        return <Reportabilidad proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'gestion':
-        return <GestionProyecto proyectoId={proyectoId} />;
+        return <GestionProyecto proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
       case 'estructura':
-        return <EstructuraCuentas />;
+        return <EstructuraCuentas sidebarCollapsed={sidebarCollapsed} />;
       default:
-        return <ResumenFinanciero proyectoId={proyectoId} />;
+        return <ResumenFinanciero proyectoId={proyectoId} sidebarCollapsed={sidebarCollapsed} />;
     }
   };
 
   return (
     <div className="main-bg">
-      <nav className="navbar">
-        <div className="navbar-left">
-          <img src={process.env.PUBLIC_URL + '/img/logo-codelco.png'} alt="Logo" className="navbar-logo" />
-          <span className="navbar-title">Control Proyectos Financieros - Codelco</span>
-        </div>
-        <div className="navbar-menu">
-          <a className="navbar-link" onClick={handleInicioClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-home"></i> Inicio
-          </a>
-          <a className="navbar-link" onClick={handleUsuariosClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-users"></i> Usuarios
-          </a>
-          <a className="navbar-link" onClick={handleProyectosClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-building"></i> Proyectos
-          </a>
-          <a className="navbar-link" onClick={handleAjusteClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-question-circle"></i> Ayuda
-          </a>
-        </div>
-        <div className="navbar-user">
-          <i className="fa fa-user-circle"></i> {user.nombre} ({user.rol})
-          <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
-        </div>
-      </nav>
+      <Navbar user={user} onLogout={handleLogout} />
       
       <div className="proyecto-layout">
         <CustomSidebar 

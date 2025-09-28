@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Sidebar.css';
+import './css/SidebarZoom.css';
 import { Sidebar, Menu, MenuItem } from 'react-pro-sidebar';
 import { Link } from 'react-router-dom';
 import { FaChevronDown, FaChevronUp, FaChartPie, FaFileAlt, FaFileInvoiceDollar, FaBalanceScale, FaExchangeAlt, FaVectorSquare } from 'react-icons/fa';
@@ -47,27 +48,34 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
       backgroundColor="rgba(0, 43, 127, 0.92)"
       collapsed={collapsed}
       rootStyles={{
-        height: 'calc(100vh - 64px)', // Ajusta 64px si tu navbar tiene otra altura
-        top: '64px',
+        height: 'calc(100vh - 51px)', // 64px * 0.8 = 51.2px
+        top: '51px', // 64px * 0.8 = 51.2px
         left: '0',
         right: 'unset',
         position: 'fixed',
         zIndex: 100,
+        width: collapsed ? '52px' : '208px', // 65px * 0.8 = 52px, 260px * 0.8 = 208px
+        minWidth: collapsed ? '52px' : '208px',
+        maxWidth: collapsed ? '52px' : '208px',
       }}
     >
       {/* Botón de colapsar/expandir dentro del sidebar */}
       <button
         onClick={() => setCollapsed(!collapsed)}
+        className="sidebar-toggle-btn"
         style={{
           position: 'absolute',
-          top: 12,
-          right: 8,
+          top: 10, // 12px * 0.8 = 9.6px
+          right: 6, // 8px * 0.8 = 6.4px
           background: 'none',
           border: 'none',
           color: '#FFD000',
-          fontSize: 22,
+          fontSize: 18, // 22px * 0.8 = 17.6px
           cursor: 'pointer',
           zIndex: 1100,
+          padding: '4px',
+          borderRadius: '4px',
+          transition: 'all 0.2s ease'
         }}
         title={collapsed ? 'Expandir menú' : 'Minimizar menú'}
       >
@@ -87,16 +95,18 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
               : disabled
               ? '#222' // Letras oscuras para deshabilitado
               : '#fff',
-            fontWeight: active ? 'bold' : 'normal',
-            borderRadius: '6px',
-            margin: '2px 8px', // Reducido de 4px a 2px
-            transition: 'background 0.18s, color 0.18s',
-            marginTop: '40px', // Solo para el primer elemento
+            fontWeight: active ? '600' : '500',
+            borderRadius: '5px', // 6px * 0.8 = 4.8px
+            margin: '2px 6px', // 2px * 0.8 = 1.6px, 8px * 0.8 = 6.4px
+            padding: '11px 16px', // 14px * 0.8 = 11.2px, 20px * 0.8 = 16px
+            transition: 'all 0.18s ease',
+            fontSize: '13px', // Reducido proporcionalmente
+            marginTop: '32px', // 40px * 0.8 = 32px
           }),
           hover: ({ disabled }) => ({
-            backgroundColor: disabled ? '#b0b0b0' : '#fff',
-            color: disabled ? '#222' : '#1a2235',
-            fontWeight: 'bold',
+            backgroundColor: disabled ? '#b0b0b0' : 'rgba(255, 255, 255, 0.1)',
+            color: disabled ? '#222' : '#F2A900',
+            fontWeight: '600',
           }),
           icon: ({ active, disabled, hovered }) => ({
             color: active
@@ -106,8 +116,10 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
                 ? '#222'
                 : '#b0b0b0'
               : hovered
-              ? '#1a2235'
+              ? '#F2A900'
               : '#F2A900',
+            fontSize: '14px', // Reducido proporcionalmente
+            marginRight: '11px', // 14px * 0.8 = 11.2px
           }),
         }}
       >
@@ -118,7 +130,7 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
             active={seleccionado === opcion.clave}
             onClick={() => onSelect(opcion.clave)}
             style={{
-              marginTop: index === 0 ? '40px' : '2px', // Solo el primer elemento tiene margen superior
+              marginTop: index === 0 ? '32px' : '2px', // 40px * 0.8 = 32px, solo el primer elemento
             }}
           >
             {opcion.texto}
@@ -127,27 +139,29 @@ const CustomSidebar = ({ seleccionado, onSelect, onCollapsedChange, proyecto }) 
       </Menu>
       {/* Tarjeta KPI de información del proyecto, ahora al pie del sidebar, sin fondo blanco */}
       {projectToShow && !collapsed && (
-        <div style={{
+        <div className="proyecto-info-container" style={{
           position: 'absolute',
-          bottom: 80,
+          bottom: 64, // 80px * 0.8 = 64px
           left: 0,
           width: '100%',
           color: '#fff',
           background: 'none',
           boxShadow: 'none',
           borderRadius: 0,
-          padding: '0 16px',
+          padding: '0 13px', // 16px * 0.8 = 12.8px
           margin: 0,
           fontWeight: 400,
-          zIndex: 1000
+          zIndex: 1000,
+          fontSize: '13px', // Reducido proporcionalmente
+          lineHeight: '1.4'
         }}>
-          <div style={{display: 'flex', alignItems: 'center', marginBottom: 4}}>
-            <span style={{fontSize: 22, marginRight: 8, color: '#FFD000'}}>📁</span>
-            <span style={{fontWeight: 700, fontSize: 18, color: '#fff'}}>{projectToShow.nombre}</span>
+          <div className="proyecto-info-header" style={{display: 'flex', alignItems: 'center', marginBottom: 3}}>
+            <span className="proyecto-info-icon" style={{fontSize: 18, marginRight: 6, color: '#FFD000'}}>📁</span>
+            <span className="proyecto-info-title" style={{fontWeight: 600, fontSize: 14, color: '#fff'}}>{projectToShow.nombre}</span>
           </div>
-          <div style={{color: '#fff', fontSize: 14}}>ID: <b>{projectToShow.proyecto_id}</b></div>
-          <div style={{color: '#fff', fontSize: 14}}>Región: <b>{projectToShow.region_id}</b></div>
-          <div style={{color: '#fff', fontSize: 14}}>Descripción: <span style={{fontWeight: 600}}>{projectToShow.descripcion}</span></div>
+          <div className="proyecto-info-detail" style={{color: '#fff', fontSize: 11}}>ID: <b>{projectToShow.proyecto_id}</b></div>
+          <div className="proyecto-info-detail" style={{color: '#fff', fontSize: 11}}>Región: <b>{projectToShow.region_id}</b></div>
+          <div className="proyecto-info-description" style={{color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: '1.3'}}>Descripción: <span style={{fontWeight: 600}}>{projectToShow.descripcion}</span></div>
         </div>
       )}
     </Sidebar>

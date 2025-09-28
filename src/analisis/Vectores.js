@@ -8,6 +8,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, Responsi
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { buildAppUrl, API_BASE } from '../config';
+import '../css/SidebarDerechoZoom.css';
 
 
 const tablas = [
@@ -30,12 +31,13 @@ const reportes = [
   // Agrega más reportes si los necesitas
 ];
 
-const ALTURA_BARRA_SUPERIOR = 56; // Ajusta según tu layout
-const ANCHO_SIDEBAR = 240;
+const ALTURA_BARRA_SUPERIOR = 45; // 56 * 0.8 = 44.8
+const ANCHO_SIDEBAR = 192; // 240 * 0.8 = 192
 
 const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVisible }) => (
   <>
     <div
+      className={`sidebar-derecho-zoom ${sidebarVisible ? 'sidebar-visible' : 'sidebar-hidden'}`}
       style={{
         position: 'fixed',
         top: ALTURA_BARRA_SUPERIOR,
@@ -45,26 +47,26 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
         background: '#16355D',
         color: '#fff',
         boxShadow: '0 0 8px #0003',
-        padding: '32px 16px 16px 16px',
+        padding: '26px 13px 13px 13px', // 32px * 0.8 = 25.6px, 16px * 0.8 = 13px
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
-        transform: sidebarVisible ? 'translateX(0)' : `translateX(${ANCHO_SIDEBAR}px)`,
         transition: 'transform 0.3s cubic-bezier(.4,1.3,.5,1)',
       }}
     >
       {/* Botón para ocultar el sidebar */}
       <button
+        className="sidebar-close-btn"
         onClick={() => setSidebarVisible(false)}
         style={{
           position: 'absolute',
-          top: 8,
-          right: 8,
+          top: 6, // 8 * 0.8 = 6.4
+          right: 6, // 8 * 0.8 = 6.4
           background: 'none',
           border: 'none',
           color: '#FFD000',
-          fontSize: 22,
+          fontSize: 18, // 22 * 0.8 = 17.6
           cursor: 'pointer',
           zIndex: 1100,
         }}
@@ -72,24 +74,26 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
       >
         ▶
       </button>
-      <div style={{ marginBottom: 16, marginTop: 16 }}>
-        <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Vectores</h4>
+      <div className="sidebar-content" style={{ marginBottom: 13, marginTop: 13 }}> {/* 16 * 0.8 = 12.8 */}
+        <h4 style={{ color: '#FFD000', marginBottom: 6, fontSize: 14 }}>Vectores</h4> {/* 8 * 0.8 = 6.4, 18px * 0.8 = 14.4 */}
         <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
           {tablas.map(tabla => (
             <button
               key={tabla.value}
+              className={`sidebar-btn ${seleccion === tabla.value ? 'selected' : ''}`}
               onClick={() => setSeleccion(tabla.value)}
               style={{
                 display: 'block',
                 width: '100%',
-                marginBottom: 6,
+                marginBottom: 5, // 6 * 0.8 = 4.8
                 background: seleccion === tabla.value ? '#FFD000' : '#fff',
                 color: seleccion === tabla.value ? '#16355D' : '#16355D',
                 border: 'none',
-                borderRadius: 4,
-                padding: '8px 0',
+                borderRadius: 3, // 4 * 0.8 = 3.2
+                padding: '6px 0', // 8 * 0.8 = 6.4
                 fontWeight: seleccion === tabla.value ? 'bold' : 'normal',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontSize: 12 // 15 * 0.8 = 12
               }}
             >
               {tabla.label}
@@ -97,24 +101,26 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
           ))}
         </div>
       </div>
-  <div>
-        <h4 style={{ color: '#FFD000', marginBottom: 8 }}>Analisis - Reportes</h4>
+  <div className="sidebar-content">
+        <h4 style={{ color: '#FFD000', marginBottom: 6, fontSize: 14 }}>Analisis - Reportes</h4> {/* 8 * 0.8 = 6.4, 18px * 0.8 = 14.4 */}
         <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
           {reportes.map(reporte => (
             <button
               key={reporte.value}
+              className={`sidebar-btn ${seleccion === reporte.value ? 'selected' : ''}`}
               onClick={() => setSeleccion(reporte.value)}
               style={{
                 display: 'block',
                 width: '100%',
-                marginBottom: 6,
+                marginBottom: 5, // 6 * 0.8 = 4.8
                 background: seleccion === reporte.value ? '#FFD000' : '#fff',
                 color: seleccion === reporte.value ? '#16355D' : '#16355D',
                 border: 'none',
-                borderRadius: 4,
-                padding: '8px 0',
+                borderRadius: 3, // 4 * 0.8 = 3.2
+                padding: '6px 0', // 8 * 0.8 = 6.4
                 fontWeight: seleccion === reporte.value ? 'bold' : 'normal',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontSize: 12 // 15 * 0.8 = 12
               }}
             >
               {reporte.label}
@@ -126,18 +132,19 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
     {/* Flecha para mostrar el sidebar cuando está oculto */}
     {!sidebarVisible && (
       <button
+        className="sidebar-show-btn"
         onClick={() => setSidebarVisible(true)}
         style={{
           position: 'fixed',
-          top: ALTURA_BARRA_SUPERIOR + 12,
+          top: ALTURA_BARRA_SUPERIOR + 10, // 12 * 0.8 = 9.6
           right: 0,
           zIndex: 1101,
           background: '#16355D',
           color: '#FFD000',
           border: 'none',
-          borderRadius: '8px 0 0 8px',
-          fontSize: 22,
-          padding: '6px 8px',
+          borderRadius: '6px 0 0 6px', // 8px * 0.8 = 6.4
+          fontSize: 18, // 22 * 0.8 = 17.6
+          padding: '5px 6px', // 6px * 0.8 = 4.8, 8px * 0.8 = 6.4
           boxShadow: '0 0 8px #0003',
           cursor: 'pointer',
         }}
@@ -149,7 +156,7 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
   </>
 );
 
-const Vectores = ({ proyectoId }) => {
+const Vectores = ({ proyectoId, sidebarCollapsed }) => {
   const [seleccion, setSeleccion] = useState('real_parcial'); // Por defecto 'Real Parcial'
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [excelData, setExcelData] = useState([]);
@@ -1174,36 +1181,11 @@ const Vectores = ({ proyectoId }) => {
 
   const anchoSidebarDerecho = sidebarVisible ? ANCHO_SIDEBAR : 0;
   
-  // Detectar el estado del sidebar izquierdo
-  const [sidebarIzquierdoCollapsed, setSidebarIzquierdoCollapsed] = useState(false);
+  // Usar la prop sidebarCollapsed del componente padre
+  const sidebarIzquierdoCollapsed = sidebarCollapsed || false;
   
-  useEffect(() => {
-    const detectarSidebarIzquierdo = () => {
-      // Buscar el elemento del sidebar izquierdo
-      const sidebarElement = document.querySelector('.ps-sidebar-root');
-      if (sidebarElement) {
-        const isCollapsed = sidebarElement.classList.contains('ps-collapsed');
-        setSidebarIzquierdoCollapsed(isCollapsed);
-      }
-    };
-    
-    // Detectar inicialmente
-    detectarSidebarIzquierdo();
-    
-    // Observar cambios en el DOM
-    const observer = new MutationObserver(detectarSidebarIzquierdo);
-    observer.observe(document.body, { 
-      childList: true, 
-      subtree: true, 
-      attributes: true, 
-      attributeFilter: ['class'] 
-    });
-    
-    return () => observer.disconnect();
-  }, []);
-  
-  // Calcular ancho dinámico basado en el estado del sidebar izquierdo
-  const anchoSidebarIzquierdo = sidebarIzquierdoCollapsed ? 64 : 260;
+  // Calcular ancho dinámico basado en el estado del sidebar izquierdo (80% zoom)
+  const anchoSidebarIzquierdo = sidebarIzquierdoCollapsed ? 52 : 208; // 65px * 0.8 = 52px, 260px * 0.8 = 208px
   const anchoAreaTrabajo = `calc(100vw - ${anchoSidebarIzquierdo}px - ${anchoSidebarDerecho}px)`;
   const alturaAreaTrabajo = `calc(100vh - ${ALTURA_BARRA_SUPERIOR}px)`;
 
@@ -8186,9 +8168,9 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
   return (
     <div style={{
       position: 'absolute',
-      left: anchoSidebarIzquierdo + 32, // Margen izquierdo de 32px
+      left: anchoSidebarIzquierdo + 25, // 32 * 0.8 = 25.6px
       top: ALTURA_BARRA_SUPERIOR,
-      width: `calc(100vw - ${anchoSidebarIzquierdo}px - ${anchoSidebarDerecho}px - 32px)`, // Reducir aún más el margen para minimizar el espacio
+      width: `calc(100vw - ${anchoSidebarIzquierdo}px - ${anchoSidebarDerecho}px - 25px)`, // 32 * 0.8 = 25.6px
       height: alturaAreaTrabajo,
       margin: 0,
       padding: 0,

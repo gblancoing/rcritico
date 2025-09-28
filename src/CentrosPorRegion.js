@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './MasterPage.css';
+import './css/Navbar.css';
+import Navbar from './components/Navbar';
 import { useProject } from './ProjectContext';
 import { API_BASE } from './config';
 
@@ -224,7 +226,7 @@ const CentrosPorRegion = ({ user, centros, onLogout }) => {
 
   return (
     <div className="main-bg" style={{
-      background: `linear-gradient(rgba(10, 110, 189, 0.4), rgba(30, 64, 175, 0.4)), url(${process.env.PUBLIC_URL + '/img/Muro.JPG'})`,
+      background: `linear-gradient(rgba(10, 110, 189, 0.4), rgba(30, 64, 175, 0.4)), url(${process.env.PUBLIC_URL + '/img/muro.jpg'})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundAttachment: 'fixed',
@@ -248,6 +250,26 @@ const CentrosPorRegion = ({ user, centros, onLogout }) => {
             100% { transform: translateX(100%); }
           }
           
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          @keyframes pulse {
+            0%, 100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.05);
+            }
+          }
+          
           /* Enable scrolling so content is visible */
           .main-content.moderno {
             overflow-y: auto !important;
@@ -258,37 +280,65 @@ const CentrosPorRegion = ({ user, centros, onLogout }) => {
             max-height: calc(100vh - 140px) !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
+            animation: fadeInUp 0.6s ease-out;
+          }
+          
+          /* Scrollbar personalizado */
+          .content-card::-webkit-scrollbar {
+            width: 6px;
+          }
+          
+          .content-card::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+          }
+          
+          .content-card::-webkit-scrollbar-thumb {
+            background: rgba(245, 158, 11, 0.6);
+            border-radius: 3px;
+          }
+          
+          .content-card::-webkit-scrollbar-thumb:hover {
+            background: rgba(245, 158, 11, 0.8);
+          }
+          
+          /* Responsive design */
+          @media (max-width: 768px) {
+            .content-card {
+              margin: 10px !important;
+              border-radius: 12px !important;
+            }
+          }
+          
+          @media (max-width: 480px) {
+            .content-card {
+              margin: 5px !important;
+              border-radius: 8px !important;
+            }
+          }
+          
+          /* Efectos de hover mejorados */
+          .region-item:hover {
+            animation: pulse 0.6s ease-in-out;
+          }
+          
+          /* Transiciones suaves */
+          * {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          }
+          
+          /* Estilos hover para navbar */
+          .navbar-link:hover {
+            color: #ffd700 !important;
+          }
+          
+          .logout-btn:hover {
+            background: #ffd700 !important;
+            color: #0a6ebd !important;
           }
         `}
       </style>
-      <nav className="navbar">
-        <div className="navbar-left">
-          <img src={process.env.PUBLIC_URL + '/img/logo-codelco.png'} alt="Logo" className="navbar-logo" />
-          <span className="navbar-title">Control Proyectos Financieros - Codelco</span>
-        </div>
-        <div className="navbar-menu">
-          <a className="navbar-link" onClick={() => navigate('/')} style={{cursor: 'pointer'}}>
-            <i className="fa fa-home"></i> Inicio
-          </a>
-          <a className="navbar-link" onClick={() => navigate('/centros-por-region')} style={{cursor: 'pointer'}}>
-            <i className="fa fa-building"></i> Proyectos
-          </a>
-          {(user.rol === 'super_admin' || user.rol === 'admin') && (
-            <a className="navbar-link" onClick={handleUsuariosClick} style={{cursor: 'pointer'}}>
-              <i className="fa fa-users"></i> Usuarios
-            </a>
-          )}
-          {user.rol === 'super_admin' && (
-            <a className="navbar-link" onClick={handleAjusteClick} style={{cursor: 'pointer'}}>
-              <i className="fa fa-cog"></i> Ajuste
-            </a>
-          )}
-        </div>
-        <div className="navbar-user">
-          <i className="fa fa-user-circle"></i> {user.nombre} ({user.rol})
-          <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
-        </div>
-      </nav>
+      <Navbar user={user} onLogout={handleLogout} />
 
       <main className="main-content moderno" style={{
         paddingTop: '30px', 
@@ -298,23 +348,24 @@ const CentrosPorRegion = ({ user, centros, onLogout }) => {
         overflow: 'hidden',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        padding: '20px'
       }}>
         <div className="content-card" style={{
-          maxWidth: '450px', 
-          minWidth: '350px',
+          maxWidth: window.innerWidth > 1200 ? '560px' : window.innerWidth > 768 ? '480px' : '76%', 
+          minWidth: window.innerWidth > 768 ? '320px' : '240px',
           margin: '0 auto', 
           padding: '0', 
-          background: 'rgba(13, 30, 60, 0.85)', 
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)', 
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          background: 'rgba(13, 30, 60, 0.92)', 
+          boxShadow: '0 20px 64px rgba(0, 0, 0, 0.32)', 
+          border: '1px solid rgba(255, 255, 255, 0.25)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: '12px',
+          borderRadius: '13px',
           position: 'relative',
-          fontSize: '12px',
+          fontSize: window.innerWidth > 768 ? '11px' : '10px',
           height: 'auto',
-          maxHeight: 'calc(100vh - 120px)',
+          maxHeight: 'calc(100vh - 140px)',
           overflow: 'hidden'
         }}>
           {/* Debug info para verificar carga de datos */}
@@ -328,137 +379,315 @@ const CentrosPorRegion = ({ user, centros, onLogout }) => {
               No se encontraron regiones. Verifica la conexión con la base de datos.
             </div>
           )}
+          {/* Header con título */}
+          {regionesFiltradas.length > 0 && (
+            <div style={{
+              padding: '16px 20px 12px 20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+              background: 'rgba(255, 255, 255, 0.05)'
+            }}>
+              <h2 style={{
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: 600,
+                margin: 0,
+                textAlign: 'center',
+                letterSpacing: '0.4px'
+              }}>
+                Regiones y Proyectos
+              </h2>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '10px',
+                margin: '3px 0 0 0',
+                textAlign: 'center'
+              }}>
+                Selecciona una región para ver sus proyectos
+              </p>
+            </div>
+          )}
+
           {/* Desplegar solo si hay datos */}
           {regionesFiltradas.length > 0 && (
-            <ul style={{
-              listStyle: 'none', 
-              padding: '12px',
-              margin: 0,
-              width: '100%'
+            <div style={{
+              padding: '16px 20px 20px 20px',
+              maxHeight: 'calc(100vh - 280px)',
+              overflowY: 'auto'
             }}>
-              {regionesFiltradas.map(region => {
-                const proyectosRegion = proyectosPorRegionFiltrados[region.region_id] || [];
-                const isExpanded = expanded.includes(region.region_id);
-                // Usar la variable correcta que estaba en el original
-                const tieneProyectos = Number(region.cantidad_proyectos) > 0;
-                
-                return (
-                  <li key={region.region_id} style={{
-                    marginBottom: '4px',
-                    padding: 0
-                  }}>
-                    <div
-                      onClick={() => tieneProyectos && toggleExpand(region.region_id)}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '10px 14px',
-                        cursor: tieneProyectos ? 'pointer' : 'default',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        transition: 'all 0.3s ease',
-                        fontWeight: 500,
-                        borderRadius: '6px',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        marginBottom: '2px'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    >
-                      <div style={{display: 'flex', alignItems: 'center', flex: 1}}>
-                        <i className="fa fa-map-marker-alt" style={{color: '#60a5fa', marginRight: 8, fontSize: '12px'}}></i>
-                        <span style={{
-                          color: '#ffffff',
+              <ul style={{
+                listStyle: 'none', 
+                padding: 0,
+                margin: 0,
+                width: '100%'
+              }}>
+                {regionesFiltradas.map((region, index) => {
+                  const proyectosRegion = proyectosPorRegionFiltrados[region.region_id] || [];
+                  const isExpanded = expanded.includes(region.region_id);
+                  const tieneProyectos = Number(region.cantidad_proyectos) > 0;
+                  
+                  return (
+                    <li key={region.region_id} style={{
+                      marginBottom: '10px'
+                    }}>
+                      <div
+                        onClick={() => tieneProyectos && toggleExpand(region.region_id)}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '13px 16px',
+                          cursor: tieneProyectos ? 'pointer' : 'default',
+                          background: tieneProyectos 
+                            ? 'linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(59, 130, 246, 0.1))'
+                            : 'rgba(255, 255, 255, 0.08)',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                           fontWeight: 500,
-                          fontSize: '12px'
-                        }}>
-                          {region.nombre}
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <span style={{
-                          color: tieneProyectos ? '#f59e0b' : '#ffffff',
-                          fontWeight: 500,
-                          fontSize: '12px'
-                        }}>
-                          {region.cantidad_proyectos} proyecto{region.cantidad_proyectos === 1 ? '' : 's'}
-                        </span>
-                        {tieneProyectos && (
-                          <i className={`fa fa-chevron-${isExpanded ? 'up' : 'down'}`} style={{
-                            fontSize: '10px',
-                            color: '#f59e0b',
-                            marginLeft: '2px'
-                          }}></i>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Proyectos desplegados - manteniendo la lógica original */}
-                    {isExpanded && tieneProyectos && (
-                      <ul style={{
-                        listStyle: 'none',
-                        margin: '2px 0',
-                        padding: '6px 0 6px 25px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                      }}>
-                        {proyectosRegion.map(proy => (
-                          <li
-                            key={proy.proyecto_id}
-                            onClick={() => handleProyectoClick(proy.proyecto_id)}
-                            style={{
-                              padding: '6px 10px',
-                              cursor: 'pointer',
+                          borderRadius: '10px',
+                          border: tieneProyectos 
+                            ? '1px solid rgba(96, 165, 250, 0.3)'
+                            : '1px solid rgba(255, 255, 255, 0.15)',
+                          boxShadow: tieneProyectos 
+                            ? '0 3px 10px rgba(96, 165, 250, 0.1)'
+                            : '0 2px 6px rgba(0, 0, 0, 0.1)',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}
+                        onMouseOver={e => {
+                          if (tieneProyectos) {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(59, 130, 246, 0.15))';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(96, 165, 250, 0.2)';
+                          }
+                        }}
+                        onMouseOut={e => {
+                          if (tieneProyectos) {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(59, 130, 246, 0.1))';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(96, 165, 250, 0.1)';
+                          }
+                        }}
+                      >
+                        {/* Efecto de brillo sutil */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '1px',
+                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)'
+                        }}></div>
+                        
+                        <div style={{display: 'flex', alignItems: 'center', flex: 1}}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: tieneProyectos 
+                              ? 'linear-gradient(135deg, #60a5fa, #3b82f6)'
+                              : 'rgba(255, 255, 255, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: '13px',
+                            boxShadow: tieneProyectos 
+                              ? '0 3px 10px rgba(96, 165, 250, 0.3)'
+                              : '0 2px 6px rgba(0, 0, 0, 0.1)'
+                          }}>
+                            <i className="fa fa-map-marker-alt" style={{
+                              color: '#ffffff', 
+                              fontSize: '13px',
+                              textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                            }}></i>
+                          </div>
+                          <div style={{flex: 1}}>
+                            <span style={{
                               color: '#ffffff',
-                              fontWeight: 400,
-                              transition: 'all 0.2s ease',
-                              borderRadius: '3px',
-                              margin: '2px 0',
-                              background: 'rgba(255, 255, 255, 0.06)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                              lineHeight: '1.3',
+                              display: 'block'
+                            }}>
+                              {region.nombre}
+                            </span>
+                            <span style={{
+                              color: 'rgba(255, 255, 255, 0.6)',
+                              fontSize: '10px',
+                              fontWeight: 400
+                            }}>
+                              Región {index + 1} de {regionesFiltradas.length}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <div style={{
+                            background: tieneProyectos 
+                              ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                              : 'rgba(255, 255, 255, 0.1)',
+                            padding: '5px 10px',
+                            borderRadius: '16px',
+                            border: tieneProyectos 
+                              ? '1px solid rgba(245, 158, 11, 0.3)'
+                              : '1px solid rgba(255, 255, 255, 0.2)',
+                            boxShadow: tieneProyectos 
+                              ? '0 2px 6px rgba(245, 158, 11, 0.2)'
+                              : 'none'
+                          }}>
+                            <span style={{
+                              color: '#ffffff',
+                              fontWeight: 600,
+                              fontSize: '11px'
+                            }}>
+                              {region.cantidad_proyectos} proyecto{region.cantidad_proyectos === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          {tieneProyectos && (
+                            <div style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '6px',
+                              background: 'rgba(245, 158, 11, 0.2)',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '6px'
-                            }}
-                            onMouseOver={e => {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                            }}
-                            onMouseOut={e => {
-                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                            }}
-                          >
-                            <i className="fa fa-folder-open" style={{color: '#f59e0b', fontSize: '10px'}}></i>
-                            <div>
-                              <div style={{
-                                fontWeight: 500,
-                                color: '#ffffff',
-                                fontSize: '10px'
-                              }}>
-                                {proy.nombre}
-                              </div>
-                              {proy.descripcion && (
-                                <div style={{
-                                  color: 'rgba(255, 255, 255, 0.7)',
-                                  fontSize: '9px',
-                                  marginTop: '1px'
-                                }}>
-                                  {proy.descripcion}
-                                </div>
-                              )}
+                              justifyContent: 'center',
+                              transition: 'all 0.3s ease'
+                            }}>
+                              <i className={`fa fa-chevron-${isExpanded ? 'up' : 'down'}`} style={{
+                                fontSize: '10px',
+                                color: '#f59e0b',
+                                transition: 'transform 0.3s ease'
+                              }}></i>
                             </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Proyectos desplegados con mejor diseño */}
+                      {isExpanded && tieneProyectos && (
+                        <div style={{
+                          marginTop: '6px',
+                          padding: '13px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(10px)'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            marginBottom: '10px',
+                            paddingBottom: '6px',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                          }}>
+                            <i className="fa fa-folder-open" style={{
+                              color: '#f59e0b',
+                              fontSize: '11px',
+                              marginRight: '6px'
+                            }}></i>
+                            <span style={{
+                              color: '#ffffff',
+                              fontSize: '11px',
+                              fontWeight: 600
+                            }}>
+                              Proyectos en esta región ({proyectosRegion.length})
+                            </span>
+                          </div>
+                          
+                          <ul style={{
+                            listStyle: 'none',
+                            padding: 0,
+                            margin: 0
+                          }}>
+                            {proyectosRegion.map((proy, proyIndex) => (
+                              <li
+                                key={proy.proyecto_id}
+                                onClick={() => handleProyectoClick(proy.proyecto_id)}
+                                style={{
+                                  padding: '10px 13px',
+                                  cursor: 'pointer',
+                                  color: '#ffffff',
+                                  fontWeight: 400,
+                                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  borderRadius: '6px',
+                                  margin: '5px 0',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                  position: 'relative',
+                                  overflow: 'hidden'
+                                }}
+                                onMouseOver={e => {
+                                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1))';
+                                  e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                                  e.currentTarget.style.transform = 'translateX(4px)';
+                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.2)';
+                                }}
+                                onMouseOut={e => {
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                  e.currentTarget.style.transform = 'translateX(0)';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
+                              >
+                                {/* Indicador numérico */}
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '9px',
+                                  fontWeight: 600,
+                                  color: '#ffffff',
+                                  flexShrink: 0
+                                }}>
+                                  {proyIndex + 1}
+                                </div>
+                                
+                                <div style={{flex: 1}}>
+                                  <div style={{
+                                    fontWeight: 600,
+                                    color: '#ffffff',
+                                    fontSize: '11px',
+                                    lineHeight: '1.3',
+                                    marginBottom: '2px'
+                                  }}>
+                                    {proy.nombre}
+                                  </div>
+                                  {proy.descripcion && (
+                                    <div style={{
+                                      color: 'rgba(255, 255, 255, 0.7)',
+                                      fontSize: '10px',
+                                      lineHeight: '1.3'
+                                    }}>
+                                      {proy.descripcion}
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <i className="fa fa-arrow-right" style={{
+                                  color: 'rgba(245, 158, 11, 0.6)',
+                                  fontSize: '10px',
+                                  transition: 'all 0.3s ease'
+                                }}></i>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </div>
       </main>

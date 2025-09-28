@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './UsuariosPage.css';
+import './css/UsuariosPageZoom.css';
+import './css/Navbar.css';
+import Navbar from './components/Navbar';
 import { API_BASE } from './config';
 import { useNavigate } from 'react-router-dom';
 
@@ -420,33 +423,7 @@ const UsuariosPage = ({ user }) => {
 
   return (
     <div className="main-bg">
-      <nav className="navbar">
-        <div className="navbar-left">
-          <img src={process.env.PUBLIC_URL + '/img/logo-codelco.png'} alt="Logo" className="navbar-logo" />
-          <span className="navbar-title">Administración de Usuarios</span>
-        </div>
-        <div className="navbar-menu">
-          <a className="navbar-link" onClick={handleInicioClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-home"></i> Inicio
-          </a>
-          <a className="navbar-link" onClick={handleProyectosClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-building"></i> Proyectos
-          </a>
-          <a className="navbar-link" onClick={handleUsuariosClick} style={{cursor: 'pointer'}}>
-            <i className="fa fa-users"></i> Usuarios
-          </a>
-          {/* Solo super_admin ve Ajuste */}
-          {user.rol === 'super_admin' && (
-            <a className="navbar-link" onClick={handleAjusteClick} style={{cursor: 'pointer'}}>
-              <i className="fa fa-cog"></i> Ajuste
-            </a>
-          )}
-        </div>
-        <div className="navbar-user">
-          <i className="fa fa-user-circle"></i> {user.nombre} ({user.rol})
-          <button className="logout-btn" onClick={handleLogout}>Cerrar sesión</button>
-        </div>
-      </nav>
+      <Navbar user={user} onLogout={handleLogout} />
       <div className="usuarios-container">
         <h2 className="usuarios-titulo">Administración de Usuarios</h2>
         {/* Botón Nuevo usuario */}
