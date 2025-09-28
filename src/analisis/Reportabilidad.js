@@ -2413,7 +2413,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
               onClick={handleImportar}
               disabled={!archivoSeleccionado || importando}
               style={{
-                  backgroundColor: (!archivoSeleccionado || importando) ? '#6c757d' : '#6f42c1',
+                  backgroundColor: (!archivoSeleccionado || importando) ? '#6c757d' : '#16355D',
                 color: 'white',
                 border: 'none',
                   padding: '6px 10px',

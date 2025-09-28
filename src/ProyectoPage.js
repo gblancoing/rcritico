@@ -23,7 +23,7 @@ const ProyectoPage = () => {
   const navigate = useNavigate();
   const [analisisSeleccionado, setAnalisisSeleccionado] = useState('resumen');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [panelAyudaAbierto, setPanelAyudaAbierto] = useState(false);
+  // const [panelAyudaAbierto, setPanelAyudaAbierto] = useState(false); // Panel de ayuda removido
 
   // Simulación de usuario (puedes reemplazar por props o contexto si lo tienes)
   const user = JSON.parse(localStorage.getItem('user')) || { nombre: 'Usuario', rol: 'usuario' };
@@ -117,7 +117,7 @@ const ProyectoPage = () => {
           proyecto={proyecto}
           onCollapsedChange={setSidebarCollapsed}
         />
-        <div className={`proyecto-analisis-content ${sidebarCollapsed ? 'sidebar-minimizado' : ''} ${panelAyudaAbierto ? 'panel-ayuda-abierto' : ''}`}>
+        <div className={`proyecto-analisis-content ${sidebarCollapsed ? 'sidebar-minimizado' : ''}`}>
           {renderAnalisis()}
         </div>
       </div>

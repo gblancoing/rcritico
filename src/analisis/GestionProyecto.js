@@ -246,8 +246,8 @@ const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClo
       }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
-          color: 'white',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+          color: '#16355D',
           padding: '20px 24px',
           display: 'flex',
           alignItems: 'center',
@@ -378,14 +378,14 @@ const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClo
           <div style={{
             marginTop: '20px',
             padding: '16px',
-            backgroundColor: '#f3e5f5',
+            backgroundColor: '#f8f9fa',
             borderRadius: '8px',
-            border: '1px solid #ce93d8'
+            border: '1px solid #dee2e6'
           }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#4a148c', fontSize: '1rem' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#16355D', fontSize: '1rem' }}>
               📅 Interpretación de las Fechas Estimadas
             </h4>
-            <ul style={{ margin: '0', paddingLeft: '20px', color: '#4a148c', fontSize: '0.9rem', lineHeight: '1.5' }}>
+            <ul style={{ margin: '0', paddingLeft: '20px', color: '#16355D', fontSize: '0.9rem', lineHeight: '1.5' }}>
               <li><strong>Fecha Promedio:</strong> Fecha más probable de finalización del proyecto</li>
               <li><strong>Fecha Máxima:</strong> Escenario pesimista - preparación para posibles retrasos</li>
               <li><strong>Fecha Mínima:</strong> Escenario optimista - potencial de finalización anticipada</li>
@@ -440,8 +440,8 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
       }}>
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
-          color: 'white',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+          color: '#16355D',
           padding: '20px 24px',
           display: 'flex',
           alignItems: 'center',
@@ -1794,8 +1794,9 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
       
       const tooltipStyle = {
         position: 'absolute',
-        backgroundColor: '#333',
-        color: 'white',
+        backgroundColor: '#ffffff',
+        color: '#16355D',
+        border: '1px solid #e5e7eb',
         padding: '8px 12px',
         borderRadius: '6px',
         fontSize: '12px',
@@ -1879,7 +1880,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
           }}>
             {/* Etiqueta para identificar la sección */}
             <div style={{
-              backgroundColor: '#6f42c1',
+              backgroundColor: '#16355D',
               color: 'white',
               padding: '4px 8px',
               borderRadius: '4px',
@@ -1959,7 +1960,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
               onClick={handleImportar}
               disabled={!archivoSeleccionado || importando}
               style={{
-                  backgroundColor: (!archivoSeleccionado || importando) ? '#6c757d' : '#6f42c1',
+                  backgroundColor: (!archivoSeleccionado || importando) ? '#6c757d' : '#16355D',
                 color: 'white',
                 border: 'none',
                   padding: '6px 10px',
@@ -5697,16 +5698,19 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       margin: 0,
       padding: 0,
       overflowX: 'hidden',
-      background: '#f8f9fb',
+      background: '#ffffff !important', // Fondo blanco forzado
       transition: 'width 0.3s cubic-bezier(.4,1.3,.5,1), left 0.3s cubic-bezier(.4,1.3,.5,1)',
       boxSizing: 'border-box',
       zIndex: 1,
       // LAS MISMAS PROPIEDADES EXITOSAS de ResumenFinanciero.js -> funcionó PERFECTAS
       transform: 'scale(0.8)',
       transformOrigin: 'top left',
-      width: `calc(100vw - ${anchoSidebarIzquierdo}px)`, // Ancho completo menos sidebar izquierdo
+      width: `calc(100vw - ${anchoSidebarIzquierdo}px + 150px)`, // Usar más ancho disponible
       minHeight: '125vh',
-      overflow: 'visible' // Sin scroll, el contenido fluye naturalmente
+      overflow: 'visible', // Sin scroll, el contenido fluye naturalmente
+      // Asegurar que cubra todo el fondo
+      right: 0,
+      bottom: 0
     }}>
 
 
@@ -5813,11 +5817,12 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       {/* Contenido del reporte con 80% zoom - SIN SCROLL INTERNO */}
       <div style={{ 
         padding: '0 16px', // 20px * 0.8 = 16px
+        background: '#ffffff', // Fondo blanco sólido
         // Aplicación TÉCNICA del scale y compensating dimensions para aprovechar todo el ancho
         transform: 'scale(0.8)',
         transformOrigin: 'top left', 
         width: '125%',
-        maxWidth: `calc((100vw - ${anchoSidebarIzquierdo}px) * 1.25)`, // Compensar el zoom y usar todo el ancho
+        maxWidth: `calc((100vw - ${anchoSidebarIzquierdo}px + 150px) * 1.25)`, // Compensar zoom y usar más ancho
         minHeight: '125vh',
         overflow: 'visible' // Sin scroll interno, usar solo el scroll del navegador
       }}>
@@ -5860,7 +5865,7 @@ const GraficoCurvaS = ({
     costoGanado: true
   });
 
-  const [modoOscuro, setModoOscuro] = useState(true); // true = fondo negro, false = fondo blanco
+  const [modoOscuro, setModoOscuro] = useState(false); // true = fondo negro, false = fondo blanco
 
   // Función para alternar filtros
   const alternarFiltro = (filtro) => {
@@ -6171,9 +6176,9 @@ const GraficoCurvaS = ({
             alignItems: 'center',
             gap: '8px',
             padding: '8px 12px',
-            backgroundColor: modoOscuro ? '#1f2937' : '#f3f4f6',
-            color: modoOscuro ? '#ffffff' : '#374151',
-            border: `1px solid ${modoOscuro ? '#374151' : '#d1d5db'}`,
+            backgroundColor: '#f3f4f6',
+            color: '#374151',
+            border: '1px solid #d1d5db',
             borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '12px',
@@ -6182,10 +6187,10 @@ const GraficoCurvaS = ({
             boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
           }}
           onMouseOver={(e) => {
-            e.target.style.backgroundColor = modoOscuro ? '#374151' : '#e5e7eb';
+            e.target.style.backgroundColor = '#e5e7eb';
           }}
           onMouseOut={(e) => {
-            e.target.style.backgroundColor = modoOscuro ? '#1f2937' : '#f3f4f6';
+            e.target.style.backgroundColor = '#f3f4f6';
           }}
         >
           {modoOscuro ? (
@@ -6426,15 +6431,22 @@ const GraficoCurvaS = ({
         {/* Chart Container */}
         <div style={{ 
           height: '600px',
-          backgroundColor: modoOscuro ? '#000000' : '#ffffff',
+          backgroundColor: '#ffffff !important', // Fondo blanco sólido siempre
           borderRadius: '6px',
           padding: '16px',
-          border: modoOscuro ? '1px solid #374151' : '1px solid #e5e7eb'
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)', // Sombra sutil para separar del fondo
+          position: 'relative',
+          overflow: 'hidden',
+          // Asegurar que cubra todo el fondo
+          width: '100%',
+          minWidth: '100%'
         }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" style={{ backgroundColor: '#ffffff' }}>
             <ComposedChart 
               data={datosGrafico} 
               margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              style={{ backgroundColor: '#ffffff' }}
             >
               <CartesianGrid vertical={false} stroke={modoOscuro ? '#374151' : '#f3f4f6'} />
               <XAxis 
@@ -6470,12 +6482,12 @@ const GraficoCurvaS = ({
                 }}
                 labelFormatter={(label) => `Mes ${label}`}
                 contentStyle={{
-                  backgroundColor: modoOscuro ? '#1f2937' : '#ffffff',
-                  border: modoOscuro ? '1px solid #374151' : '1px solid #e5e7eb',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
                   borderRadius: '6px',
                   fontSize: '12px',
-                  boxShadow: modoOscuro ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
-                  color: modoOscuro ? '#ffffff' : '#111827'
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  color: '#111827'
                 }}
                 cursor={false}
               />
@@ -6493,7 +6505,7 @@ const GraficoCurvaS = ({
                 dataKey="ieacMin"
                 stackId="ieacCloud"
                 stroke="none"
-                fill={modoOscuro ? "#000000" : "#ffffff"}
+                fill="#ffffff"
                 fillOpacity={1}
                 baseValue={0}
               />
@@ -6503,7 +6515,7 @@ const GraficoCurvaS = ({
                 dataKey="ieacCloudArea"
                 stackId="ieacCloud"
                 stroke="none"
-                fill={modoOscuro ? "rgba(139, 69, 19, 0.25)" : "rgba(139, 69, 19, 0.2)"}
+                fill="rgba(22, 53, 93, 0.1)" // Azul claro en lugar de marrón/morado
                 fillOpacity={0.4}
                 baseValue={0}
               />
@@ -6637,7 +6649,7 @@ const GraficoCurvaS = ({
                 <Line 
                   type="monotone" 
                   dataKey="costoGanado" 
-                  stroke="#8b5cf6" 
+                  stroke="#2563eb" 
                   strokeWidth={2}
                   name="Costo Ganado (USD)"
                   dot={false}
@@ -8936,28 +8948,50 @@ const ReporteLineasBases = ({ proyectoId }) => {
         padding: '20px', 
         borderRadius: '8px', 
         border: '1px solid #dee2e6',
-        overflowX: 'auto',
+        overflowX: 'visible', // Sin scroll horizontal, usar todo el ancho
         maxHeight: '70vh',
         overflowY: 'auto'
       }}>
-        <h4 style={{ color: '#16355D', marginBottom: '15px' }}>
-          Tabla Dinámica - Proyecto ID: {proyectoId} ({obtenerDatosFiltrados().length} registros)
+        <h4 style={{ 
+          color: '#16355D', 
+          marginBottom: '15px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <span>Tabla Dinámica - Proyecto ID: {proyectoId} ({obtenerDatosFiltrados().length} registros)</span>
           {fechaCorte && (
             <span style={{ 
               color: '#dc3545', 
-              fontSize: '14px', 
+              fontSize: '12px', 
               fontWeight: 'normal',
-              marginLeft: '10px'
+              backgroundColor: '#f8f9fa',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              border: '1px solid #dee2e6',
+              whiteSpace: 'nowrap'
             }}>
               📅 Corte: {fechaCorte} (Real hasta {fechaCorte}, Proyectado desde {fechaCorte})
             </span>
           )}
         </h4>
         
+        {/* Contenedor responsive para la tabla */}
+        <div style={{
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          border: '1px solid #dee2e6',
+          backgroundColor: 'white'
+        }}>
           <table style={{ 
             width: '100%', 
+            minWidth: '1400px', // Ancho mínimo para mantener legibilidad en móviles
             borderCollapse: 'collapse',
-            fontSize: '12px'
+            fontSize: '12px',
+            tableLayout: 'auto' // Cambiar a auto para mejor responsive
           }}>
             <thead>
               <tr style={{ 
@@ -8969,24 +9003,28 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
                   <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '60px',
+                    whiteSpace: 'nowrap'
                   }}>
                 Mes
                   </th>
                   <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'left', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 Periodo
                   </th>
@@ -9013,90 +9051,106 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 Av. Financiero Planificado(USD)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 Av. Fisico Real(%)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 Av. Fisico Proyectado(%)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 Av. Financiero Real(USD)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 IEAC (avg)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 IEAC Min (USD)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 IEAC Max (USD)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 EAC Informado (USD)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
+                    padding: '8px 6px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    minWidth: '120px',
+                    whiteSpace: 'nowrap'
                   }}>
                 EAC Proyectado (USD)
               </th>
@@ -9158,43 +9212,43 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 <tr key={index} style={{ 
                   borderBottom: '1px solid #dee2e6'
                 }}>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {index + 1}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', fontWeight: 'bold' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.periodo}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.api_acum ? `${(parseFloat(row.api_acum) * 100).toFixed(2)}` : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.monto_total ? formatearMoneda(row.monto_total) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.api_acum_real ? `${(parseFloat(row.api_acum_real) * 100).toFixed(2)}` : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.api_acum_proyectado ? `${(parseFloat(row.api_acum_proyectado) * 100).toFixed(2)}` : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.incurrido_total ? formatearMoneda(row.incurrido_total) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {row.ieac_avg ? formatearMoneda(row.ieac_avg) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {calcularIEACMin(numeroMes) ? formatearMoneda(calcularIEACMin(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {calcularIEACMax(numeroMes) ? formatearMoneda(calcularIEACMax(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {calcularEACInformado(numeroMes) ? formatearMoneda(calcularEACInformado(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {calcularEACProyectado(numeroMes) ? formatearMoneda(calcularEACProyectado(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'center' }}>
+                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     {calcularCostoGanado(numeroMes, row.periodo, row) ? formatearMoneda(calcularCostoGanado(numeroMes, row.periodo, row)) : '-'}
                   </td>
                 </tr>
@@ -9215,6 +9269,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
             )}
           </tbody>
           </table>
+        </div>
       </div>
 
       {/* Gráfico de Curva S */}
