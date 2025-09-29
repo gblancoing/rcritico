@@ -1050,7 +1050,7 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
     };
 
     return (
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={600}>
         <LineChart
           data={data}
           margin={{ top: 40, right: 40, left: 10, bottom: 20 }}
@@ -1166,7 +1166,7 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
 
   // --- COMPONENTE DE GRÁFICO CURVA S ACUMULADOS ---
   const CurvaSChartAcumulados = ({ data }) => (
-    <ResponsiveContainer width="100%" height={440}>
+    <ResponsiveContainer width="100%" height={640}>
       <LineChart data={data} margin={{ top: 40, right: 40, left: 10, bottom: 60 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="periodo" angle={-45} textAnchor="end" height={60} />
@@ -1541,11 +1541,14 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
   const GraficoCascada = ({ data, titulo }) => (
     <div style={{ width: '100%', maxWidth: 900, margin: '32px auto 0 auto', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', padding: 24 }}>
       <h4 style={{ textAlign: 'center', color: '#0a3265', fontWeight: 700, marginBottom: 12 }}>{titulo}</h4>
-      <ResponsiveContainer width="100%" height={340}>
+      <ResponsiveContainer width="100%" height={500}>
         <BarChart data={data} margin={{ top: 30, right: 30, left: 10, bottom: 60 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" angle={-35} textAnchor="end" height={60} />
-          <YAxis label={{ value: 'M$USD', angle: -90, position: 'insideLeft', offset: 10 }} />
+          <YAxis 
+            label={{ value: 'M$USD', angle: -90, position: 'insideLeft', offset: 10 }} 
+            domain={['dataMin - dataMin*0.1', 'dataMax + dataMax*0.2']}
+          />
           <Tooltip formatter={v => `${v} M$USD`} />
           <Bar dataKey="value">
             {data.map((entry, idx) => (
@@ -1655,7 +1658,7 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
   const GraficoCascadaAcumulativa = ({ data, titulo }) => (
     <div style={{ width: '100%', maxWidth: 900, margin: '32px auto 0 auto', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', padding: 24 }}>
       <h4 style={{ textAlign: 'center', color: '#0a3265', fontWeight: 700, marginBottom: 12 }}>{titulo}</h4>
-      <ResponsiveContainer width="100%" height={340}>
+      <ResponsiveContainer width="100%" height={500}>
         <BarChart data={data} margin={{ top: 30, right: 30, left: 10, bottom: 80 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
@@ -1670,7 +1673,10 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
               fill: '#222'
             }}
           />
-          <YAxis label={{ value: 'M$USD', angle: -90, position: 'insideLeft', offset: 10 }} />
+          <YAxis 
+            label={{ value: 'M$USD', angle: -90, position: 'insideLeft', offset: 10 }} 
+            domain={['dataMin - dataMin*0.1', 'dataMax + dataMax*0.2']}
+          />
           <Tooltip formatter={v => `${v} M$USD`} />
           {/* Serie invisible para el offset/base */}
           <Bar dataKey="base" stackId="a" fill="transparent" />
@@ -5206,7 +5212,7 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
         </div>
 
         {/* Gráfico principal */}
-      <ResponsiveContainer width="100%" height={500}>
+      <ResponsiveContainer width="100%" height={700}>
         <LineChart
           data={datosEVM}
             margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
@@ -5220,7 +5226,7 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
             interval="preserveStartEnd"
           />
           <YAxis 
-            domain={['dataMin', 'dataMax']}
+            domain={['dataMin - dataMin*0.1', 'dataMax + dataMax*0.2']}
             tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`}
           />
           <Tooltip 
@@ -9247,7 +9253,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
           {/* Gráfico solo para reporte6 (Curva S - Acumulados) */}
           {seleccion === 'reporte6' && (
             <div ref={graficoRef}>
-              <ResponsiveContainer width="100%" height={400}>
+              <ResponsiveContainer width="100%" height={600}>
                 <LineChart data={prepararDatosCurvaS_Acumulados(
                   tablaRealAcumulado,
                   tablaV0Acumulada,
