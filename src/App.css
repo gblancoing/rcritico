@@ -10,7 +10,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f5f6fa; /* Fondo blanco gris claro profesional */
   min-height: 100vh;
 }
 
@@ -89,7 +89,7 @@ body {
 }
 
 .test-button, .send-button {
-  background: linear-gradient(45deg, #667eea, #764ba2);
+  background: linear-gradient(45deg, #0a6ebd, #1976d2);
   color: white;
   border: none;
   padding: 12px 24px;

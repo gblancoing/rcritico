@@ -19,7 +19,7 @@
 /* Clase para aplicar zoom al sidebar derecho */
 .sidebar-derecho-zoom {
   width: var(--sidebar-derecho-ancho) !important;
-  padding: var(--sidebar-derecho-padding-large) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
+  padding: 10px var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
 }
 
 /* Botón de cerrar sidebar */
@@ -31,8 +31,8 @@
 
 /* Contenido del sidebar */
 .sidebar-derecho-zoom .sidebar-content {
-  margin-bottom: var(--sidebar-derecho-margin) !important;
-  margin-top: var(--sidebar-derecho-margin) !important;
+  margin-bottom: 2px !important;
+  margin-top: 2px !important;
 }
 
 /* Títulos del sidebar */
@@ -165,9 +165,9 @@
 }
 
 .sidebar-derecho-zoom[style*="padding: 80px 16px 16px 16px"] {
-  padding: var(--sidebar-derecho-padding-large) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
+  padding: 10px var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
 }
 
 .sidebar-derecho-zoom[style*="padding: 32px 16px 16px 16px"] {
-  padding: var(--sidebar-derecho-padding-medium) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
+  padding: 10px var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) var(--sidebar-derecho-padding) !important;
 }

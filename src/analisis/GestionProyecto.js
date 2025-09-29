@@ -576,6 +576,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
   const [mensajeImportacion, setMensajeImportacion] = useState('');
   const [tipoMensaje, setTipoMensaje] = useState('');
   const [descripcionesDisponibles, setDescripcionesDisponibles] = useState([]); // NUEVO: Lista de descripciones
+  const [modoOscuro, setModoOscuro] = useState(false); // Estado para modo oscuro
 
   // Usar la prop sidebarCollapsed del componente padre
   const sidebarIzquierdoCollapsed = sidebarCollapsed || false;
@@ -680,7 +681,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
       case 'cumplimiento_fisico':
         return <ReporteCumplimientoFisico data={datosReporte} autorizado={autorizado} setAutorizado={setAutorizado} proyectoId={proyectoId} fechaDesde={fechaDesde} fechaHasta={fechaHasta} datosCumplimientoFisico={datosCumplimientoFisico} filtroVector={filtroVector} setFiltroVector={setFiltroVector} />;
       case 'lineas_bases':
-        return <ReporteLineasBases proyectoId={proyectoId} />;
+        return <ReporteLineasBases proyectoId={proyectoId} modoOscuro={modoOscuro} setModoOscuro={setModoOscuro} />;
       
       // Nuevos reportes de Análisis y Gestión
       case 'recursos':
@@ -2080,7 +2081,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
                 
                 <p style={{ 
                   margin: '0',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   lineHeight: '1.5',
                   color: '#666'
                 }}>
@@ -2092,7 +2093,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
                 <label style={{
                   display: 'block',
                   marginBottom: '8px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   fontWeight: '500',
                   color: '#333'
                 }}>
@@ -2160,7 +2161,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
                     padding: '12px 24px',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: '500',
                     transition: 'all 0.3s ease',
                     minWidth: '100px'
@@ -2185,7 +2186,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
                     padding: '12px 24px',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: '500',
                     transition: 'all 0.3s ease',
                     minWidth: '100px'
@@ -2256,7 +2257,7 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
             </h2>
             <p style={{ 
               margin: '0',
-              fontSize: '14px',
+              fontSize: '16px',
               opacity: '0.85',
               fontWeight: '300',
               letterSpacing: '0.5px'
@@ -2933,7 +2934,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       backgroundColor: '#d1ecf1', 
                       borderRadius: '6px',
                       border: '1px solid #bee5eb',
-                      fontSize: '12px',
+                      fontSize: '16px',
                       color: '#0c5460'
                     }}>
                       <strong>💡 INSIGHTS DE PREDICTIVIDAD:</strong>
@@ -3596,7 +3597,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#16355D',
                   color: 'white',
                   fontWeight: 'bold'
@@ -3607,7 +3608,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#16355D',
                   color: 'white'
                 }}>
@@ -3617,7 +3618,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#ffc107',
                   color: 'black'
                 }}>
@@ -3627,7 +3628,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
@@ -3637,7 +3638,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#16355D',
                   color: 'white'
                 }}>
@@ -3647,7 +3648,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#ffc107',
                   color: 'black'
                 }}>
@@ -3657,7 +3658,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
@@ -3667,7 +3668,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
@@ -3677,7 +3678,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '12px', 
                   textAlign: 'center', 
                   border: '1px solid #ddd', 
-                  fontSize: '14px',
+                  fontSize: '16px',
                   backgroundColor: '#17a2b8',
                   color: 'white'
                 }}>
@@ -3717,7 +3718,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     padding: '12px', 
                     textAlign: 'center', 
                     border: '1px solid #ddd',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: 'bold'
                   }}>
                     {fila.cumplimientoA.toFixed(2)}%
@@ -3742,7 +3743,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     padding: '12px', 
                     textAlign: 'center', 
                     border: '1px solid #ddd',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: 'bold'
                   }}>
                     {fila.cumplimientoB.toFixed(2)}%
@@ -3751,7 +3752,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     padding: '12px', 
                     textAlign: 'center', 
                     border: '1px solid #ddd',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: 'bold',
                     color: fila.eficienciaGasto >= 150 ? '#28a745' : fila.eficienciaGasto >= 100 ? '#ffc107' : '#dc3545'
                   }}>
@@ -3761,7 +3762,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     padding: '12px', 
                     textAlign: 'center', 
                     border: '1px solid #ddd',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: 'bold',
                     color: fila.nota >= 4 ? '#28a745' : fila.nota >= 3 ? '#ffc107' : '#dc3545'
                   }}>
@@ -3853,7 +3854,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
               <h5 style={{ 
                 color: '#856404', 
                 marginBottom: '12px', 
-                fontSize: '14px', 
+                fontSize: '16px', 
               fontWeight: 'bold',
                 display: 'flex',
                 alignItems: 'center',
@@ -4036,7 +4037,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                <h5 style={{ 
                  color: '#495057', 
                  marginBottom: '12px', 
-                 fontSize: '14px', 
+                 fontSize: '16px', 
                  fontWeight: 'bold',
                  display: 'flex',
                  alignItems: 'center',
@@ -4105,7 +4106,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
               backgroundColor: '#e3f2fd', 
               borderRadius: '6px',
               border: '1px solid #2196f3',
-              fontSize: '14px',
+              fontSize: '16px',
               color: '#1976d2'
             }}>
               <strong>🔍 Filtros aplicados:</strong> 
@@ -4820,7 +4821,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 color: '#155724', 
                 padding: '4px 8px', 
                 borderRadius: '4px', 
-                fontSize: '12px',
+                fontSize: '16px',
                 fontWeight: 'bold',
                 border: '1px solid #c3e6cb'
               }}>
@@ -4832,7 +4833,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 color: '#856404', 
                 padding: '4px 8px', 
                 borderRadius: '4px', 
-                fontSize: '12px',
+                fontSize: '16px',
                 fontWeight: 'bold',
                 border: '1px solid #ffeaa7'
               }}>
@@ -4851,7 +4852,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '8px 16px',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: '500'
               }}
               title="Ver formato requerido del archivo Excel"
@@ -4868,7 +4869,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '8px 16px',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: '500'
               }}
               title="Descargar plantilla Excel"
@@ -4893,7 +4894,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '8px 16px',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: '500'
               }}
               title="Seleccionar archivo Excel"
@@ -4912,7 +4913,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '8px 16px',
                 borderRadius: '4px',
                 cursor: archivoSeleccionado && !importando ? 'pointer' : 'not-allowed',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: '500',
                 position: 'relative'
               }}
@@ -4995,7 +4996,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
               style={{ 
                 color: '#16355D', 
                 fontWeight: 'bold', 
-                fontSize: '14px',
+                fontSize: '16px',
                 marginRight: '5px',
                 cursor: 'help'
               }}
@@ -5010,7 +5011,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 padding: '6px 12px',
                 borderRadius: '4px',
                 border: '2px solid #16355D',
-                fontSize: '14px',
+                fontSize: '16px',
                 color: '#16355D',
                 fontWeight: '500',
                 background: 'white',
@@ -5035,7 +5036,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   padding: '6px 12px',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '16px',
                   fontWeight: 'bold'
                 }}
                 title="Limpiar el filtro de vector y mostrar todos los vectores nuevamente"
@@ -5058,7 +5059,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   background: '#f8f9fa', 
                   padding: '8px 12px', 
                   borderBottom: '1px solid #ddd',
-                  fontSize: '12px',
+                  fontSize: '16px',
                   color: '#666',
                   fontWeight: '500',
                   cursor: 'help'
@@ -5105,7 +5106,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       </td>
                       <td style={{ 
                         padding: '8px', 
-                        fontSize: '12px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: item.vector === 'REAL' ? '#FF8C00' : 
@@ -5116,7 +5117,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       </td>
                       <td style={{ 
                         padding: '8px', 
-                        fontSize: '12px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: '#16355D'
@@ -5128,7 +5129,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       </td>
                       <td style={{ 
                         padding: '8px', 
-                        fontSize: '12px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: '#16355D'
@@ -5190,7 +5191,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     <th style={{ 
                       padding: '12px 8px', 
                       textAlign: 'center', 
-                      fontSize: '12px',
+                      fontSize: '16px',
                       background: '#FF8C00',
                       color: '#fff'
                     }}>
@@ -5286,7 +5287,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                     }}>
                       <td style={{ 
                         padding: '12px 8px', 
-                        fontSize: '14px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: resumen.vector === 'REAL' ? '#FF8C00' : 
@@ -5302,7 +5303,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       </td>
                       <td style={{ 
                         padding: '12px 8px', 
-                        fontSize: '14px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: '#16355D'
@@ -5316,7 +5317,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       </td>
                       <td style={{ 
                         padding: '12px 8px', 
-                        fontSize: '14px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: '#16355D'
@@ -5330,7 +5331,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       </td>
                       <td style={{ 
                         padding: '12px 8px', 
-                        fontSize: '14px', 
+                        fontSize: '16px', 
                         textAlign: 'center',
                         fontWeight: 'bold',
                         color: '#16355D'
@@ -5453,7 +5454,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   </h3>
                   <p style={{ 
                     margin: 0, 
-                    fontSize: '14px',
+                    fontSize: '16px',
                     color: 'white'
                   }}>
                     Ingrese el código de autorización para importar datos
@@ -5500,7 +5501,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                   {errorCodigo && (
                     <p style={{ 
                       color: '#dc3545', 
-                      fontSize: '12px', 
+                      fontSize: '16px', 
                       margin: '8px 0 0 0',
                       fontWeight: 'bold'
                     }}>
@@ -5524,7 +5525,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       padding: '12px 24px',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px',
+                      fontSize: '16px',
                       fontWeight: 'bold',
                       minWidth: '120px'
                     }}
@@ -5544,7 +5545,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       padding: '12px 24px',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      fontSize: '14px',
+                      fontSize: '16px',
                       fontWeight: 'bold',
                       minWidth: '120px'
                     }}
@@ -5562,7 +5563,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                 }}>
                   <p style={{ 
                     margin: 0, 
-                    fontSize: '12px', 
+                    fontSize: '16px', 
                     color: '#856404',
                     fontWeight: 'bold'
                   }}>
@@ -5670,7 +5671,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
                       padding: '8px 20px',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      fontSize: '14px',
+                      fontSize: '16px',
                       fontWeight: 'bold'
                     }}
                   >
@@ -5698,7 +5699,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       margin: 0,
       padding: 0,
       overflowX: 'hidden',
-      background: '#ffffff !important', // Fondo blanco forzado
+      background: modoOscuro ? '#1f2937' : '#ffffff', // Fondo adaptativo
       transition: 'width 0.3s cubic-bezier(.4,1.3,.5,1), left 0.3s cubic-bezier(.4,1.3,.5,1)',
       boxSizing: 'border-box',
       zIndex: 1,
@@ -5707,7 +5708,7 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       transformOrigin: 'top left',
       width: `calc(100vw - ${anchoSidebarIzquierdo}px + 150px)`, // Usar más ancho disponible
       minHeight: '125vh',
-      overflow: 'visible', // Sin scroll, el contenido fluye naturalmente
+      overflow: 'visible', // Sin scroll interno, usar solo el scroll del navegador
       // Asegurar que cubra todo el fondo
       right: 0,
       bottom: 0
@@ -5817,14 +5818,14 @@ Precisión Promedio = (${typeof precisionFinanciera === 'number' ? precisionFina
       {/* Contenido del reporte con 80% zoom - SIN SCROLL INTERNO */}
       <div style={{ 
         padding: '0 16px', // 20px * 0.8 = 16px
-        background: '#ffffff', // Fondo blanco sólido
+        background: modoOscuro ? '#1f2937' : '#ffffff', // Fondo adaptativo
         // Aplicación TÉCNICA del scale y compensating dimensions para aprovechar todo el ancho
         transform: 'scale(0.8)',
         transformOrigin: 'top left', 
         width: '125%',
         maxWidth: `calc((100vw - ${anchoSidebarIzquierdo}px + 150px) * 1.25)`, // Compensar zoom y usar más ancho
         minHeight: '125vh',
-        overflow: 'visible' // Sin scroll interno, usar solo el scroll del navegador
+        overflow: 'visible' // Sin scroll interno, usar solo el scroll del contenedor principal
       }}>
         {renderContenidoReporte()}
       </div>
@@ -5845,7 +5846,9 @@ const GraficoCurvaS = ({
   plazoControlECD, 
   datosAvFisicoReal,
   datosCostoGanado,
-  cargandoCostoGanado
+  cargandoCostoGanado,
+  modoOscuro,
+  setModoOscuro
 }) => {
   const [datosGrafico, setDatosGrafico] = useState([]);
   const [cargandoGrafico, setCargandoGrafico] = useState(false);
@@ -5865,7 +5868,6 @@ const GraficoCurvaS = ({
     costoGanado: true
   });
 
-  const [modoOscuro, setModoOscuro] = useState(false); // true = fondo negro, false = fondo blanco
 
   // Función para alternar filtros
   const alternarFiltro = (filtro) => {
@@ -6152,7 +6154,7 @@ const GraficoCurvaS = ({
           <h3 style={{ 
             margin: '0 0 8px 0',
             color: '#111827',
-            fontSize: '18px',
+            fontSize: '22px',
             fontWeight: '600',
             lineHeight: '1.2'
           }}>
@@ -6161,7 +6163,7 @@ const GraficoCurvaS = ({
           <p style={{
             margin: '0',
             color: '#6b7280',
-            fontSize: '14px',
+                fontSize: '18px',
             lineHeight: '1.4'
           }}>
             Proyecto {proyectoId} - Análisis de avance físico y financiero
@@ -6223,7 +6225,7 @@ const GraficoCurvaS = ({
           <h4 style={{ 
             marginBottom: '16px', 
             color: '#111827',
-            fontSize: '14px',
+                fontSize: '16px',
             fontWeight: '600'
           }}>
             🔍 Filtros de Líneas
@@ -6236,10 +6238,10 @@ const GraficoCurvaS = ({
           }}>
             {/* Grupo: Avances Planificados */}
             <div style={{ marginBottom: '8px' }}>
-              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+              <h5 style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
                 📊 Avances Planificados
               </h5>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', marginBottom: '4px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.avFisicoPlanificado}
@@ -6248,7 +6250,7 @@ const GraficoCurvaS = ({
                 />
                 <span style={{ color: '#FF0000' }}>●</span> Av. Físico Planificado
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.avFinancieroPlanificado}
@@ -6261,10 +6263,10 @@ const GraficoCurvaS = ({
 
             {/* Grupo: Avances Reales */}
             <div style={{ marginBottom: '8px' }}>
-              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+              <h5 style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
                 📈 Avances Reales
               </h5>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', marginBottom: '4px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.avFisicoReal}
@@ -6273,7 +6275,7 @@ const GraficoCurvaS = ({
                 />
                 <span style={{ color: '#00FF00' }}>●</span> Av. Físico Real
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.avFinancieroReal}
@@ -6286,10 +6288,10 @@ const GraficoCurvaS = ({
 
             {/* Grupo: Proyecciones */}
             <div style={{ marginBottom: '8px' }}>
-              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+              <h5 style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
                 🔮 Proyecciones
               </h5>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', marginBottom: '4px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.avFisicoProyectado}
@@ -6298,7 +6300,7 @@ const GraficoCurvaS = ({
                 />
                 <span style={{ color: '#000000' }}>●</span> Av. Físico Proyectado
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.costoGanado}
@@ -6311,10 +6313,10 @@ const GraficoCurvaS = ({
 
             {/* Grupo: IEAC */}
             <div style={{ marginBottom: '8px' }}>
-              <h5 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
+              <h5 style={{ fontSize: '16px', fontWeight: '600', color: '#6b7280', marginBottom: '6px' }}>
                 💰 IEAC
               </h5>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', marginBottom: '4px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.ieacAvg}
@@ -6323,7 +6325,7 @@ const GraficoCurvaS = ({
                 />
                 <span style={{ color: '#00FFFF' }}>●</span> IEAC Avg
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', marginBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', marginBottom: '4px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.ieacMin}
@@ -6332,7 +6334,7 @@ const GraficoCurvaS = ({
                 />
                 <span style={{ color: '#8B4513' }}>●</span> IEAC Min
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px' }}>
                 <input
                   type="checkbox"
                   checked={filtrosActivos.ieacMax}
@@ -6387,7 +6389,7 @@ const GraficoCurvaS = ({
               })}
               style={{
                 padding: '6px 12px',
-                fontSize: '12px',
+                fontSize: '16px',
                 backgroundColor: '#10b981',
                 color: 'white',
                 border: 'none',
@@ -6414,7 +6416,7 @@ const GraficoCurvaS = ({
               })}
               style={{
                 padding: '6px 12px',
-                fontSize: '12px',
+                fontSize: '16px',
                 backgroundColor: '#ef4444',
                 color: 'white',
                 border: 'none',
@@ -6431,48 +6433,43 @@ const GraficoCurvaS = ({
         {/* Chart Container */}
         <div style={{ 
           height: '600px',
-          backgroundColor: '#ffffff !important', // Fondo blanco sólido siempre
+          backgroundColor: modoOscuro ? '#1f2937' : '#ffffff',
           borderRadius: '6px',
           padding: '16px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)', // Sombra sutil para separar del fondo
+          border: modoOscuro ? '1px solid #4b5563' : '1px solid #e5e7eb',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           position: 'relative',
           overflow: 'hidden',
-          // Asegurar que cubra todo el fondo
           width: '100%',
-          minWidth: '100%'
+          minWidth: '100%',
+          maxWidth: '100%'
         }}>
-          <ResponsiveContainer width="100%" height="100%" style={{ backgroundColor: '#ffffff' }}>
+          <ResponsiveContainer width="100%" height="100%" style={{ backgroundColor: modoOscuro ? '#1f2937' : '#ffffff' }}>
             <ComposedChart 
               data={datosGrafico} 
               margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-              style={{ backgroundColor: '#ffffff' }}
+              style={{ backgroundColor: modoOscuro ? '#1f2937' : '#ffffff' }}
             >
-              <CartesianGrid vertical={false} stroke={modoOscuro ? '#374151' : '#f3f4f6'} />
+              <CartesianGrid vertical={false} stroke={modoOscuro ? '#4b5563' : '#f3f4f6'} />
               <XAxis 
                 dataKey="mes" 
                 stroke={modoOscuro ? '#ffffff' : '#6b7280'}
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
+                fontSize={16}
+                tickLine={modoOscuro ? true : false}
+                axisLine={modoOscuro ? true : false}
+                tickMargin={12}
                 tickFormatter={(value) => `Mes ${value}`}
               />
               <YAxis 
-                stroke={modoOscuro ? '#ffffff' : '#6b7280'}
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                tickFormatter={(value) => `${value.toLocaleString()}`}
+                stroke={modoOscuro ? '#ffffff' : '#374151'}
+                fontSize={18}
+                tickLine={true}
+                axisLine={true}
+                tickMargin={16}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
                 domain={[rangoEjeY.min, rangoEjeY.max]}
-                ticks={[
-                  rangoEjeY.min,
-                  rangoEjeY.max * 0.25,
-                  rangoEjeY.max * 0.5,
-                  rangoEjeY.max * 0.75,
-                  rangoEjeY.max
-                ]}
+                width={80}
+                interval={0}
               />
               <Tooltip 
                 formatter={(value, name) => {
@@ -6482,19 +6479,20 @@ const GraficoCurvaS = ({
                 }}
                 labelFormatter={(label) => `Mes ${label}`}
                 contentStyle={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e7eb',
+                  backgroundColor: modoOscuro ? '#1f2937' : '#ffffff',
+                  border: modoOscuro ? '1px solid #4b5563' : '1px solid #e5e7eb',
                   borderRadius: '6px',
-                  fontSize: '12px',
+                  fontSize: '18px',
                   boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  color: '#111827'
+                  color: modoOscuro ? '#ffffff' : '#111827'
                 }}
                 cursor={false}
               />
               <Legend 
                 wrapperStyle={{ 
                   paddingTop: '20px',
-                  fontSize: '12px'
+                  fontSize: '16px',
+                  color: modoOscuro ? '#ffffff' : '#374151'
                 }}
               />
               
@@ -6505,7 +6503,7 @@ const GraficoCurvaS = ({
                 dataKey="ieacMin"
                 stackId="ieacCloud"
                 stroke="none"
-                fill="#ffffff"
+                fill={modoOscuro ? '#1f2937' : '#ffffff'}
                 fillOpacity={1}
                 baseValue={0}
               />
@@ -6682,7 +6680,7 @@ const GraficoCurvaS = ({
 };
 
 // Componente para el reporte de Líneas Bases - Real/Proyectado
-const ReporteLineasBases = ({ proyectoId }) => {
+const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
   // Estados para las 5 tablas
   const [tablaReal, setTablaReal] = useState([]);
   const [tablaNpc, setTablaNpc] = useState([]);
@@ -8679,9 +8677,16 @@ const ReporteLineasBases = ({ proyectoId }) => {
 
 
     return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ 
+      padding: '20px',
+      width: '100%',
+      maxWidth: '100%',
+      margin: '0 auto',
+      boxSizing: 'border-box',
+      background: '#ffffff' // Fondo blanco para resaltar contenido
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ color: '#16355D', margin: 0 }}>
+        <h2 style={{ color: '#16355D', margin: 0, fontSize: '28px', fontWeight: 'bold' }}>
           Líneas Bases - Real/Proyectado
         </h2>
       </div>
@@ -8698,18 +8703,18 @@ const ReporteLineasBases = ({ proyectoId }) => {
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           
           <div>
-            <label style={{ display: 'block', marginBottom: '5px', fontSize: '12px', color: '#dc3545', fontWeight: 'bold' }}>
-              Fecha de Corte: <span style={{ fontSize: '10px', color: '#6c757d', fontWeight: 'normal' }}>(Mes actual -1)</span>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '16px', color: '#dc3545', fontWeight: 'bold' }}>
+              Fecha de Corte: <span style={{ fontSize: '14px', color: '#6c757d', fontWeight: 'normal' }}>(Mes actual -1)</span>
             </label>
             <input
               type="month"
               value={fechaCorte}
               onChange={(e) => setFechaCorte(e.target.value)}
               style={{
-                padding: '8px 12px',
+                padding: '10px 14px',
                 borderRadius: '6px',
                 border: '1px solid #dc3545',
-                fontSize: '14px',
+                fontSize: '16px',
                 minWidth: '150px'
               }}
               placeholder="MM-YYYY"
@@ -8730,7 +8735,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
               padding: '8px 12px',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
+              fontSize: '16px',
               marginTop: '20px'
             }}
             title="Limpiar filtros"
@@ -8749,7 +8754,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
               padding: '8px 12px',
               borderRadius: '6px',
               cursor: datosIEAC && datosIEAC.length > 0 ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
+              fontSize: '16px',
               marginTop: '20px',
               marginLeft: '10px',
               opacity: datosIEAC && datosIEAC.length > 0 ? 1 : 0.6
@@ -8770,7 +8775,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
               padding: '8px 12px',
               borderRadius: '6px',
               cursor: datosECD && datosECD.metodologiaA ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
+              fontSize: '16px',
               marginTop: '20px',
               marginLeft: '10px',
               opacity: datosECD && datosECD.metodologiaA ? 1 : 0.6
@@ -8791,7 +8796,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
               padding: '8px 12px',
               borderRadius: '6px',
               cursor: (datosIEAC && datosIEAC.length > 0 && datosECD && datosECD.metodologiaA) ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
+              fontSize: '16px',
               marginTop: '20px',
               marginLeft: '10px',
               opacity: (datosIEAC && datosIEAC.length > 0 && datosECD && datosECD.metodologiaA) ? 1 : 0.6
@@ -8850,7 +8855,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                   padding: '8px 12px',
                   borderRadius: '6px',
                   border: '1px solid #007bff',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   minWidth: '200px'
                 }}
               >
@@ -8877,7 +8882,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                     padding: '8px 12px',
                     borderRadius: '6px',
                     border: '1px solid #007bff',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     minWidth: '100px'
                   }}
                 />
@@ -8895,7 +8900,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                     padding: '8px 12px',
                     borderRadius: '6px',
                     border: '1px solid #007bff',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     minWidth: '100px'
                   }}
                 />
@@ -8921,7 +8926,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 padding: '10px 20px',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: 'bold'
               }}
             >
@@ -8948,9 +8953,7 @@ const ReporteLineasBases = ({ proyectoId }) => {
         padding: '20px', 
         borderRadius: '8px', 
         border: '1px solid #dee2e6',
-        overflowX: 'visible', // Sin scroll horizontal, usar todo el ancho
-        maxHeight: '70vh',
-        overflowY: 'auto'
+        overflow: 'visible' // Sin scroll en ninguna dirección
       }}>
         <h4 style={{ 
           color: '#16355D', 
@@ -8960,14 +8963,14 @@ const ReporteLineasBases = ({ proyectoId }) => {
           alignItems: 'center',
           gap: '10px'
         }}>
-          <span>Tabla Dinámica - Proyecto ID: {proyectoId} ({obtenerDatosFiltrados().length} registros)</span>
+          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Tabla Dinámica - Proyecto ID: {proyectoId} ({obtenerDatosFiltrados().length} registros)</span>
           {fechaCorte && (
             <span style={{ 
               color: '#dc3545', 
-              fontSize: '12px', 
+              fontSize: '16px', 
               fontWeight: 'normal',
               backgroundColor: '#f8f9fa',
-              padding: '4px 8px',
+              padding: '6px 10px',
               borderRadius: '4px',
               border: '1px solid #dee2e6',
               whiteSpace: 'nowrap'
@@ -8979,19 +8982,22 @@ const ReporteLineasBases = ({ proyectoId }) => {
         
         {/* Contenedor responsive para la tabla */}
         <div style={{
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
+          overflow: 'visible', // Sin scroll interno - elimina tanto X como Y
           borderRadius: '8px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           border: '1px solid #dee2e6',
-          backgroundColor: 'white'
+          backgroundColor: 'white',
+          width: '100%',
+          maxWidth: '100%',
+          margin: '0',
+          padding: '0'
         }}>
           <table style={{ 
             width: '100%', 
-            minWidth: '1400px', // Ancho mínimo para mantener legibilidad en móviles
+            minWidth: '100%', // Cambiado para usar todo el ancho disponible
             borderCollapse: 'collapse',
-            fontSize: '12px',
-            tableLayout: 'auto' // Cambiar a auto para mejor responsive
+            fontSize: '16px', // Aumentado de 14px a 16px
+            tableLayout: 'fixed' // Cambiado a fixed para mejor control del ancho
           }}>
             <thead>
               <tr style={{ 
@@ -8999,169 +9005,203 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 color: 'white',
                 position: 'sticky',
                 top: 0,
-                zIndex: 10,
+                zIndex: 100,
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
                   <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '60px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '5%',
+                    whiteSpace: 'nowrap',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
-                Mes
+                #
                   </th>
                   <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'left', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '8%',
+                    whiteSpace: 'nowrap',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 Periodo
                   </th>
                 <th style={{ 
-                    padding: '10px', 
-                    textAlign: 'left', 
+                    padding: '12px 8px', 
+                    textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '16px',
+                    width: '10%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
-                Av. Fisico Planificado(%)
+                Av. Físico Planificado(%)
                 </th>
                 <th style={{ 
-                    padding: '10px', 
-                    textAlign: 'left', 
+                    padding: '12px 8px', 
+                    textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '16px',
+                    width: '12%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 Av. Financiero Planificado(USD)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '10%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
-                Av. Fisico Real(%)
+                Av. Físico Real(%)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '10%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
-                Av. Fisico Proyectado(%)
+                Av. Físico Proyectado(%)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '12%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 Av. Financiero Real(USD)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '8%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 IEAC (avg)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '8%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 IEAC Min (USD)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '8%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 IEAC Max (USD)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '8%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 EAC Informado (USD)
                 </th>
                 <th style={{ 
-                    padding: '8px 6px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px',
-                    minWidth: '120px',
-                    whiteSpace: 'nowrap'
+                    fontSize: '16px',
+                    width: '8%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 EAC Proyectado (USD)
               </th>
               <th style={{ 
-                    padding: '10px', 
+                    padding: '12px 8px', 
                     textAlign: 'center', 
                     border: '1px solid #dee2e6',
                     backgroundColor: '#16355D',
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '11px'
+                    fontSize: '16px',
+                    width: '8%',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 101
                   }}>
                 Costo Ganado (USD)
                 </th>
@@ -9212,43 +9252,43 @@ const ReporteLineasBases = ({ proyectoId }) => {
                 <tr key={index} style={{ 
                   borderBottom: '1px solid #dee2e6'
                 }}>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {index + 1}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', fontWeight: 'bold', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.periodo}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.api_acum ? `${(parseFloat(row.api_acum) * 100).toFixed(2)}` : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.monto_total ? formatearMoneda(row.monto_total) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.api_acum_real ? `${(parseFloat(row.api_acum_real) * 100).toFixed(2)}` : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.api_acum_proyectado ? `${(parseFloat(row.api_acum_proyectado) * 100).toFixed(2)}` : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.incurrido_total ? formatearMoneda(row.incurrido_total) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {row.ieac_avg ? formatearMoneda(row.ieac_avg) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {calcularIEACMin(numeroMes) ? formatearMoneda(calcularIEACMin(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {calcularIEACMax(numeroMes) ? formatearMoneda(calcularIEACMax(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {calcularEACInformado(numeroMes) ? formatearMoneda(calcularEACInformado(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {calcularEACProyectado(numeroMes) ? formatearMoneda(calcularEACProyectado(numeroMes)) : '-'}
                   </td>
-                  <td style={{ padding: '6px 4px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '12px 8px', border: '1px solid #dee2e6', textAlign: 'center', fontSize: '16px', whiteSpace: 'nowrap' }}>
                     {calcularCostoGanado(numeroMes, row.periodo, row) ? formatearMoneda(calcularCostoGanado(numeroMes, row.periodo, row)) : '-'}
                   </td>
                 </tr>
@@ -9285,6 +9325,8 @@ const ReporteLineasBases = ({ proyectoId }) => {
         datosAvFisicoReal={datosAvFisicoReal}
         datosCostoGanado={datosCostoGanado}
         cargandoCostoGanado={cargandoCostoGanado}
+        modoOscuro={modoOscuro}
+        setModoOscuro={setModoOscuro}
       />
 
       {/* Modal Metodologías IEAC */}

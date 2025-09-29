@@ -43,15 +43,17 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
         top: ALTURA_BARRA_SUPERIOR,
         right: 0,
         width: ANCHO_SIDEBAR,
-        height: `calc(100vh - ${ALTURA_BARRA_SUPERIOR}px)`,
+        height: 'auto',
+        maxHeight: `calc(100vh - ${ALTURA_BARRA_SUPERIOR}px)`,
         background: '#16355D',
         color: '#fff',
         boxShadow: '0 0 8px #0003',
-        padding: '26px 13px 13px 13px', // 32px * 0.8 = 25.6px, 16px * 0.8 = 13px
+        padding: '10px 13px 13px 13px', // Reducido de 26px a 10px
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
+        gap: 0,
         transition: 'transform 0.3s cubic-bezier(.4,1.3,.5,1)',
       }}
     >
@@ -74,7 +76,7 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
       >
         ▶
       </button>
-      <div className="sidebar-content" style={{ marginBottom: 13, marginTop: 13 }}> {/* 16 * 0.8 = 12.8 */}
+      <div className="sidebar-content"> {/* Sin estilos inline - usar CSS */}
         <h4 style={{ color: '#FFD000', marginBottom: 6, fontSize: 14 }}>Vectores</h4> {/* 8 * 0.8 = 6.4, 18px * 0.8 = 14.4 */}
         <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
           {tablas.map(tabla => (
@@ -101,7 +103,7 @@ const SidebarDerecho = ({ seleccion, setSeleccion, sidebarVisible, setSidebarVis
           ))}
         </div>
       </div>
-  <div className="sidebar-content">
+  <div className="sidebar-content"> {/* Sin estilos inline - usar CSS */}
         <h4 style={{ color: '#FFD000', marginBottom: 6, fontSize: 14 }}>Analisis - Reportes</h4> {/* 8 * 0.8 = 6.4, 18px * 0.8 = 14.4 */}
         <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
           {reportes.map(reporte => (
@@ -1729,8 +1731,8 @@ const Vectores = ({ proyectoId, sidebarCollapsed }) => {
     // Usar los estados globales de fechaDesde y fechaHasta
     const data = prepararDatosTranspuesta();
     return (
-      <div style={{ width: '100%', margin: '32px 0 0 0', overflowX: 'auto', overflowY: 'visible', maxHeight: 'none' }}>
-        <div style={{ overflowY: 'auto', maxHeight: '65vh', width: '100%' }}>
+      <div style={{ width: '100%', margin: '32px 0 0 0', overflow: 'visible' }}>
+        <div style={{ overflow: 'visible', width: '100%' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', fontSize: 13, minWidth: 700 }}>
             <thead>
               <tr>
@@ -6671,7 +6673,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
           {/* Content */}
           <div style={{
             padding: '20px',
-            overflowY: 'auto',
+            overflow: 'visible',
             flex: 1,
             transform: 'scale(0.8)',
             transformOrigin: 'top left',
@@ -7061,7 +7063,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
           {/* Content */}
           <div style={{
             padding: '24px',
-            overflowY: 'auto',
+            overflow: 'visible',
             flex: 1
           }}>
             {/* Estadísticas Resumen */}
@@ -7134,7 +7136,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                 Detalle de las 9 Metodologías IEAC
               </div>
               
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflow: 'visible' }}>
                 <table style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -7418,7 +7420,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
           {/* Content */}
           <div style={{
             padding: '24px',
-            overflowY: 'auto',
+            overflow: 'visible',
             flex: 1
           }}>
             {/* Estadísticas Resumen */}
@@ -7508,7 +7510,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                 Detalle de las 11 Metodologías ECD
               </div>
               
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflow: 'visible' }}>
                 <table style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -8888,7 +8890,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
             )}
 
             {/* TABLA RESUMEN DE PARCIALES */}
-            <div style={{ width: '100%', margin: '32px 0 0 0', overflowX: 'auto' }}>
+            <div style={{ width: '100%', margin: '32px 0 0 0', overflow: 'visible' }}>
               <table style={{ borderCollapse: 'collapse', width: '100%', background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px #0001', fontSize: 13, minWidth: 900 }}>
                 <thead>
                   <tr style={{ background: '#0a3265', color: '#fff' }}>
@@ -9113,22 +9115,22 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
         ) : (seleccion === 'reporte6' || seleccion === 'reporte9' || seleccion === 'av_fisico_c9') ? null : (
           seleccion !== 'reporte9' && seleccion !== 'av_fisico_c9' && (
             <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
-              <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Datos importados en la base de datos:</h4>
+              <h4 style={{margin: '19px 0 6px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%', fontSize: '16px' }}>Datos importados en la base de datos:</h4>
               <div
                 className="ag-theme-alpine custom-codelco-theme"
                 style={{
-                  height: '60vh',
+                  height: '48vh', // 60vh * 0.8 = 48vh
                   width: '100%',
                   minWidth: 0,
                   maxWidth: '100%',
-                  fontSize: '0.8em',
+                  fontSize: '0.64em', // 0.8em * 0.8 = 0.64em
                   background: '#fff',
-                  borderRadius: 10,
+                  borderRadius: 8, // 10 * 0.8 = 8
                   boxShadow: '0 1px 4px 0 rgba(10,50,101,0.07)',
                   margin: 0,
                   padding: 0,
                   boxSizing: 'border-box',
-                  overflowX: 'auto',
+                  overflow: 'visible',
                   alignSelf: 'stretch',
                   display: 'flex',
                   flexDirection: 'column'
@@ -9138,19 +9140,19 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                   className="ag-theme-alpine"
                   rowData={getTablaFiltrada()}
                   columnDefs={[
-                    { headerName: 'ID', field: 'id', width: 60, sortable: true, cellStyle: { padding: '0.2em 0.4em', fontSize: '0.8em' } },
-                    { headerName: 'Proyecto', field: 'proyecto_nombre', flex: 1, sortable: true, cellStyle: { padding: '2px 4px', fontSize: 12 } },
-                    { headerName: 'Centro Costo', field: 'centro_costo', flex: 1, sortable: true, cellStyle: { padding: '2px 4px', fontSize: 12 } },
-                    { headerName: 'Periodo', field: 'periodo', flex: 1, sortable: true, cellStyle: { padding: '2px 4px', fontSize: 12 } },
-                    { headerName: 'Tipo', field: 'tipo', flex: 1, sortable: true, cellStyle: { padding: '2px 4px', fontSize: 12 } },
-                    { headerName: 'Cat VP', field: 'cat_vp', flex: 1, sortable: true, cellStyle: { padding: '2px 4px', fontSize: 12 } },
-                    { headerName: 'Detalle Factorial', field: 'detalle_factorial', flex: 1, sortable: true, cellStyle: { padding: '2px 4px', fontSize: 12 } },
-                    { headerName: 'Monto', field: 'monto', width: 110, sortable: true, valueFormatter: p => p.value ? `USD ${Number(p.value).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'USD 0', cellStyle: { padding: '2px 4px', fontSize: 12, textAlign: 'right' } },
+                    { headerName: 'ID', field: 'id', width: 48, sortable: true, cellStyle: { padding: '0.16em 0.32em', fontSize: '0.64em' } }, // 60*0.8=48, 0.2*0.8=0.16, 0.4*0.8=0.32, 0.8*0.8=0.64
+                    { headerName: 'Proyecto', field: 'proyecto_nombre', flex: 1, sortable: true, cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 } }, // 2*0.8=1.6, 4*0.8=3.2, 12*0.8=9.6
+                    { headerName: 'Centro Costo', field: 'centro_costo', flex: 1, sortable: true, cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 } },
+                    { headerName: 'Periodo', field: 'periodo', flex: 1, sortable: true, cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 } },
+                    { headerName: 'Tipo', field: 'tipo', flex: 1, sortable: true, cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 } },
+                    { headerName: 'Cat VP', field: 'cat_vp', flex: 1, sortable: true, cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 } },
+                    { headerName: 'Detalle Factorial', field: 'detalle_factorial', flex: 1, sortable: true, cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 } },
+                    { headerName: 'Monto', field: 'monto', width: 88, sortable: true, valueFormatter: p => p.value ? `USD ${Number(p.value).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'USD 0', cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6, textAlign: 'right' } }, // 110*0.8=88
                   ]}
                   defaultColDef={{
                     sortable: true,
                     resizable: true,
-                    cellStyle: { padding: '2px 4px', fontSize: 12 },
+                    cellStyle: { padding: '1.6px 3.2px', fontSize: 9.6 }, // 2*0.8=1.6, 4*0.8=3.2, 12*0.8=9.6
                   }}
                   pagination={true}
                   paginationPageSize={20}
@@ -10153,7 +10155,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
               overflow: 'hidden',
               border: '1px solid #e0e0e0'
             }}>
-              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+              <div style={{ overflow: 'visible' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead style={{ background: '#16355D', position: 'sticky', top: 0 }}>
                     <tr>
@@ -10345,7 +10347,7 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
               overflow: 'hidden',
               border: '1px solid #e0e0e0'
             }}>
-              <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+              <div style={{ overflow: 'visible' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead style={{ background: '#16355D', position: 'sticky', top: 0 }}>
                     <tr>
