@@ -5,7 +5,6 @@ import Login from './login';
 import MasterPage from './MasterPage';
 import FinancieroPage from './FinancieroPage';
 import CentrosPorRegion from './CentrosPorRegion';
-import TestPage from './TestPage';
 import ProyectoPage from './ProyectoPage';
 import './ProyectoPage.css';
 import UsuariosPage from './UsuariosPage';
@@ -116,7 +115,6 @@ function App() {
       <Route path="/" element={<MasterPage user={user} centros={centros} onLogout={() => setUser(null)} />} />
       <Route path="/financiero/:centroId" element={<FinancieroPage user={user} centros={centros} />} />
       <Route path="/centros-por-region" element={<CentrosPorRegion user={user} centros={centros} onLogout={() => setUser(null)} />} />
-      <Route path="/test" element={<TestPage />} />
       <Route path="/ajuste" element={<Ajuste user={user} />} />
       {/* Rutas alternativas para compatibilidad */}
       <Route path="/controlcantidad" element={<MasterPage user={user} centros={centros} onLogout={() => setUser(null)} />} />

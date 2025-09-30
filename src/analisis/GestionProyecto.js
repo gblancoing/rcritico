@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -94,7 +94,7 @@ const ALTURA_BARRA_SUPERIOR = 45; // 56 * 0.8 = 44.8
 const ANCHO_SIDEBAR = 192; // 240 * 0.8 = 192
 
 // --- COMPONENTE MODAL METODOLOGÍAS ECD ---
-const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClose }) => {
+const ModalMetodologiasECD = React.memo(({ datosECD, fechaCorte, duracionPlanificada, onClose }) => {
   const formatearFecha = (meses) => {
     if (!meses || meses <= 0 || !isFinite(meses) || meses > 1000) return 'N/A';
     
@@ -231,7 +231,9 @@ const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClo
       justifyContent: 'center',
       zIndex: 10000,
       padding: '20px',
-      fontFamily: 'Arial, sans-serif'
+      fontFamily: 'Arial, sans-serif',
+      transform: 'scale(0.8)',
+      transformOrigin: 'center center'
     }}>
       <div style={{
         backgroundColor: 'white',
@@ -279,20 +281,30 @@ const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClo
           <button
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              border: '2px solid #16355D',
+              color: '#16355D',
+              fontSize: '28px',
+              fontWeight: 'bold',
               cursor: 'pointer',
-              padding: '8px',
+              padding: '8px 12px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'background-color 0.2s ease'
+              transition: 'all 0.2s ease',
+              minWidth: '40px',
+              minHeight: '40px'
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#16355D';
+              e.target.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+              e.target.style.color = '#16355D';
+            }}
+            title="Cerrar"
           >
             ×
           </button>
@@ -398,10 +410,10 @@ const ModalMetodologiasECD = ({ datosECD, fechaCorte, duracionPlanificada, onClo
     </div>,
     document.body
   );
-};
+});
 
 // --- COMPONENTE MODAL METODOLOGÍAS IEAC ---
-const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 }) => {
+const ModalMetodologiasIEAC = React.memo(({ datosIEAC, fechaCorte, onClose, porGanar = 0 }) => {
   // Función para formatear moneda
   const formatearMoneda = (valor) => `USD ${(valor / 1000000).toFixed(2)}M`;
   
@@ -425,7 +437,9 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
       justifyContent: 'center',
       zIndex: 10000,
       padding: '20px',
-      fontFamily: 'Arial, sans-serif'
+      fontFamily: 'Arial, sans-serif',
+      transform: 'scale(0.8)',
+      transformOrigin: 'center center'
     }}>
       <div style={{
         backgroundColor: 'white',
@@ -473,20 +487,30 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
           <button
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              border: '2px solid #16355D',
+              color: '#16355D',
+              fontSize: '28px',
+              fontWeight: 'bold',
               cursor: 'pointer',
-              padding: '8px',
+              padding: '8px 12px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'background-color 0.2s ease'
+              transition: 'all 0.2s ease',
+              minWidth: '40px',
+              minHeight: '40px'
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#16355D';
+              e.target.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+              e.target.style.color = '#16355D';
+            }}
+            title="Cerrar"
           >
             ×
           </button>
@@ -556,7 +580,7 @@ const ModalMetodologiasIEAC = ({ datosIEAC, fechaCorte, onClose, porGanar = 0 })
     </div>,
     document.body
   );
-};
+});
 
 
 
@@ -6901,8 +6925,8 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
   const [cargandoCostoGanado, setCargandoCostoGanado] = useState(false);
 
 
-  // Cargar datos de las tablas
-  const cargarDatosTabla = async (tabla, setter) => {
+  // Cargar datos de las tablas - OPTIMIZADO
+  const cargarDatosTabla = useCallback(async (tabla, setter) => {
     try {
     if (!proyectoId) return;
     
@@ -6918,7 +6942,7 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
       console.error(`Error cargando datos de ${tabla}:`, error);
       setter([]);
     }
-  };
+  }, [proyectoId]);
 
   // Función para cargar períodos desde la API
   const cargarPeriodos = async () => {
@@ -7427,33 +7451,37 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
       // Convertir fechaCorte de YYYY-MM a YYYY-MM-DD (primer día del mes)
       const fechaFiltroCompleta = `${fechaCorte}-01`;
       
-      // Calcular ECD(a) dinámicamente usando la nueva API
-      let ecdA = 0;
-      try {
-        const response = await fetch(`${API_BASE}/calcular_ecd_a.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          ecdA = parseFloat(data.ecd_a) || 0;
-          console.log('✅ ECD(a) calculado dinámicamente:', ecdA, 'meses');
+        // Calcular ECD(a) dinámicamente usando la API compatible
+        let ecdA = 0;
+        try {
+          const response = await fetch(`${API_BASE}/calcular_ecd_a_compatible.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            ecdA = parseFloat(data.ecd_a) || 0;
+            console.log('✅ ECD(a) calculado dinámicamente:', ecdA, 'meses');
+          } else {
+            console.warn('⚠️ ECD(a) falló:', data.error);
+          }
+        } catch (error) {
+          console.error('❌ Error calculando ECD(a) dinámico:', error);
         }
-      } catch (error) {
-        console.error('❌ Error calculando ECD(a) dinámico:', error);
-      }
 
-      // Calcular ECD(b) dinámicamente usando la nueva API
-      let ecdB = 0;
-      try {
-        const response = await fetch(`${API_BASE}/calcular_ecd_b.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          ecdB = parseFloat(data.ecd_b) || 0;
-          console.log('✅ ECD(b) calculado dinámicamente:', ecdB, 'meses');
+        // Calcular ECD(b) dinámicamente usando la API compatible
+        let ecdB = 0;
+        try {
+          const response = await fetch(`${API_BASE}/calcular_ecd_b_compatible.php?proyecto_id=${proyectoId}&fecha_filtro=${fechaFiltroCompleta}`);
+          const data = await response.json();
+          
+          if (data.success) {
+            ecdB = parseFloat(data.ecd_b) || 0;
+            console.log('✅ ECD(b) calculado dinámicamente:', ecdB, 'meses');
+          } else {
+            console.warn('⚠️ ECD(b) falló:', data.message);
+          }
+        } catch (error) {
+          console.error('❌ Error calculando ECD(b) dinámico:', error);
         }
-      } catch (error) {
-        console.error('❌ Error calculando ECD(b) dinámico:', error);
-      }
 
       // Calcular ECD(c) dinámicamente usando la nueva API
       let ecdC = 0;
@@ -8132,23 +8160,39 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
     }
   }, [proyectoId]);
 
-  // Recargar períodos y datos cuando cambien los filtros de fecha
+  // Recargar períodos y datos cuando cambien los filtros de fecha - OPTIMIZADO
   useEffect(() => {
     console.log('🔄 useEffect [fechaDesde, fechaHasta, fechaCorte] ejecutándose...');
     console.log('Fecha Desde:', fechaDesde, 'Fecha Hasta:', fechaHasta, 'Fecha Corte:', fechaCorte);
     if (proyectoId) {
-      cargarPeriodos();
-      cargarAvFisicoPlan();
-      cargarAvFinancieroPlan();
-      cargarAvFisicoReal();
-      cargarAvFisicoProyectado();
-      cargarAvFinancieroIncurrido();
-      cargarIEACAvg();
-      cargarMetodologiasIEAC(); // Recargar Metodologías IEAC cuando cambie la fecha de corte
-      cargarMetodologiasECD(); // Recargar Metodologías ECD cuando cambie la fecha de corte
-      cargarDuracionPlanificada(); // Recargar duración planificada cuando cambie la fecha de corte
-      cargarIEACStrategico(); // Recargar datos estratégicos de IEAC cuando cambie la fecha de corte
-      cargarCostoGanado(); // Recargar datos del Costo Ganado cuando cambie la fecha de corte
+      // Cargar datos en paralelo para mejor rendimiento
+      const cargarDatosEnParalelo = async () => {
+        const promesas = [
+          cargarPeriodos(),
+          cargarAvFisicoPlan(),
+          cargarAvFinancieroPlan(),
+          cargarAvFisicoReal(),
+          cargarAvFisicoProyectado(),
+          cargarAvFinancieroIncurrido(),
+          cargarIEACAvg()
+        ];
+        
+        // Ejecutar cargas básicas en paralelo
+        await Promise.all(promesas);
+        
+        // Cargar datos dependientes después
+        const promesasDependientes = [
+          cargarMetodologiasIEAC(),
+          cargarMetodologiasECD(),
+          cargarDuracionPlanificada(),
+          cargarIEACStrategico(),
+          cargarCostoGanado()
+        ];
+        
+        await Promise.all(promesasDependientes);
+      };
+      
+      cargarDatosEnParalelo();
     }
   }, [fechaDesde, fechaHasta, fechaCorte]);
 
@@ -8482,8 +8526,49 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
     }
   };
 
-  // Función para filtrar datos por fecha
-  const obtenerDatosFiltrados = () => {
+  // Función para formatear el período en formato mes-año (MM-YYYY) - MEMOIZADA
+  const formatearPeriodo = useCallback((fecha) => {
+    if (!fecha) return '-';
+    
+    try {
+      // Extraer directamente el mes y año de la fecha string para evitar problemas de zona horaria
+      const partes = fecha.split('-');
+      if (partes.length >= 2) {
+        const año = partes[0];
+        const mes = partes[1];
+        return `${mes}-${año}`;
+      }
+      
+      // Fallback: usar Date si el formato no es el esperado
+      const date = new Date(fecha + 'T00:00:00'); // Forzar hora local
+      const mes = String(date.getMonth() + 1).padStart(2, '0');
+      const año = date.getFullYear();
+      
+      return `${mes}-${año}`;
+    } catch (error) {
+      console.error('Error formateando fecha:', error);
+      return fecha; // Retornar la fecha original si hay error
+    }
+  }, []);
+
+  // Función para formatear montos en formato de moneda USD - MEMOIZADA
+  const formatearMoneda = useCallback((monto) => {
+    if (monto === null || monto === undefined) return '-';
+    
+    try {
+      const valor = parseFloat(monto);
+      if (isNaN(valor)) return '-';
+      
+      // Formatear en millones USD
+      return `USD ${(valor / 1000000).toFixed(2)}M`;
+    } catch (error) {
+      console.error('Error formateando moneda:', error);
+      return '-';
+    }
+  }, []);
+
+  // Función para filtrar datos por fecha - MEMOIZADA
+  const obtenerDatosFiltrados = useMemo(() => {
     console.log(`🔍 Aplicando lógica de fecha de corte: ${fechaCorte}`);
     
     // Crear array base con todos los períodos cargados desde la API
@@ -8549,51 +8634,10 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
     }
 
     return datosBase;
-  };
+  }, [periodos, fechaCorte, mesMaximoECD, datosECD, obtenerApiAcumRealConCorte, obtenerApiAcumProyectadoConCorte, obtenerIncurridoTotalConCorte, obtenerIEACAvgPorPeriodo, obtenerApiAcumPorPeriodo, obtenerMontoTotalPorPeriodo, formatearPeriodo]);
 
-  // Función para formatear el período en formato mes-año (MM-YYYY)
-  const formatearPeriodo = (fecha) => {
-    if (!fecha) return '-';
-    
-    try {
-      // Extraer directamente el mes y año de la fecha string para evitar problemas de zona horaria
-      const partes = fecha.split('-');
-      if (partes.length >= 2) {
-        const año = partes[0];
-        const mes = partes[1];
-        return `${mes}-${año}`;
-      }
-      
-      // Fallback: usar Date si el formato no es el esperado
-      const date = new Date(fecha + 'T00:00:00'); // Forzar hora local
-      const mes = String(date.getMonth() + 1).padStart(2, '0');
-      const año = date.getFullYear();
-      
-      return `${mes}-${año}`;
-    } catch (error) {
-      console.error('Error formateando fecha:', error);
-      return fecha; // Retornar la fecha original si hay error
-    }
-  };
-
-  // Función para formatear montos en formato de moneda USD
-  const formatearMoneda = (monto) => {
-    if (monto === null || monto === undefined) return '-';
-    
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'decimal',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(monto);
-    } catch (error) {
-      console.error('Error formateando moneda:', error);
-      return monto.toString();
-    }
-  };
-
-  // Función para determinar el estilo de marcado de filas basado en ECD
-  const obtenerEstiloFila = (numeroMes) => {
+  // Función para determinar el estilo de marcado de filas basado en ECD - MEMOIZADA
+  const obtenerEstiloFila = useCallback((numeroMes) => {
     if (!mesMinimoECD || !mesMaximoECD || !numeroMes) {
       return {}; // Sin marcado si no hay datos ECD
     }
@@ -8608,15 +8652,15 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
     }
 
     return {}; // Sin marcado para filas fuera del rango
-  };
+  }, [mesMinimoECD, mesMaximoECD]);
 
   // Función para determinar si una fila es un mes adicional agregado por ECD
   const esMesAdicionalECD = (numeroMes) => {
     return periodos && numeroMes > periodos.length;
   };
 
-  // Función para determinar el estilo de marcado de filas basado en IEAC
-  const obtenerEstiloFilaIEAC = (montoTotal) => {
+  // Función para determinar el estilo de marcado de filas basado en IEAC - MEMOIZADA
+  const obtenerEstiloFilaIEAC = useCallback((montoTotal) => {
     if (!montoMinimoIEAC || !montoMaximoIEAC || !montoTotal) {
       return {}; // Sin marcado si no hay datos IEAC o monto
     }
@@ -8631,7 +8675,7 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
     }
 
     return {}; // Sin marcado para filas fuera del rango
-  };
+  }, [montoMinimoIEAC, montoMaximoIEAC]);
 
   // Función para obtener la fecha actual formateada
   const obtenerFechaActual = () => {
@@ -8653,7 +8697,7 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
         fechaCorte,
         valorBAC,
         plazoControlECD,
-        datosTabla: obtenerDatosFiltrados()?.length || 0,
+        datosTabla: obtenerDatosFiltrados?.length || 0,
         datosCostoGanado: Object.keys(datosCostoGanado || {}).length
       });
       
@@ -8664,7 +8708,7 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
         fechaCorte, 
         valorBAC, 
         plazoControlECD, 
-        obtenerDatosFiltrados(), 
+        obtenerDatosFiltrados, 
         datosCostoGanado,
         jsPDF
       );
@@ -8745,42 +8789,56 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
 
           {/* Botón Metodologías IEAC */}
           <button
-            onClick={() => setMostrarModalIEAC(true)}
-            disabled={cargandoIEAC || !datosIEAC || datosIEAC.length === 0}
+            onClick={() => {
+              console.log('🔍 DEBUG IEAC - Estado actual:', {
+                cargandoIEAC,
+                datosIEAC: datosIEAC?.length,
+                mostrarModalIEAC
+              });
+              setMostrarModalIEAC(true);
+            }}
+            disabled={cargandoIEAC}
             style={{
-              background: datosIEAC && datosIEAC.length > 0 ? '#e67e22' : '#6c757d',
+              background: cargandoIEAC ? '#6c757d' : '#e67e22',
               color: 'white',
               border: 'none',
               padding: '8px 12px',
               borderRadius: '6px',
-              cursor: datosIEAC && datosIEAC.length > 0 ? 'pointer' : 'not-allowed',
+              cursor: cargandoIEAC ? 'not-allowed' : 'pointer',
               fontSize: '16px',
               marginTop: '20px',
               marginLeft: '10px',
-              opacity: datosIEAC && datosIEAC.length > 0 ? 1 : 0.6
+              opacity: cargandoIEAC ? 0.6 : 1
             }}
-            title={datosIEAC && datosIEAC.length > 0 ? "Ver Metodologías IEAC" : "Cargando datos IEAC..."}
+            title={cargandoIEAC ? "Cargando datos IEAC..." : "Ver Metodologías IEAC"}
           >
             🎯 Metodologías IEAC
           </button>
 
           {/* Botón Metodologías ECD */}
           <button
-            onClick={() => setMostrarModalECD(true)}
-            disabled={cargandoECD || !datosECD || datosECD.metodologiaA === 0 || datosECD.metodologiaA === null}
+            onClick={() => {
+              console.log('🔍 DEBUG ECD - Estado actual:', {
+                cargandoECD,
+                datosECD: datosECD?.metodologiaA,
+                mostrarModalECD
+              });
+              setMostrarModalECD(true);
+            }}
+            disabled={cargandoECD}
             style={{
-              background: datosECD && datosECD.metodologiaA ? '#8e44ad' : '#6c757d',
+              background: cargandoECD ? '#6c757d' : '#8e44ad',
               color: 'white',
               border: 'none',
               padding: '8px 12px',
               borderRadius: '6px',
-              cursor: datosECD && datosECD.metodologiaA ? 'pointer' : 'not-allowed',
+              cursor: cargandoECD ? 'not-allowed' : 'pointer',
               fontSize: '16px',
               marginTop: '20px',
               marginLeft: '10px',
-              opacity: datosECD && datosECD.metodologiaA ? 1 : 0.6
+              opacity: cargandoECD ? 0.6 : 1
             }}
-            title={datosECD && datosECD.metodologiaA ? "Ver Metodologías ECD" : "Cargando datos ECD..."}
+            title={cargandoECD ? "Cargando datos ECD..." : "Ver Metodologías ECD"}
           >
             📅 Metodologías ECD
           </button>
@@ -8963,7 +9021,7 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
           alignItems: 'center',
           gap: '10px'
         }}>
-          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Tabla Dinámica - Proyecto ID: {proyectoId} ({obtenerDatosFiltrados().length} registros)</span>
+          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Tabla Dinámica - Proyecto ID: {proyectoId} ({obtenerDatosFiltrados.length} registros)</span>
           {fechaCorte && (
             <span style={{ 
               color: '#dc3545', 
@@ -9220,8 +9278,8 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
                   Cargando períodos...
                 </td>
               </tr>
-            ) : obtenerDatosFiltrados().length > 0 ? (
-              obtenerDatosFiltrados().map((row, index) => {
+            ) : obtenerDatosFiltrados.length > 0 ? (
+              obtenerDatosFiltrados.map((row, index) => {
                 // Obtener el número de mes de la primera columna (index + 1)
                 const numeroMes = index + 1;
                 const estiloFilaECD = obtenerEstiloFila(numeroMes);
@@ -9314,7 +9372,7 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
 
       {/* Gráfico de Curva S */}
       <GraficoCurvaS 
-        datosTabla={obtenerDatosFiltrados()} 
+        datosTabla={obtenerDatosFiltrados} 
         proyectoId={proyectoId}
         mesMinimoECD={mesMinimoECD}
         mesMaximoECD={mesMaximoECD}
@@ -9330,9 +9388,9 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
       />
 
       {/* Modal Metodologías IEAC */}
-      {mostrarModalIEAC && datosIEAC && datosIEAC.length > 0 && (
+      {mostrarModalIEAC && (
         <ModalMetodologiasIEAC 
-          datosIEAC={datosIEAC} 
+          datosIEAC={datosIEAC || []} 
           fechaCorte={fechaCorte} 
           porGanar={porGanar}
           onClose={() => setMostrarModalIEAC(false)} 
@@ -9340,9 +9398,9 @@ const ReporteLineasBases = ({ proyectoId, modoOscuro, setModoOscuro }) => {
       )}
 
       {/* Modal Metodologías ECD */}
-      {mostrarModalECD && datosECD && datosECD.metodologiaA && (
+      {mostrarModalECD && (
         <ModalMetodologiasECD 
-          datosECD={datosECD} 
+          datosECD={datosECD || {}} 
           fechaCorte={fechaCorte} 
           duracionPlanificada={duracionPlanificada}
           onClose={() => setMostrarModalECD(false)} 
