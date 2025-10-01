@@ -8634,7 +8634,16 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
         <div>Cargando datos...</div>
       ) : (
         seleccion === 'reporte1' ? (
-          <div style={{ width: '100%', margin: 0, padding: 0, paddingRight: 8 }}>
+          <div style={{ 
+            width: '100%', 
+            margin: 0, 
+            padding: 0, 
+            paddingRight: 8,
+            transform: 'scale(0.8)',
+            transformOrigin: 'top left',
+            width: '125%',
+            minHeight: '125vh'
+          }}>
             <h4 style={{margin: '24px 0 8px 0', color: '#0a3265', fontWeight: 700, alignSelf: 'flex-start', width: '100%' }}>Curva S - Evolución de Parciales</h4>
 
             {/* Filtros de fecha y barredor */}
