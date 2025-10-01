@@ -13,8 +13,8 @@
 
 /* Cuando el panel de ayuda está abierto, ajustar la página */
 .resumen-financiero.panel-abierto {
-  margin-right: 400px; /* Ancho del panel de ayuda */
-  width: calc(100% - 400px);
+  margin-right: 320px; /* Ancho del panel de ayuda ajustado para zoom 80% (400px * 0.8) */
+  width: calc(100% - 320px);
 }
 
 /* Header con filtros */

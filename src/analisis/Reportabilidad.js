@@ -949,8 +949,8 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
         console.log('🔍 DEBUG - fechaDesde:', fechaDesde);
         console.log('🔍 DEBUG - fechaHasta:', fechaHasta);
         
-        // TEMPORAL: Usar endpoint de prueba
-        let url = `${API_BASE}/eficiencia_gasto/test_av_fisico_real.php`;
+        // Usar endpoint correcto para obtener real físico
+        let url = `${API_BASE}/eficiencia_gasto/avance_fisico_real.php`;
         const params = new URLSearchParams();
         
         if (proyectoId) {
@@ -1041,10 +1041,10 @@ const Reportabilidad = ({ proyectoId, sidebarCollapsed }) => {
         };
         
         console.log('🔍 DEBUG - Request body:', requestBody);
-        console.log('🔍 DEBUG - URL:', `${API_BASE}/predictividad/test_proyeccion_fisica_dinamico.php`);
+        console.log('🔍 DEBUG - URL:', `${API_BASE}/predictividad/obtener_proyeccion_fisica.php`);
 
-        // TEMPORAL: Usar endpoint de prueba dinámico
-        const response = await fetch(`${API_BASE}/predictividad/test_proyeccion_fisica_dinamico.php`, {
+        // Usar endpoint correcto para obtener proyección física
+        const response = await fetch(`${API_BASE}/predictividad/obtener_proyeccion_fisica.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

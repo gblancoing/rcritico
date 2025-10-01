@@ -17,6 +17,12 @@ const PanelAyuda = ({ categoriaSeleccionada, onCerrar }) => {
     }, 300);
   };
 
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      handleCerrar();
+    }
+  };
+
   useEffect(() => {
     const cargarCategoriasInfo = async () => {
       try {
@@ -48,6 +54,20 @@ const PanelAyuda = ({ categoriaSeleccionada, onCerrar }) => {
     };
 
     cargarCategoriasInfo();
+  }, []);
+
+  // Efecto para manejar la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        handleCerrar();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const toggleDescripcionLarga = (catVp) => {
@@ -87,25 +107,51 @@ const PanelAyuda = ({ categoriaSeleccionada, onCerrar }) => {
 
   if (loading) {
     return (
-      <div className={`panel-ayuda ${cerrando ? 'cerrando' : ''}`}>
-        <div className="panel-header">
-          <h3><i className="fa fa-question-circle"></i> Ayuda - Categorías VP</h3>
-          <button className="cerrar-btn" onClick={handleCerrar}>
-            <i className="fa fa-times"></i>
-          </button>
-        </div>
-        <div className="panel-content">
-          <div className="loading-spinner">
-            <i className="fa fa-spinner fa-spin"></i>
-            <p>Cargando información de categorías...</p>
+      <>
+        <div className="panel-overlay" onClick={handleOverlayClick}></div>
+        <div className={`panel-ayuda ${cerrando ? 'cerrando' : ''}`}>
+          <div className="panel-header">
+            <h3><i className="fa fa-question-circle"></i> Ayuda - Categorías VP</h3>
+            <button className="cerrar-btn" onClick={handleCerrar}>
+              <i className="fa fa-times"></i>
+            </button>
+          </div>
+          <div className="panel-content">
+            <div className="loading-spinner">
+              <i className="fa fa-spinner fa-spin"></i>
+              <p>Cargando información de categorías...</p>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
+      <>
+        <div className="panel-overlay" onClick={handleOverlayClick}></div>
+        <div className={`panel-ayuda ${cerrando ? 'cerrando' : ''}`}>
+          <div className="panel-header">
+            <h3><i className="fa fa-question-circle"></i> Ayuda - Categorías VP</h3>
+            <button className="cerrar-btn" onClick={handleCerrar}>
+              <i className="fa fa-times"></i>
+            </button>
+          </div>
+          <div className="panel-content">
+            <div className="error-message">
+              <i className="fa fa-exclamation-triangle"></i>
+              <p>Error: {error}</p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="panel-overlay" onClick={handleOverlayClick}></div>
       <div className={`panel-ayuda ${cerrando ? 'cerrando' : ''}`}>
         <div className="panel-header">
           <h3><i className="fa fa-question-circle"></i> Ayuda - Categorías VP</h3>
@@ -113,24 +159,6 @@ const PanelAyuda = ({ categoriaSeleccionada, onCerrar }) => {
             <i className="fa fa-times"></i>
           </button>
         </div>
-        <div className="panel-content">
-          <div className="error-message">
-            <i className="fa fa-exclamation-triangle"></i>
-            <p>Error: {error}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`panel-ayuda ${cerrando ? 'cerrando' : ''}`}>
-      <div className="panel-header">
-        <h3><i className="fa fa-question-circle"></i> Ayuda - Categorías VP</h3>
-        <button className="cerrar-btn" onClick={handleCerrar}>
-          <i className="fa fa-times"></i>
-        </button>
-      </div>
       
       <div className="panel-content">
         <div className="ayuda-intro">
@@ -215,7 +243,8 @@ const PanelAyuda = ({ categoriaSeleccionada, onCerrar }) => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

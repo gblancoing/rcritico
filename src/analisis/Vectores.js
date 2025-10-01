@@ -6596,25 +6596,60 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
     }
 
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        background: 'rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000,
-        fontFamily: 'Arial, sans-serif'
-      }}>
+      <>
+        <style>
+          {`
+            .modal-content-scroll::-webkit-scrollbar {
+              width: 8px;
+            }
+            .modal-content-scroll::-webkit-scrollbar-track {
+              background: #f1f3f4;
+              border-radius: 4px;
+            }
+            .modal-content-scroll::-webkit-scrollbar-thumb {
+              background: linear-gradient(135deg, #1ecb4f 0%, #17a85a 100%);
+              border-radius: 4px;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .modal-content-scroll::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(135deg, #17a85a 0%, #0d7a3d 100%);
+            }
+            .table-scroll::-webkit-scrollbar {
+              width: 6px;
+              height: 6px;
+            }
+            .table-scroll::-webkit-scrollbar-track {
+              background: #f1f3f4;
+              border-radius: 3px;
+            }
+            .table-scroll::-webkit-scrollbar-thumb {
+              background: linear-gradient(135deg, #1ecb4f 0%, #17a85a 100%);
+              border-radius: 3px;
+            }
+            .table-scroll::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(135deg, #17a85a 0%, #0d7a3d 100%);
+            }
+          `}
+        </style>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          fontFamily: 'Arial, sans-serif'
+        }}>
         <div style={{
           background: 'white',
           borderRadius: '12px',
-          width: '80%',
-          maxWidth: '800px',
-          maxHeight: '80%',
+          width: '90%',
+          maxWidth: '1000px',
+          maxHeight: '90%',
           overflow: 'hidden',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
           display: 'flex',
@@ -6679,13 +6714,15 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
           {/* Content */}
           <div style={{
             padding: '20px',
-            overflow: 'visible',
+            overflow: 'auto',
             flex: 1,
+            maxHeight: 'calc(90vh - 120px)',
             transform: 'scale(0.8)',
             transformOrigin: 'top left',
-            width: '125%',
-            height: '125%'
-          }}>
+            width: '125%'
+          }}
+          className="modal-content-scroll"
+          >
             {/* Resumen */}
             <div style={{
               background: '#f8f9fa',
@@ -6760,9 +6797,12 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                 background: 'white',
                 border: '1px solid #e9ecef',
                 borderRadius: '8px',
-                overflow: 'hidden'
-              }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                overflow: 'auto',
+                maxHeight: '400px'
+              }}
+              className="table-scroll"
+              >
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                   <thead>
                     <tr style={{ background: '#f8f9fa' }}>
                       <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #e9ecef', color: '#0a3265', fontSize: '0.85rem' }}>Período</th>
@@ -6905,7 +6945,8 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </>
     );
   };
 
@@ -8901,10 +8942,10 @@ Calculados automáticamente a partir de EV, PV, AC y BAC. Representan el progres
                 <thead>
                   <tr style={{ background: '#0a3265', color: '#fff' }}>
                     <th style={{ padding: '8px 12px', borderTopLeftRadius: 10 }}>Categoría VP</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>Real Parcial USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A)</span></th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>V0 Parcial USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(B)</span></th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>NPC Parcial USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(C)</span></th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>API Parcial USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(D)</span></th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>Real USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A)</span></th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>V0 USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(B)</span></th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>NPC USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(C)</span></th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>API USD <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(D)</span></th>
                     <th style={{ padding: '8px 12px', textAlign: 'center', borderLeft: '3px solid #e53935' }}>Cascada V0 <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A-B)</span></th>
                     <th style={{ padding: '8px 12px', borderTopRightRadius: 10, textAlign: 'center' }}>Cascada API <span style={{ color: '#90EE90', fontWeight: 'bold' }}>(A-D)</span></th>
                   </tr>
