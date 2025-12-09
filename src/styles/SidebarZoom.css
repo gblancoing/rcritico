@@ -1,0 +1,188 @@
+/* Sidebar con zoom al 80% - Estilos estandarizados */
+
+/* Override de estilos del Sidebar - Ancho completo para texto visible */
+.pro-sidebar {
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
+}
+
+.pro-sidebar.collapsed {
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+}
+
+/* Ajustes de altura para el navbar reducido */
+.pro-sidebar {
+  height: calc(100vh - 51px) !important; /* 64px * 0.8 = 51.2px */
+  top: 51px !important; /* 64px * 0.8 = 51.2px */
+}
+
+/* Botón de colapsar/expandir */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 10px; /* 12px * 0.8 = 9.6px */
+  right: 6px; /* 8px * 0.8 = 6.4px */
+  background: none;
+  border: none;
+  color: #FFD000;
+  font-size: 18px; /* 22px * 0.8 = 17.6px */
+  cursor: pointer;
+  z-index: 1100;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background: rgba(255, 208, 0, 0.1);
+  transform: scale(1.1);
+}
+
+/* Estilos del menú */
+.pro-menu {
+  font-size: 14px !important;
+}
+
+.pro-menu-item {
+  padding: 11px 12px !important;
+  margin: 2px 6px !important;
+  border-radius: 5px !important;
+  transition: all 0.18s ease !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.pro-menu-item .pro-menu-item-content {
+  font-size: 14px !important;
+  font-weight: 500;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.pro-menu-item .pro-menu-item-icon {
+  font-size: 16px !important;
+  margin-right: 10px !important;
+  flex-shrink: 0;
+}
+
+/* Estados activo y hover */
+.pro-menu-item.active {
+  background-color: #F2A900 !important;
+  color: #1a2235 !important;
+  font-weight: 600 !important;
+}
+
+.pro-menu-item:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #F2A900 !important;
+}
+
+/* Información del proyecto */
+.proyecto-info-container {
+  position: absolute;
+  bottom: 64px; /* 80px * 0.8 = 64px */
+  left: 0;
+  width: 100%;
+  color: #fff;
+  background: none;
+  padding: 0 13px; /* 16px * 0.8 = 12.8px */
+  font-size: 13px; /* Reducido proporcionalmente */
+  line-height: 1.4;
+}
+
+.proyecto-info-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 3px; /* 4px * 0.8 = 3.2px */
+}
+
+.proyecto-info-icon {
+  font-size: 18px; /* 22px * 0.8 = 17.6px */
+  margin-right: 6px; /* 8px * 0.8 = 6.4px */
+  color: #FFD000;
+}
+
+.proyecto-info-title {
+  font-weight: 600;
+  font-size: 14px; /* 18px * 0.8 = 14.4px */
+  color: #fff;
+}
+
+.proyecto-info-detail {
+  color: #fff;
+  font-size: 11px; /* 14px * 0.8 = 11.2px */
+  margin-bottom: 2px;
+}
+
+.proyecto-info-detail b {
+  font-weight: 600;
+}
+
+.proyecto-info-description {
+  color: #fff;
+  font-size: 11px; /* 14px * 0.8 = 11.2px */
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .pro-sidebar {
+    width: 52px !important; /* 64px * 0.8 = 51.2px */
+    min-width: 52px !important;
+    max-width: 52px !important;
+  }
+  
+  .pro-sidebar.collapsed {
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+  }
+  
+  .proyecto-info-container {
+    display: none; /* Ocultar información del proyecto en móvil */
+  }
+}
+
+@media (max-width: 600px) {
+  .pro-sidebar {
+    width: 39px !important; /* 48px * 0.8 = 38.4px */
+    min-width: 39px !important;
+    max-width: 39px !important;
+  }
+  
+  .sidebar-toggle-btn {
+    font-size: 14px; /* Reducido más para móvil */
+    top: 8px;
+    right: 4px;
+  }
+}
+
+/* Animaciones suaves */
+.pro-sidebar,
+.pro-menu-item,
+.sidebar-toggle-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Scrollbar personalizado para el sidebar si es necesario */
+.pro-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.pro-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pro-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 208, 0, 0.6);
+  border-radius: 2px;
+}
+
+.pro-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 208, 0, 0.8);
+}

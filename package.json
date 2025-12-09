@@ -1,15 +1,14 @@
 {
-  "name": "financiero",
+  "name": "pmo",
   "version": "1.0.0",
-  "homepage": "https://finance.jej664caren.cl",
-  "description": "Proyecto de prueba para visualización en hosting",
+  "description": "Sistema de gestión financiera y física de proyectos - PMO",
   "main": "index.js",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "prepare-production": "node preparar-produccion.js",
+    "prepare-production": "node preparar_produccion.js",
     "legacy-production": "node build-production.js"
   },
   "dependencies": {
@@ -24,6 +23,7 @@
     "d3": "^7.9.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "primeicons": "^7.0.0",
     "primereact": "^10.9.6",
     "react": "^18.2.0",
@@ -47,5 +47,6 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost/financiero"
+  "proxy": "http://localhost/rcritico",
+  "homepage": "https://rcritico.jej664caren.cl"
 }

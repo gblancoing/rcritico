@@ -1,6 +1,30 @@
 # Apache Configuration for React Router
 RewriteEngine On
 
+# Permitir acceso directo a archivos en /api/uploads/
+# Primero verificar que no sea un archivo físico existente
+RewriteCond %{REQUEST_URI} ^/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^api/uploads/(.*)$ api/uploads.php?file=$1 [L,QSA]
+
+# También manejar /rcritico/api/uploads/ si es necesario
+# Cuando accedes desde /rcritico/api/uploads/, el .htaccess está en la raíz de rcritico
+RewriteCond %{REQUEST_URI} ^/rcritico/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/uploads/(.*)$ api/uploads.php?file=$1 [L,QSA]
+
+# También manejar /ssocaren/api/uploads/ si es necesario
+RewriteCond %{REQUEST_URI} ^/ssocaren/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ssocaren/api/uploads/(.*)$ api/uploads.php?file=$1 [L,QSA]
+
+# Si la URL es /api/uploads/ y el archivo no existe físicamente, redirigir al script PHP
+RewriteCond %{REQUEST_URI} ^/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/uploads/(.+)$ api/uploads.php?file=$1 [L,QSA]
+
 # Handle Angular and React Router
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
@@ -13,8 +37,13 @@ php_value error_reporting 0
 
 # Security headers
 Header always set X-Content-Type-Options nosniff
-Header always set X-Frame-Options DENY
 Header always set X-XSS-Protection "1; mode=block"
+Header always set X-Frame-Options DENY
+
+# Excepción SOLO para view_pdf.php (visualización de PDFs en iframe)
+<FilesMatch "view_pdf\.php$">
+    Header always unset X-Frame-Options
+</FilesMatch>
 
 # Cache optimization
 <IfModule mod_expires.c>

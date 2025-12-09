@@ -1,0 +1,147 @@
+password_verify resultado: TRUE
+Password válida!
+DESPUÉS DE PASSWORD
+DESPUÉS DE APROBADO
+CENTROS OBTENIDOS: Array
+(
+    [0] => Array
+        (
+            [id] => 1
+            [nombre] => T21C404 8a-9a
+            [descripcion] => Centro de costos principal para pruebas
+            [proyecto_id] => 1
+        )
+
+    [1] => Array
+        (
+            [id] => 2
+            [nombre] => Contrato CC-858
+            [descripcion] => Centro de costo CC-858
+            [proyecto_id] => 2
+        )
+
+)
+
+ANTES DE LOGIN EXITOSO
+Preparando respuesta JSON
+Respuesta preparada: {"status":"success","message":"Login exitoso","user":{"id":1,"nombre":"Guido Blanco","email":"gblanco@jej.cl","rol":"super_admin","aprobado":1,"centro_costo_id":1,"proyecto_id":1,"region_id":7,"centro_costo_nombre":"T21C404 8a-9a","proyecto_nombre":"Proyecto Embalse Carén","region_nombre":"Región Metropolitana de Santiago"},"centros":[{"id":1,"nombre":"T21C404 8a-9a","descripcion":"Centro de costos principal para pruebas","proyecto_id":1},{"id":2,"nombre":"Contrato CC-858","descripcion":"Centro de costo CC-858","proyecto_id":2}]}
+Respuesta enviada exitosamente
+========================================
+NUEVO INTENTO DE LOGIN: 2025-12-01 21:34:00
+Método: POST
+Conexión a DB OK
+INICIO LOGIN
+Raw input recibido: {"email":"gblanco@jej.cl","password":"Inging1989$"}
+Input decodificado: Array
+(
+    [email] => gblanco@jej.cl
+    [password] => Inging1989$
+)
+
+Email recibido: 'gblanco@jej.cl'
+Password recibido (longitud): 11
+Password recibido (primeros 3 chars): Ing...
+Usuario encontrado: ID=1, Email=gblanco@jej.cl, Rol=super_admin, Aprobado=1
+Password hash en DB (primeros 30 chars): $2y$10$MUyUvGraTewMNdYEg8Awa.s...
+Password hash en DB (longitud): 60
+Comparando password recibido con hash almacenado...
+password_verify resultado: TRUE
+Password válida!
+DESPUÉS DE PASSWORD
+DESPUÉS DE APROBADO
+CENTROS OBTENIDOS: Array
+(
+    [0] => Array
+        (
+            [id] => 1
+            [nombre] => T21C404 8a-9a
+            [descripcion] => Centro de costos principal para pruebas
+            [proyecto_id] => 1
+        )
+
+    [1] => Array
+        (
+            [id] => 2
+            [nombre] => Contrato CC-858
+            [descripcion] => Centro de costo CC-858
+            [proyecto_id] => 2
+        )
+
+)
+
+ANTES DE LOGIN EXITOSO
+Preparando respuesta JSON
+Respuesta preparada: {"status":"success","message":"Login exitoso","user":{"id":1,"nombre":"Guido Blanco","email":"gblanco@jej.cl","rol":"super_admin","aprobado":1,"centro_costo_id":1,"proyecto_id":1,"region_id":7,"centro_costo_nombre":"T21C404 8a-9a","proyecto_nombre":"Proyecto Embalse Carén","region_nombre":"Región Metropolitana de Santiago"},"centros":[{"id":1,"nombre":"T21C404 8a-9a","descripcion":"Centro de costos principal para pruebas","proyecto_id":1},{"id":2,"nombre":"Contrato CC-858","descripcion":"Centro de costo CC-858","proyecto_id":2}]}
+Respuesta enviada exitosamente
+========================================
+NUEVO INTENTO DE LOGIN: 2025-12-01 21:34:10
+Método: POST
+Conexión a DB OK
+INICIO LOGIN
+Raw input recibido: {"email":"gblanco@jej.cl","password":"OInging1989$"}
+Input decodificado: Array
+(
+    [email] => gblanco@jej.cl
+    [password] => OInging1989$
+)
+
+Email recibido: 'gblanco@jej.cl'
+Password recibido (longitud): 12
+Password recibido (primeros 3 chars): OIn...
+Usuario encontrado: ID=1, Email=gblanco@jej.cl, Rol=super_admin, Aprobado=1
+Password hash en DB (primeros 30 chars): $2y$10$MUyUvGraTewMNdYEg8Awa.s...
+Password hash en DB (longitud): 60
+Comparando password recibido con hash almacenado...
+password_verify resultado: FALSE
+password_verify falló, probando variaciones...
+Probando sin trim (longitud): 12
+Test sin trim: FALSE
+Password NO coincide. Password recibido (longitud): 12
+Password en DB (longitud): 60
+========================================
+NUEVO INTENTO DE LOGIN: 2025-12-01 21:34:16
+Método: POST
+Conexión a DB OK
+INICIO LOGIN
+Raw input recibido: {"email":"gblanco@jej.cl","password":"Inging1989$"}
+Input decodificado: Array
+(
+    [email] => gblanco@jej.cl
+    [password] => Inging1989$
+)
+
+Email recibido: 'gblanco@jej.cl'
+Password recibido (longitud): 11
+Password recibido (primeros 3 chars): Ing...
+Usuario encontrado: ID=1, Email=gblanco@jej.cl, Rol=super_admin, Aprobado=1
+Password hash en DB (primeros 30 chars): $2y$10$MUyUvGraTewMNdYEg8Awa.s...
+Password hash en DB (longitud): 60
+Comparando password recibido con hash almacenado...
+password_verify resultado: TRUE
+Password válida!
+DESPUÉS DE PASSWORD
+DESPUÉS DE APROBADO
+CENTROS OBTENIDOS: Array
+(
+    [0] => Array
+        (
+            [id] => 1
+            [nombre] => T21C404 8a-9a
+            [descripcion] => Centro de costos principal para pruebas
+            [proyecto_id] => 1
+        )
+
+    [1] => Array
+        (
+            [id] => 2
+            [nombre] => Contrato CC-858
+            [descripcion] => Centro de costo CC-858
+            [proyecto_id] => 2
+        )
+
+)
+
+ANTES DE LOGIN EXITOSO
+Preparando respuesta JSON
+Respuesta preparada: {"status":"success","message":"Login exitoso","user":{"id":1,"nombre":"Guido Blanco","email":"gblanco@jej.cl","rol":"super_admin","aprobado":1,"centro_costo_id":1,"proyecto_id":1,"region_id":7,"centro_costo_nombre":"T21C404 8a-9a","proyecto_nombre":"Proyecto Embalse Carén","region_nombre":"Región Metropolitana de Santiago"},"centros":[{"id":1,"nombre":"T21C404 8a-9a","descripcion":"Centro de costos principal para pruebas","proyecto_id":1},{"id":2,"nombre":"Contrato CC-858","descripcion":"Centro de costo CC-858","proyecto_id":2}]}
+Respuesta enviada exitosamente

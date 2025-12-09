@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import App from './App';
-import { ProjectProvider } from './ProjectContext';
+import { ProjectProvider } from './context/ProjectContext';
 
 ReactDOM.render(
   <ProjectProvider>

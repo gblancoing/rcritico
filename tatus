@@ -1,0 +1,64 @@
+[33mcommit e55735ed821782eac0e5478a3f2dfff10ebcb2af[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: guido blanco <gblanco.espinoza@gmail.com>
+Date:   Thu Nov 27 21:59:47 2025 -0300
+
+    Mejoras: Mitigadores nivel 2, endpoint descarga archivos, columna Comentarios Contratista
+
+ api/archivos/linea_base_archivos.php               |  248 [32m++++[m
+ api/archivos/linea_base_carpetas.php               |  238 [32m++++[m
+ api/auth/login_debug.txt                           |   96 [32m+[m[31m-[m
+ .../crear_tablas_documentos_linea_base.sql         |   61 [32m+[m
+ api/debug_foro.php                                 |   95 [32m++[m
+ api/descargar_archivo.php                          |  140 [32m+++[m
+ api/utils/gemini_chat.php                          |   20 [32m+[m[31m-[m
+ deploy_rcritico.zip                                |  Bin [31m17875512[m -> [32m25716191[m bytes
+ deploy_rcritico/.htaccess                          |   65 [32m+[m[31m-[m
+ .../api/archivos/carpeta_linea_base.php            |  116 [32m+[m[31m-[m
+ .../archivos/carpeta_linea_base_mitigadores.php    |  116 [32m+[m[31m-[m
+ deploy_rcritico/api/archivos/carpetas.php          |  131 [31m--[m
+ .../api/archivos/linea_base_archivos.php           |  248 [32m++++[m
+ .../api/archivos/linea_base_carpetas.php           |  238 [32m++++[m
+ deploy_rcritico/api/archivos/subir_respaldo.php    |  133 [32m++[m
+ deploy_rcritico/api/auth/login_debug.txt           |   46 [32m+[m[31m-[m
+ deploy_rcritico/api/config.php                     |   55 [32m+[m
+ .../database/agregar_columnas_foro_linea_base.sql  |   15 [32m+[m
+ .../crear_tablas_documentos_linea_base.sql         |   61 [32m+[m
+ deploy_rcritico/api/debug_foro.php                 |   95 [32m++[m
+ deploy_rcritico/api/descargar_archivo.php          |  140 [32m+++[m
+ deploy_rcritico/api/diagnostico_trabajador.php     |    3 [32m+[m
+ deploy_rcritico/api/utils/gemini_chat.php          |  583 [32m++++++++[m[31m-[m
+ deploy_rcritico/asset-manifest.json                |   12 [32m+[m[31m-[m
+ deploy_rcritico/index.html                         |    2 [32m+[m[31m-[m
+ deploy_rcritico/static/css/main.3e62a79f.css.map   |    1 [31m-[m
+ .../css/{main.3e62a79f.css => main.609cd586.css}   |    4 [32m+[m[31m-[m
+ deploy_rcritico/static/css/main.609cd586.css.map   |    1 [32m+[m
+ deploy_rcritico/static/js/main.3dc73c12.js         |    3 [31m-[m
+ deploy_rcritico/static/js/main.3dc73c12.js.map     |    1 [31m-[m
+ deploy_rcritico/static/js/main.da33625d.js         |    3 [32m+[m
+ ...js.LICENSE.txt => main.da33625d.js.LICENSE.txt} |    0
+ deploy_rcritico/static/js/main.da33625d.js.map     |    1 [32m+[m
+ .../lb_1299/doc_6928bfc24791d_1764278210.jpeg      |  Bin [31m0[m -> [32m742065[m bytes
+ .../lb_1299/doc_6928c3545f370_1764279124.jpeg      |  Bin [31m0[m -> [32m742065[m bytes
+ .../lb_1299/doc_6928c44a6088c_1764279370.jpeg      |  Bin [31m0[m -> [32m742065[m bytes
+ .../lb_49/doc_6928e0100bee0_1764286480.jpeg        |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_6928944781334_1764267079.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_6928947f0ae93_1764267135.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_692896780df64_1764267640.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_69289790a4c73_1764267920.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_6928989dc4783_1764268189.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_69289ceeee0d9_1764269294.xlsx         |  Bin [31m0[m -> [32m30383[m bytes
+ .../respaldo_6928dfd6d2d28_1764286422.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ .../tareas_adjuntos/tarea_3_6925a9f0b8977.pdf      |  Bin [31m0[m -> [32m385493[m bytes
+ deploy_rcritico_2025-11-27_17-49.zip               |  Bin [31m0[m -> [32m21984515[m bytes
+ deploy_rcritico_2025-11-27_18-37.zip               |  Bin [31m0[m -> [32m24230231[m bytes
+ deploy_rcritico_2025-11-27_21-00.zip               |  Bin [31m0[m -> [32m25716026[m bytes
+ deploy_rcritico_2025-11-27_21-33.zip               |  Bin [31m0[m -> [32m25716171[m bytes
+ deploy_rcritico_2025-11-27_21-55.zip               |  Bin [31m0[m -> [32m25716191[m bytes
+ preparar-deploy.ps1                                |  137 [32m+++[m
+ src/components/GestorArchivos.js                   | 1297 [32m+++++++++++++++++[m[31m---[m
+ .../lb_1299/doc_6928bfc24791d_1764278210.jpeg      |  Bin [31m0[m -> [32m742065[m bytes
+ .../lb_1299/doc_6928c3545f370_1764279124.jpeg      |  Bin [31m0[m -> [32m742065[m bytes
+ .../lb_1299/doc_6928c44a6088c_1764279370.jpeg      |  Bin [31m0[m -> [32m742065[m bytes
+ .../lb_49/doc_6928e0100bee0_1764286480.jpeg        |  Bin [31m0[m -> [32m742065[m bytes
+ .../respaldo_6928dfd6d2d28_1764286422.jpeg         |  Bin [31m0[m -> [32m742065[m bytes
+ 57 files changed, 3777 insertions(+), 628 deletions(-)

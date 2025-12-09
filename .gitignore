@@ -37,6 +37,11 @@ pids
 # PHP logs
 api/message_log.txt
 
+# Debug logs (archivos grandes)
+src/control_fisico/*.log
+**/*debug*.log
+*.log
+
 # IDE files
 .vscode/
 .idea/
@@ -45,3 +50,10 @@ api/message_log.txt
 
 # OS generated files
 Thumbs.db 
+# Archivos grandes
+src/control_fisico/*.log
+src/control_fisico/*.sql
+deploy_rcritico_*.zip
+src/control_fisico/*.log
+src/control_fisico/*.sql
+deploy_rcritico_*.zip

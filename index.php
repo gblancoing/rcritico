@@ -1,6 +1,6 @@
 <?php
 /**
- * Router Definitivo para Subdominio financiero.jej664caren.cl
+ * Router Definitivo para Subdominio pmo.jej664caren.cl
  * Solución que funciona sin configuración del servidor
  */
 
@@ -173,4 +173,3 @@ if (file_exists($index_file)) {
         }
     }
 }
-?> 

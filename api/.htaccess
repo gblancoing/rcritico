@@ -1,0 +1,27 @@
+# Configuración específica para el directorio api/
+RewriteEngine On
+
+# Manejar peticiones a /api/uploads/ y redirigirlas al script PHP
+RewriteCond %{REQUEST_URI} ^/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
+
+# También manejar /rcritico/api/uploads/
+RewriteCond %{REQUEST_URI} ^/rcritico/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
+
+# También manejar /ssocaren/api/uploads/
+RewriteCond %{REQUEST_URI} ^/ssocaren/api/uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
+
+# Regla genérica: cualquier petición a uploads/ que no sea un archivo físico
+RewriteCond %{REQUEST_URI} /uploads/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
+

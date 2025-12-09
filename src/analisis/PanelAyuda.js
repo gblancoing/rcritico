@@ -248,4 +248,4 @@ const PanelAyuda = ({ categoriaSeleccionada, onCerrar }) => {
   );
 };
 
-export default PanelAyuda; 
+export default PanelAyuda;
