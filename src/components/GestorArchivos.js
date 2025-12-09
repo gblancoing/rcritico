@@ -243,10 +243,17 @@ const puedeEditarColumnaLineaBase = (user, rutaNavegacion, columna) => {
 // Muestra el universo completo de carpetas del Riesgo Crítico
 // =====================================================
 const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(70);
   const [datosSubcarpetas, setDatosSubcarpetas] = useState({});
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [progresoCarga, setProgresoCarga] = useState('');
+  
+  // Estados para pan (arrastrar el diagrama)
+  const [isPanning, setIsPanning] = useState(false);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const containerRef = React.useRef(null);
+  const contentRef = React.useRef(null);
 
   // Cargar TODOS los datos de cada subcarpeta:
   // 1. Carpetas de Archivos (pestaña Archivos)
@@ -335,6 +342,55 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
       return () => clearTimeout(timer);
     }
   }, [zoom, cargandoDatos, datosSubcarpetas]);
+
+  // Handler para zoom con rueda del mouse (focalizado)
+  const handleWheel = (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -10 : 10;
+      setZoom(prev => Math.min(200, Math.max(25, prev + delta)));
+    }
+  };
+
+  // Handlers para pan (arrastrar)
+  const handleMouseDown = (e) => {
+    if (e.button === 0) { // Click izquierdo
+      setIsPanning(true);
+      setStartPan({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
+      e.currentTarget.style.cursor = 'grabbing';
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (isPanning) {
+      setPanPosition({
+        x: e.clientX - startPan.x,
+        y: e.clientY - startPan.y
+      });
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    setIsPanning(false);
+    if (e.currentTarget) {
+      e.currentTarget.style.cursor = 'grab';
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsPanning(false);
+  };
+
+  // Resetear posición y zoom
+  const resetView = () => {
+    setZoom(70);
+    setPanPosition({ x: 0, y: 0 });
+  };
+
+  // Centrar el diagrama
+  const centerDiagram = () => {
+    setPanPosition({ x: 0, y: 0 });
+  };
 
   // Función helper para limpiar texto
   const limpiarTexto = (texto, maxLen = 30) => {
@@ -530,11 +586,12 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
         </p>
       </div>
 
-      {/* Controles de Zoom */}
+      {/* Controles de Zoom y Pan */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '1rem',
+        flexWrap: 'wrap',
+        gap: '0.75rem',
         marginBottom: '1rem',
         padding: '0.75rem 1rem',
         background: '#f8f9fa',
@@ -542,116 +599,159 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
         border: '1px solid #e9ecef'
       }}>
         <span style={{ fontWeight: '600', color: '#495057', fontSize: '14px' }}>
-          <i className="fa fa-search" style={{ marginRight: '8px' }}></i>
+          <i className="fa fa-search-plus" style={{ marginRight: '8px' }}></i>
           Zoom:
         </span>
         <button
-          onClick={() => setZoom(Math.max(25, zoom - 25))}
+          onClick={() => setZoom(Math.max(25, zoom - 10))}
           style={{
-            width: '36px', height: '36px',
+            width: '32px', height: '32px',
             border: '1px solid #dee2e6',
             borderRadius: '6px',
             background: 'white',
             cursor: 'pointer',
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: 'bold',
             color: '#495057'
           }}
+          title="Alejar (-10%)"
         >
           −
         </button>
-        <div style={{
-          minWidth: '100px',
-          height: '8px',
-          background: '#e9ecef',
-          borderRadius: '4px',
-          position: 'relative'
-        }}>
-          <div style={{
-            width: `${zoom}%`,
-            height: '100%',
-            background: 'linear-gradient(90deg, #667eea, #764ba2)',
-            borderRadius: '4px',
-            transition: 'width 0.2s ease'
-          }}></div>
-        </div>
-        <button
-          onClick={() => setZoom(Math.min(200, zoom + 25))}
+        <input
+          type="range"
+          min="25"
+          max="200"
+          value={zoom}
+          onChange={(e) => setZoom(parseInt(e.target.value))}
           style={{
-            width: '36px', height: '36px',
+            width: '120px',
+            cursor: 'pointer',
+            accentColor: '#667eea'
+          }}
+        />
+        <button
+          onClick={() => setZoom(Math.min(200, zoom + 10))}
+          style={{
+            width: '32px', height: '32px',
             border: '1px solid #dee2e6',
             borderRadius: '6px',
             background: 'white',
             cursor: 'pointer',
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: 'bold',
             color: '#495057'
           }}
+          title="Acercar (+10%)"
         >
           +
         </button>
         <span style={{ 
-          minWidth: '50px', 
+          minWidth: '45px', 
           textAlign: 'center',
           fontWeight: '600',
-          color: '#667eea'
+          color: '#667eea',
+          fontSize: '14px'
         }}>
           {zoom}%
         </span>
+        
+        <div style={{ borderLeft: '1px solid #dee2e6', height: '24px', margin: '0 4px' }}></div>
+        
+        {/* Presets de zoom */}
+        {[30, 50, 70, 100, 150].map(z => (
+          <button
+            key={z}
+            onClick={() => setZoom(z)}
+            style={{
+              padding: '6px 10px',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              background: zoom === z ? '#667eea' : 'white',
+              color: zoom === z ? 'white' : '#495057',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: zoom === z ? '600' : '400'
+            }}
+          >
+            {z}%
+          </button>
+        ))}
+        
+        <div style={{ borderLeft: '1px solid #dee2e6', height: '24px', margin: '0 4px' }}></div>
+        
+        {/* Controles de posición */}
         <button
-          onClick={() => setZoom(100)}
+          onClick={centerDiagram}
           style={{
-            padding: '8px 16px',
+            padding: '6px 12px',
             border: '1px solid #dee2e6',
             borderRadius: '6px',
             background: 'white',
             cursor: 'pointer',
-            fontSize: '13px',
+            fontSize: '12px',
             color: '#495057'
           }}
+          title="Centrar diagrama"
+        >
+          <i className="fa fa-crosshairs" style={{ marginRight: '6px' }}></i>
+          Centrar
+        </button>
+        <button
+          onClick={resetView}
+          style={{
+            padding: '6px 12px',
+            border: '1px solid #17a2b8',
+            borderRadius: '6px',
+            background: '#17a2b8',
+            cursor: 'pointer',
+            fontSize: '12px',
+            color: 'white'
+          }}
+          title="Resetear vista (70% + centrado)"
         >
           <i className="fa fa-undo" style={{ marginRight: '6px' }}></i>
-          Reset
-        </button>
-        <button
-          onClick={() => setZoom(50)}
-          style={{
-            padding: '8px 16px',
-            border: '1px solid #dee2e6',
-            borderRadius: '6px',
-            background: zoom === 50 ? '#667eea' : 'white',
-            color: zoom === 50 ? 'white' : '#495057',
-            cursor: 'pointer',
-            fontSize: '13px'
-          }}
-        >
-          50%
-        </button>
-        <button
-          onClick={() => setZoom(150)}
-          style={{
-            padding: '8px 16px',
-            border: '1px solid #dee2e6',
-            borderRadius: '6px',
-            background: zoom === 150 ? '#667eea' : 'white',
-            color: zoom === 150 ? 'white' : '#495057',
-            cursor: 'pointer',
-            fontSize: '13px'
-          }}
-        >
-          150%
+          Resetear
         </button>
       </div>
-
-      {/* Diagrama Mermaid */}
+      
+      {/* Instrucciones de uso */}
       <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        overflow: 'auto',
-        maxHeight: '70vh'
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1.5rem',
+        marginBottom: '0.75rem',
+        padding: '0.5rem 1rem',
+        background: '#e7f3ff',
+        borderRadius: '6px',
+        fontSize: '12px',
+        color: '#0d6efd'
       }}>
+        <span><i className="fa fa-hand-paper-o" style={{ marginRight: '6px' }}></i> <strong>Arrastrar:</strong> Click + mover</span>
+        <span><i className="fa fa-mouse-pointer" style={{ marginRight: '6px' }}></i> <strong>Zoom:</strong> Ctrl + Scroll</span>
+        <span><i className="fa fa-arrows" style={{ marginRight: '6px' }}></i> <strong>Posición actual:</strong> X:{Math.round(panPosition.x)}, Y:{Math.round(panPosition.y)}</span>
+      </div>
+
+      {/* Diagrama Mermaid con Pan y Zoom interactivo */}
+      <div 
+        ref={containerRef}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '1rem',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          overflow: 'hidden',
+          height: '65vh',
+          cursor: isPanning ? 'grabbing' : 'grab',
+          position: 'relative',
+          border: '2px solid #e9ecef'
+        }}
+      >
         {cargandoDatos ? (
           <div style={{ textAlign: 'center', padding: '3rem' }}>
             <i className="fa fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#667eea' }}></i>
@@ -662,22 +762,42 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
           </div>
         ) : (
           <div 
+            ref={contentRef}
             style={{ 
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: 'top center',
-              transition: 'transform 0.3s ease',
-              minHeight: '400px'
+              transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoom / 100})`,
+              transformOrigin: 'center center',
+              transition: isPanning ? 'none' : 'transform 0.15s ease-out',
+              minHeight: '400px',
+              display: 'inline-block',
+              userSelect: 'none'
             }}
           >
             <pre className="mermaid" style={{ 
               background: 'transparent',
               border: 'none',
-              fontSize: '14px'
+              fontSize: '14px',
+              pointerEvents: 'none'
             }}>
               {mermaidCodeVisual}
             </pre>
           </div>
         )}
+        
+        {/* Indicador de zoom en esquina */}
+        <div style={{
+          position: 'absolute',
+          bottom: '10px',
+          right: '10px',
+          background: 'rgba(102, 126, 234, 0.9)',
+          color: 'white',
+          padding: '4px 10px',
+          borderRadius: '4px',
+          fontSize: '11px',
+          fontWeight: '600',
+          pointerEvents: 'none'
+        }}>
+          {zoom}%
+        </div>
       </div>
       
       {/* Leyenda */}
