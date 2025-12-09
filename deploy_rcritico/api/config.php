@@ -15,13 +15,12 @@ function getDbConfig() {
             'dbname' => 'rcritico'
         ];
     } else {
-        // Configuración para producción (cPanel)
-        // TODO: Ajustar credenciales de producción cuando sea necesario
+        // Configuración para producción (cPanel - rcritico.carenvp.cl)
         return [
             'host' => 'localhost',
-            'user' => 'jejcatvn',
-            'pass' => '+T2v9jtSZS',
-            'dbname' => 'jejcatvn_rcritico'
+            'user' => 'carenvpc_rcritico',
+            'pass' => 'O$AR-B5R2v',
+            'dbname' => 'carenvpc_rcritico'
         ];
     }
 }

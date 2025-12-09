@@ -22,9 +22,10 @@ function getDbConfig() {
                strpos($host, ':3002') !== false ||
                (isset($_SERVER['SERVER_ADDR']) && $_SERVER['SERVER_ADDR'] === '127.0.0.1');
     
-    // Si el host contiene 'jejcatvn' o el dominio de producción, forzar producción
-    $isProduction = strpos($host, 'jejcatvn') !== false || 
-                    strpos($host, 'rcritico') !== false ||
+    // Si el host contiene el dominio de producción, forzar producción
+    $isProduction = strpos($host, 'carenvp') !== false || 
+                    strpos($host, 'rcritico.carenvp.cl') !== false ||
+                    strpos($host, '.cl') !== false ||
                     strpos($host, '.com') !== false ||
                     strpos($host, '.net') !== false ||
                     strpos($host, '.org') !== false;
@@ -33,9 +34,9 @@ function getDbConfig() {
     if ($isProduction && !$isLocal) {
         return [
             'host' => 'localhost',
-            'user' => 'jejcatvn',
-            'pass' => '+T2v9jtSZS',
-            'dbname' => 'jejcatvn_rcritico'
+            'user' => 'carenvpc_rcritico',
+            'pass' => 'O$AR-B5R2v',
+            'dbname' => 'carenvpc_rcritico'
         ];
     }
     
@@ -48,12 +49,12 @@ function getDbConfig() {
             'dbname' => 'rcritico'
         ];
     } else {
-        // Configuración para producción (cPanel) - por defecto
+        // Configuración para producción (cPanel - rcritico.carenvp.cl)
         return [
             'host' => 'localhost',
-            'user' => 'jejcatvn',
-            'pass' => '+T2v9jtSZS',
-            'dbname' => 'jejcatvn_rcritico'
+            'user' => 'carenvpc_rcritico',
+            'pass' => 'O$AR-B5R2v',
+            'dbname' => 'carenvpc_rcritico'
         ];
     }
 }

@@ -329,19 +329,28 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
     cargarDatosCompletos();
   }, [carpetaActual, carpetas, API_BASE]);
 
-  // Re-renderizar Mermaid cuando cambie el zoom o los datos
+  // Re-renderizar Mermaid cuando cambien los datos
   useEffect(() => {
     if (!cargandoDatos && typeof window !== 'undefined' && window.mermaid) {
       const timer = setTimeout(() => {
         try {
-          window.mermaid.run({ querySelector: '.mermaid' });
+          // Buscar el contenedor y forzar re-procesamiento
+          const containers = document.querySelectorAll('#mermaid-diagram');
+          containers.forEach(el => {
+            el.removeAttribute('data-processed');
+          });
+          
+          window.mermaid.run({ 
+            nodes: containers,
+            suppressErrors: true 
+          });
         } catch (e) {
           console.log('Mermaid render:', e);
         }
-      }, 100);
+      }, 300);
       return () => clearTimeout(timer);
     }
-  }, [zoom, cargandoDatos, datosSubcarpetas]);
+  }, [cargandoDatos, datosSubcarpetas, carpetaActual]);
 
   // Handler para zoom con rueda del mouse (focalizado)
   const handleWheel = (e) => {
@@ -392,11 +401,12 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
     setPanPosition({ x: 0, y: 0 });
   };
 
-  // Función helper para limpiar texto
-  const limpiarTexto = (texto, maxLen = 30) => {
+  // Función helper para limpiar texto para Mermaid
+  const limpiarTexto = (texto, maxLen = 40) => {
     if (!texto) return '';
-    const limpio = texto.replace(/["\n\r<>]/g, ' ').trim();
-    return limpio.length > maxLen ? limpio.substring(0, maxLen) + '...' : limpio;
+    // Limpiar caracteres problemáticos para Mermaid
+    const limpio = texto.replace(/["\n\r<>{}[\]|]/g, ' ').replace(/\s+/g, ' ').trim();
+    return limpio.length > maxLen ? limpio.substring(0, maxLen - 3) + '...' : limpio;
   };
 
   // Generar código Mermaid - versión para visualización (con límites)
@@ -482,7 +492,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
       
       subcarpetasNivel2.forEach((sub, idx) => {
         const subId = `EMP${idx}`;
-        mermaidCode += `  ${subId}["📂 ${limpiarTexto(sub.nombre, 18)}"]\n`;
+        mermaidCode += `  ${subId}["📂 ${limpiarTexto(sub.nombre, 25)}"]\n`;
         mermaidCode += `  style ${subId} fill:#495057,stroke:#343a40,color:#fff\n`;
         mermaidCode += `  EMPRESAS --> ${subId}\n`;
         
@@ -500,7 +510,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
           // Mostrar carpetas de archivos
           datosEmpresa.carpetasArchivos.slice(0, limiteCarpetasArchivos).forEach((carpArch, archIdx) => {
             const carpArchId = `CARCH${idx}_${archIdx}`;
-            mermaidCode += `  ${carpArchId}["📂 ${limpiarTexto(carpArch.nombre, 12)}"]\n`;
+            mermaidCode += `  ${carpArchId}["📂 ${limpiarTexto(carpArch.nombre, 20)}"]\n`;
             mermaidCode += `  style ${carpArchId} fill:#fff3e0,stroke:#ffcc80,color:#e65100\n`;
             mermaidCode += `  ${archGrupoId} --> ${carpArchId}\n`;
           });
@@ -525,7 +535,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
           datosEmpresa.registrosLineaBase.slice(0, limiteRegistrosLB).forEach((registro, regIdx) => {
             const regId = `REG${idx}_${regIdx}`;
             const codigoReg = registro.codigo || `Ctrl ${regIdx + 1}`;
-            mermaidCode += `  ${regId}["📝 ${limpiarTexto(codigoReg, 12)}"]\n`;
+            mermaidCode += `  ${regId}["📝 ${limpiarTexto(codigoReg, 20)}"]\n`;
             mermaidCode += `  style ${regId} fill:#fce4ec,stroke:#f48fb1,color:#880e4f\n`;
             mermaidCode += `  ${lbGroupId} --> ${regId}\n`;
             
@@ -540,7 +550,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
               // Mostrar carpetas de documentos
               carpetasDocLB.slice(0, limiteCarpetasDoc).forEach((carpDoc, docIdx) => {
                 const carpDocId = `CDOC${idx}_${regIdx}_${docIdx}`;
-                mermaidCode += `  ${carpDocId}["📄 ${limpiarTexto(carpDoc.nombre, 10)}"]\n`;
+                mermaidCode += `  ${carpDocId}["📄 ${limpiarTexto(carpDoc.nombre, 18)}"]\n`;
                 mermaidCode += `  style ${carpDocId} fill:#e7f1ff,stroke:#b6d4fe,color:#0d6efd\n`;
                 mermaidCode += `  ${docGroupId} --> ${carpDocId}\n`;
               });
@@ -727,9 +737,8 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
         fontSize: '12px',
         color: '#0d6efd'
       }}>
-        <span><i className="fa fa-hand-paper-o" style={{ marginRight: '6px' }}></i> <strong>Arrastrar:</strong> Click + mover</span>
-        <span><i className="fa fa-mouse-pointer" style={{ marginRight: '6px' }}></i> <strong>Zoom:</strong> Ctrl + Scroll</span>
-        <span><i className="fa fa-arrows" style={{ marginRight: '6px' }}></i> <strong>Posición actual:</strong> X:{Math.round(panPosition.x)}, Y:{Math.round(panPosition.y)}</span>
+        <span><i className="fa fa-arrows" style={{ marginRight: '6px' }}></i> <strong>Navegar:</strong> Scroll horizontal y vertical</span>
+        <span><i className="fa fa-search-plus" style={{ marginRight: '6px' }}></i> <strong>Zoom:</strong> Usa los controles de arriba o Ctrl + Scroll</span>
       </div>
 
       {/* Diagrama Mermaid con Pan y Zoom interactivo */}
@@ -741,11 +750,10 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         style={{
-          background: 'white',
+          background: '#fafafa',
           borderRadius: '12px',
-          padding: '1rem',
           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          overflow: 'hidden',
+          overflow: 'auto',
           height: '65vh',
           cursor: isPanning ? 'grabbing' : 'grab',
           position: 'relative',
@@ -764,38 +772,43 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
           <div 
             ref={contentRef}
             style={{ 
-              transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoom / 100})`,
-              transformOrigin: 'center center',
-              transition: isPanning ? 'none' : 'transform 0.15s ease-out',
-              minHeight: '400px',
-              display: 'inline-block',
-              userSelect: 'none'
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: 'top left',
+              transition: 'transform 0.2s ease-out',
+              padding: '2rem',
+              minWidth: 'fit-content'
             }}
           >
-            <pre className="mermaid" style={{ 
-              background: 'transparent',
-              border: 'none',
-              fontSize: '14px',
-              pointerEvents: 'none'
-            }}>
+            <div 
+              id="mermaid-diagram"
+              className="mermaid" 
+              style={{ 
+                background: 'white',
+                padding: '1rem',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+              }}
+            >
               {mermaidCodeVisual}
-            </pre>
+            </div>
           </div>
         )}
         
         {/* Indicador de zoom en esquina */}
         <div style={{
-          position: 'absolute',
-          bottom: '10px',
-          right: '10px',
-          background: 'rgba(102, 126, 234, 0.9)',
+          position: 'fixed',
+          bottom: '80px',
+          right: '30px',
+          background: 'rgba(102, 126, 234, 0.95)',
           color: 'white',
-          padding: '4px 10px',
-          borderRadius: '4px',
-          fontSize: '11px',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '13px',
           fontWeight: '600',
-          pointerEvents: 'none'
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          zIndex: 1000
         }}>
+          <i className="fa fa-search" style={{ marginRight: '6px' }}></i>
           {zoom}%
         </div>
       </div>

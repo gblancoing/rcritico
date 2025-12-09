@@ -4,6 +4,12 @@
  * Maneja diferentes rutas donde pueden estar los archivos
  */
 
+// Iniciar buffer de salida para capturar cualquier output no deseado
+ob_start();
+
+// Limpiar cualquier BOM o espacios previos
+if (ob_get_level()) ob_end_clean();
+
 // Headers CORS
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, OPTIONS");
@@ -14,7 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Capturar output de includes
+ob_start();
 require_once __DIR__ . '/config/db.php';
+ob_end_clean(); // Limpiar cualquier output del include
 
 // Obtener ID del archivo
 $archivo_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -91,22 +100,43 @@ try {
         exit;
     }
     
-    // Determinar tipo MIME
-    $tipo_mime = $archivo['tipo_mime'];
-    if (!$tipo_mime) {
-        $tipo_mime = mime_content_type($ruta_encontrada) ?: 'application/octet-stream';
+    // Determinar tipo MIME - forzar para tipos conocidos
+    $extension = strtolower(pathinfo($ruta_encontrada, PATHINFO_EXTENSION));
+    $mimes_forzados = [
+        'pdf' => 'application/pdf',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    
+    if (isset($mimes_forzados[$extension])) {
+        $tipo_mime = $mimes_forzados[$extension];
+    } else {
+        $tipo_mime = $archivo['tipo_mime'];
+        if (!$tipo_mime) {
+            $tipo_mime = mime_content_type($ruta_encontrada) ?: 'application/octet-stream';
+        }
     }
     
     // Obtener tamaño del archivo
     $tamano = filesize($ruta_encontrada);
     
-    // Limpiar cualquier output previo
-    if (ob_get_level()) {
+    // CRÍTICO: Limpiar TODOS los buffers de output antes de enviar headers
+    while (ob_get_level()) {
         ob_end_clean();
     }
     
-    // Headers para descarga o visualización
-    header('Content-Type: ' . $tipo_mime);
+    // Remover headers que puedan interferir
+    @header_remove('Content-Type');
+    
+    // Headers para descarga o visualización - IMPORTANTE: Content-Type primero
+    header('Content-Type: ' . $tipo_mime, true); // true = reemplazar header anterior
     header('Content-Length: ' . $tamano);
     
     if ($accion === 'ver') {
@@ -133,4 +163,3 @@ try {
     exit;
 }
 ?>
-
