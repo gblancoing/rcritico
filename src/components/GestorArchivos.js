@@ -9411,7 +9411,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             </>
                           )}
                           {canDeleteFiles(user) && (
-                            <button onClick={async () => { if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id); } else { alert('Error: ' + data.error); } } catch (e) { alert('Error: ' + e.message); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }} title="Eliminar"><i className="fa fa-trash"></i></button>
+                            <button onClick={async () => { if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } else { alert('Error: ' + data.error); } } catch (e) { alert('Error: ' + e.message); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }} title="Eliminar"><i className="fa fa-trash"></i></button>
                         )}
                       </div>
                       </div>
@@ -9461,7 +9461,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       </>
                     )}
                     {canDeleteFiles(user) && (
-                                  <button onClick={async () => { if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id); } else { alert('Error: ' + data.error); } } catch (e) { alert('Error: ' + e.message); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }} title="Eliminar"><i className="fa fa-trash"></i></button>
+                                  <button onClick={async () => { if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } else { alert('Error: ' + data.error); } } catch (e) { alert('Error: ' + e.message); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }} title="Eliminar"><i className="fa fa-trash"></i></button>
                                 )}
                               </div>
                             </td>
@@ -9490,7 +9490,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         <div style={{ fontSize: '10px', color: '#999', marginTop: '5px' }}>{archivo.tamaño ? `${(archivo.tamaño / 1024).toFixed(1)} KB` : ''}</div>
                         <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', marginTop: '8px' }}>
                           {canDownloadFiles(user) && <button onClick={(e) => { e.stopPropagation(); window.open(`${API_BASE}/descargar_archivo.php?id=${archivo.id}&accion=descargar`, '_blank'); }} style={{ background: '#17a2b8', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} title="Descargar"><i className="fa fa-download"></i></button>}
-                          {canDeleteFiles(user) && <button onClick={async (e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id); } } catch (err) { alert('Error'); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} title="Eliminar"><i className="fa fa-trash"></i></button>}
+                          {canDeleteFiles(user) && <button onClick={async (e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } } catch (err) { alert('Error'); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} title="Eliminar"><i className="fa fa-trash"></i></button>}
                         </div>
                       </div>
                     );
@@ -9521,7 +9521,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               <button onClick={(e) => { e.stopPropagation(); window.open(`${API_BASE}/descargar_archivo.php?id=${archivo.id}&accion=descargar`, '_blank'); }} style={{ background: '#17a2b8', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '500' }} title="Descargar"><i className="fa fa-download"></i></button>
                             </>
                           )}
-                          {canDeleteFiles(user) && <button onClick={async (e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id); } } catch (err) { alert('Error'); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '500' }} title="Eliminar"><i className="fa fa-trash"></i></button>}
+                          {canDeleteFiles(user) && <button onClick={async (e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } } catch (err) { alert('Error'); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '500' }} title="Eliminar"><i className="fa fa-trash"></i></button>}
                   </div>
                 </div>
                     );
@@ -17160,7 +17160,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   onClick={() => {
                     setUploadProgress(null);
                     setArchivosSubiendo([]);
-                    cargarArchivos(carpetaActual.id);
+                    cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root');
                   }}
                   style={{
                     padding: '10px 20px',
