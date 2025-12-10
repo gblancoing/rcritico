@@ -118,9 +118,9 @@ try {
     if (isset($mimes_forzados[$extension])) {
         $tipo_mime = $mimes_forzados[$extension];
     } else {
-        $tipo_mime = $archivo['tipo_mime'];
-        if (!$tipo_mime) {
-            $tipo_mime = mime_content_type($ruta_encontrada) ?: 'application/octet-stream';
+    $tipo_mime = $archivo['tipo_mime'];
+    if (!$tipo_mime) {
+        $tipo_mime = mime_content_type($ruta_encontrada) ?: 'application/octet-stream';
         }
     }
     

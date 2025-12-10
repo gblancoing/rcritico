@@ -14,8 +14,7 @@ require_once __DIR__ . '/../config/db.php';
 // =====================================================
 // CONFIGURACIÓN DE GEMINI API
 // =====================================================
-// Puedes configurar la API key aquí o en variables de entorno
-$GEMINI_API_KEY = getenv('GEMINI_API_KEY') ?: 'TU_API_KEY_AQUI'; // Reemplazar con tu clave real
+$GEMINI_API_KEY = 'AIzaSyD15tuiCmV8A3gCcCkT3RsfLTlwNpdR9ck';
 $GEMINI_MODEL = 'gemini-1.5-flash'; // Modelo a usar (flash es más rápido, pro es más potente)
 $GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{$GEMINI_MODEL}:generateContent";
 
@@ -361,29 +360,44 @@ function buscarInformacionRelevante($pdo, $mensaje) {
         }
     }
     
-    // Si pregunta por empresas/contratistas
+    // Si pregunta por CUMPLIMIENTO o RANKING de empresas
+    if (preg_match('/(cumplimiento|ranking|mejor|peor|comparar|comparativa|todas las empresas|global)/i', $mensaje)) {
+        $info .= obtenerAnalisisCumplimientoEmpresas($pdo);
+    }
+    
+    // Si pregunta por empresas/contratistas específicos
     if (preg_match('/(empresa|contratista|subcarpeta)/i', $mensaje)) {
         try {
+            // Obtener empresas con sus estadísticas
             $stmt = $pdo->query("
-                SELECT c.nombre, p.nombre as padre_nombre
+                SELECT 
+                    c.id,
+                    c.nombre as empresa,
+                    p.nombre as riesgo_critico,
+                    COUNT(lb.id) as total_controles,
+                    ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as promedio_avance,
+                    SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados,
+                    SUM(CASE WHEN lb.estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as observaciones,
+                    SUM(CASE WHEN lb.estado_validacion IS NULL OR lb.estado_validacion = '' THEN 1 ELSE 0 END) as pendientes
                 FROM carpetas c
                 LEFT JOIN carpetas p ON c.carpeta_padre_id = p.id
+                LEFT JOIN carpeta_linea_base lb ON lb.carpeta_id = c.id AND lb.activo = 1
                 WHERE c.nivel = 2 AND c.activo = 1
-                ORDER BY c.nombre
-                LIMIT 20
+                GROUP BY c.id, c.nombre, p.nombre
+                ORDER BY promedio_avance DESC
+                LIMIT 30
             ");
             $empresas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             if (count($empresas) > 0) {
-                $info .= "\n### 🏢 EMPRESAS/CONTRATISTAS EN EL SISTEMA:\n";
-                $porPadre = [];
+                $info .= "\n### 🏢 EMPRESAS CON ESTADÍSTICAS:\n";
                 foreach ($empresas as $e) {
-                    $padre = $e['padre_nombre'] ?? 'Sin asignar';
-                    if (!isset($porPadre[$padre])) $porPadre[$padre] = [];
-                    $porPadre[$padre][] = $e['nombre'];
-                }
-                foreach ($porPadre as $padre => $emps) {
-                    $info .= "**{$padre}**: " . implode(", ", $emps) . "\n";
+                    $barra = $e['total_controles'] > 0 ? 
+                        str_repeat("█", round($e['promedio_avance'] / 10)) . str_repeat("░", 10 - round($e['promedio_avance'] / 10)) : 
+                        "Sin datos";
+                    $info .= "**{$e['empresa']}** ({$e['riesgo_critico']})\n";
+                    $info .= "  - Avance: {$e['promedio_avance']}% [{$barra}]\n";
+                    $info .= "  - Controles: {$e['total_controles']} (✅{$e['validados']} 🟡{$e['observaciones']} ⚪{$e['pendientes']})\n";
                 }
             }
         } catch (PDOException $e) {
@@ -391,7 +405,7 @@ function buscarInformacionRelevante($pdo, $mensaje) {
         }
     }
     
-    // Si pregunta por estadísticas o avance
+    // Si pregunta por estadísticas o avance general
     if (preg_match('/(estadística|avance|porcentaje|cuánto|validado|progreso)/i', $mensaje)) {
         try {
             $stmt = $pdo->query("
@@ -419,6 +433,232 @@ function buscarInformacionRelevante($pdo, $mensaje) {
         } catch (PDOException $e) {
             // Continuar
         }
+    }
+    
+    // Si pregunta por controles pendientes o con problemas
+    if (preg_match('/(pendiente|observación|problema|crítico|atrasado|sin validar|falta)/i', $mensaje)) {
+        $info .= obtenerControlesPendientes($pdo);
+    }
+    
+    // Si pregunta por dimensiones específicas (diseño, implementación, entrenamiento)
+    if (preg_match('/(diseño|implementación|implementacion|entrenamiento|capacitación|capacitacion)/i', $mensaje)) {
+        $info .= obtenerAnalisisPorDimension($pdo);
+    }
+    
+    return $info;
+}
+
+/**
+ * Obtener análisis de cumplimiento por empresa a nivel global
+ */
+function obtenerAnalisisCumplimientoEmpresas($pdo) {
+    $info = "\n### 📊 ANÁLISIS DE CUMPLIMIENTO GLOBAL POR EMPRESA:\n\n";
+    
+    try {
+        // Ranking de empresas por cumplimiento
+        $stmt = $pdo->query("
+            SELECT 
+                c.nombre as empresa,
+                p.nombre as riesgo_critico,
+                COUNT(lb.id) as total_controles,
+                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as cumplimiento,
+                SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados,
+                SUM(CASE WHEN lb.estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as con_observaciones,
+                SUM(CASE WHEN lb.estado_validacion IS NULL OR lb.estado_validacion = '' THEN 1 ELSE 0 END) as sin_validar,
+                ROUND(SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(lb.id), 0), 1) as pct_validados
+            FROM carpetas c
+            LEFT JOIN carpetas p ON c.carpeta_padre_id = p.id
+            LEFT JOIN carpeta_linea_base lb ON lb.carpeta_id = c.id AND lb.activo = 1
+            WHERE c.nivel = 2 AND c.activo = 1
+            GROUP BY c.id, c.nombre, p.nombre
+            HAVING total_controles > 0
+            ORDER BY cumplimiento DESC
+        ");
+        $empresas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($empresas) > 0) {
+            // Calcular promedio global
+            $totalCumplimiento = 0;
+            $totalEmpresas = count($empresas);
+            foreach ($empresas as $e) {
+                $totalCumplimiento += $e['cumplimiento'];
+            }
+            $promedioGlobal = round($totalCumplimiento / $totalEmpresas, 1);
+            
+            $info .= "**🌐 PROMEDIO GLOBAL DE CUMPLIMIENTO: {$promedioGlobal}%**\n\n";
+            
+            // Top 5 mejores
+            $info .= "**🏆 TOP 5 MEJORES EMPRESAS:**\n";
+            $top5 = array_slice($empresas, 0, 5);
+            foreach ($top5 as $i => $e) {
+                $medalla = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][$i];
+                $barra = str_repeat("█", round($e['cumplimiento'] / 10)) . str_repeat("░", 10 - round($e['cumplimiento'] / 10));
+                $info .= "{$medalla} **{$e['empresa']}**: {$e['cumplimiento']}% [{$barra}]\n";
+                $info .= "   📁 {$e['riesgo_critico']} | Controles: {$e['total_controles']} | ✅{$e['validados']} 🟡{$e['con_observaciones']} ⚪{$e['sin_validar']}\n";
+            }
+            
+            // Bottom 5 (si hay más de 5 empresas)
+            if (count($empresas) > 5) {
+                $info .= "\n**⚠️ EMPRESAS QUE REQUIEREN ATENCIÓN:**\n";
+                $bottom5 = array_slice($empresas, -5);
+                $bottom5 = array_reverse($bottom5);
+                foreach ($bottom5 as $e) {
+                    $barra = str_repeat("█", round($e['cumplimiento'] / 10)) . str_repeat("░", 10 - round($e['cumplimiento'] / 10));
+                    $info .= "⚠️ **{$e['empresa']}**: {$e['cumplimiento']}% [{$barra}]\n";
+                    $info .= "   📁 {$e['riesgo_critico']} | Pendientes: {$e['sin_validar']} | Con obs: {$e['con_observaciones']}\n";
+                }
+            }
+            
+            // Resumen estadístico
+            $info .= "\n**📈 RESUMEN ESTADÍSTICO:**\n";
+            $cumplimientos = array_column($empresas, 'cumplimiento');
+            $info .= "- Empresas evaluadas: " . count($empresas) . "\n";
+            $info .= "- Cumplimiento máximo: " . max($cumplimientos) . "%\n";
+            $info .= "- Cumplimiento mínimo: " . min($cumplimientos) . "%\n";
+            $info .= "- Promedio global: {$promedioGlobal}%\n";
+            
+            // Empresas por rango de cumplimiento
+            $excelente = count(array_filter($cumplimientos, fn($c) => $c >= 80));
+            $bueno = count(array_filter($cumplimientos, fn($c) => $c >= 60 && $c < 80));
+            $regular = count(array_filter($cumplimientos, fn($c) => $c >= 40 && $c < 60));
+            $bajo = count(array_filter($cumplimientos, fn($c) => $c < 40));
+            
+            $info .= "\n**📊 DISTRIBUCIÓN POR NIVEL:**\n";
+            $info .= "- 🟢 Excelente (≥80%): {$excelente} empresas\n";
+            $info .= "- 🔵 Bueno (60-79%): {$bueno} empresas\n";
+            $info .= "- 🟡 Regular (40-59%): {$regular} empresas\n";
+            $info .= "- 🔴 Bajo (<40%): {$bajo} empresas\n";
+        } else {
+            $info .= "No hay datos de cumplimiento disponibles.\n";
+        }
+    } catch (PDOException $e) {
+        $info .= "Error al obtener análisis: " . $e->getMessage() . "\n";
+    }
+    
+    return $info;
+}
+
+/**
+ * Obtener controles pendientes o con observaciones
+ */
+function obtenerControlesPendientes($pdo) {
+    $info = "\n### ⚠️ CONTROLES QUE REQUIEREN ATENCIÓN:\n\n";
+    
+    try {
+        // Controles con observaciones
+        $stmt = $pdo->query("
+            SELECT 
+                lb.codigo,
+                lb.pregunta,
+                lb.porcentaje_avance,
+                lb.comentario_validacion,
+                c.nombre as empresa,
+                p.nombre as riesgo
+            FROM carpeta_linea_base lb
+            JOIN carpetas c ON lb.carpeta_id = c.id
+            JOIN carpetas p ON c.carpeta_padre_id = p.id
+            WHERE lb.activo = 1 AND lb.estado_validacion = 'con_observaciones'
+            ORDER BY lb.porcentaje_avance ASC
+            LIMIT 10
+        ");
+        $conObservaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($conObservaciones) > 0) {
+            $info .= "**🟡 CONTROLES CON OBSERVACIONES:**\n";
+            foreach ($conObservaciones as $ctrl) {
+                $info .= "- **{$ctrl['codigo']}** ({$ctrl['empresa']} - {$ctrl['riesgo']})\n";
+                $info .= "  Avance: {$ctrl['porcentaje_avance']}%\n";
+                if ($ctrl['comentario_validacion']) {
+                    $info .= "  Obs: " . substr($ctrl['comentario_validacion'], 0, 100) . "\n";
+                }
+            }
+        }
+        
+        // Controles sin validar con bajo avance
+        $stmt = $pdo->query("
+            SELECT 
+                lb.codigo,
+                lb.pregunta,
+                lb.porcentaje_avance,
+                c.nombre as empresa,
+                p.nombre as riesgo
+            FROM carpeta_linea_base lb
+            JOIN carpetas c ON lb.carpeta_id = c.id
+            JOIN carpetas p ON c.carpeta_padre_id = p.id
+            WHERE lb.activo = 1 
+            AND (lb.estado_validacion IS NULL OR lb.estado_validacion = '')
+            AND COALESCE(lb.porcentaje_avance, 0) < 50
+            ORDER BY lb.porcentaje_avance ASC
+            LIMIT 10
+        ");
+        $sinValidar = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($sinValidar) > 0) {
+            $info .= "\n**⚪ CONTROLES SIN VALIDAR CON BAJO AVANCE (<50%):**\n";
+            foreach ($sinValidar as $ctrl) {
+                $info .= "- **{$ctrl['codigo']}** ({$ctrl['empresa']}): {$ctrl['porcentaje_avance']}%\n";
+            }
+        }
+        
+        // Resumen
+        $stmt = $pdo->query("
+            SELECT 
+                SUM(CASE WHEN estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as total_obs,
+                SUM(CASE WHEN (estado_validacion IS NULL OR estado_validacion = '') AND COALESCE(porcentaje_avance, 0) < 50 THEN 1 ELSE 0 END) as total_bajo
+            FROM carpeta_linea_base WHERE activo = 1
+        ");
+        $totales = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $info .= "\n**📊 TOTALES:**\n";
+        $info .= "- Controles con observaciones: {$totales['total_obs']}\n";
+        $info .= "- Controles con bajo avance sin validar: {$totales['total_bajo']}\n";
+        
+    } catch (PDOException $e) {
+        $info .= "Error al obtener controles pendientes.\n";
+    }
+    
+    return $info;
+}
+
+/**
+ * Obtener análisis por dimensión
+ */
+function obtenerAnalisisPorDimension($pdo) {
+    $info = "\n### 📐 ANÁLISIS POR DIMENSIÓN DE VERIFICACIÓN:\n\n";
+    
+    try {
+        $stmt = $pdo->query("
+            SELECT 
+                lb.dimension,
+                COUNT(*) as total,
+                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as promedio,
+                SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados
+            FROM carpeta_linea_base lb
+            WHERE lb.activo = 1 AND lb.dimension IS NOT NULL AND lb.dimension != ''
+            GROUP BY lb.dimension
+            ORDER BY promedio DESC
+        ");
+        $dimensiones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($dimensiones) > 0) {
+            foreach ($dimensiones as $d) {
+                $icono = '';
+                $dim = strtoupper($d['dimension']);
+                if (strpos($dim, 'DISEÑO') !== false || strpos($dim, 'DISENO') !== false) $icono = '📝';
+                elseif (strpos($dim, 'IMPLEMENT') !== false) $icono = '🔧';
+                elseif (strpos($dim, 'ENTRENA') !== false || strpos($dim, 'CAPACIT') !== false) $icono = '👨‍🎓';
+                else $icono = '📋';
+                
+                $barra = str_repeat("█", round($d['promedio'] / 10)) . str_repeat("░", 10 - round($d['promedio'] / 10));
+                $info .= "{$icono} **{$d['dimension']}**\n";
+                $info .= "   Avance: {$d['promedio']}% [{$barra}]\n";
+                $info .= "   Controles: {$d['total']} | Validados: {$d['validados']}\n\n";
+            }
+        } else {
+            $info .= "No hay datos de dimensiones disponibles.\n";
+        }
+    } catch (PDOException $e) {
+        $info .= "Error al obtener análisis por dimensión.\n";
     }
     
     return $info;
