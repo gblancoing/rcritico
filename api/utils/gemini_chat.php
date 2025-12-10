@@ -19,819 +19,401 @@ $GEMINI_MODEL = 'gemini-1.5-flash';
 $GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{$GEMINI_MODEL}:generateContent";
 
 // =====================================================
-// FUNCIONES DE ANÁLISIS AVANZADO
+// FUNCIONES DE DATOS
 // =====================================================
 
-/**
- * Obtener resumen ejecutivo del sistema
- */
-function obtenerResumenEjecutivo($pdo) {
-    $resumen = "\n### 📊 RESUMEN EJECUTIVO DEL SISTEMA:\n\n";
+function getDatosResumen($pdo) {
+    $data = [];
     
     try {
         // Totales generales
-        $stmt = $pdo->query("
-            SELECT 
-                (SELECT COUNT(*) FROM carpetas WHERE nivel = 1 AND activo = 1) as total_rc,
-                (SELECT COUNT(*) FROM carpetas WHERE nivel = 2 AND activo = 1) as total_empresas,
-                (SELECT COUNT(*) FROM carpeta_linea_base WHERE activo = 1) as total_controles_prev,
-                (SELECT COUNT(*) FROM carpeta_linea_base_mitigadores WHERE activo = 1) as total_controles_mit,
-                (SELECT COUNT(*) FROM usuarios WHERE aprobado = 1) as total_usuarios,
-                (SELECT COUNT(*) FROM carpeta_tareas WHERE activo = 1 AND estado != 'completada') as tareas_pendientes
-        ");
-        $totales = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $pdo->query("SELECT COUNT(*) as t FROM carpetas WHERE nivel = 1 AND activo = 1");
+        $data['riesgos_criticos'] = $stmt->fetch()['t'];
         
-        $resumen .= "**📈 NÚMEROS CLAVE:**\n";
-        $resumen .= "- Riesgos Críticos (RC): {$totales['total_rc']}\n";
-        $resumen .= "- Empresas/Contratistas: {$totales['total_empresas']}\n";
-        $resumen .= "- Controles Preventivos en Línea Base: {$totales['total_controles_prev']}\n";
-        $resumen .= "- Controles Mitigadores en Línea Base: {$totales['total_controles_mit']}\n";
-        $resumen .= "- Usuarios activos: {$totales['total_usuarios']}\n";
-        $resumen .= "- Tareas pendientes: {$totales['tareas_pendientes']}\n";
+        $stmt = $pdo->query("SELECT COUNT(*) as t FROM carpetas WHERE nivel = 2 AND activo = 1");
+        $data['empresas'] = $stmt->fetch()['t'];
         
-        // Promedios de avance
-        $stmt = $pdo->query("
-            SELECT 
-                ROUND(AVG(COALESCE(porcentaje_avance, 0)), 1) as promedio_prev,
-                SUM(CASE WHEN estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados_prev,
-                SUM(CASE WHEN estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as observaciones_prev
-            FROM carpeta_linea_base WHERE activo = 1
-        ");
-        $statsPrev = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $pdo->query("SELECT COUNT(*) as t, ROUND(AVG(COALESCE(porcentaje_avance,0)),1) as prom FROM carpeta_linea_base WHERE activo = 1");
+        $r = $stmt->fetch();
+        $data['ctrl_preventivos'] = $r['t'];
+        $data['avance_preventivos'] = $r['prom'] ?? 0;
         
-        $stmt = $pdo->query("
-            SELECT 
-                ROUND(AVG(COALESCE(porcentaje_avance, 0)), 1) as promedio_mit,
-                SUM(CASE WHEN estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados_mit,
-                SUM(CASE WHEN estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as observaciones_mit
-            FROM carpeta_linea_base_mitigadores WHERE activo = 1
-        ");
-        $statsMit = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $pdo->query("SELECT COUNT(*) as t, ROUND(AVG(COALESCE(porcentaje_avance,0)),1) as prom FROM carpeta_linea_base_mitigadores WHERE activo = 1");
+        $r = $stmt->fetch();
+        $data['ctrl_mitigadores'] = $r['t'];
+        $data['avance_mitigadores'] = $r['prom'] ?? 0;
         
-        $resumen .= "\n**🎯 ESTADO DE IMPLEMENTACIÓN:**\n";
-        $resumen .= "- Avance Controles Preventivos: {$statsPrev['promedio_prev']}% (✅{$statsPrev['validados_prev']} validados, 🟡{$statsPrev['observaciones_prev']} con obs)\n";
-        $resumen .= "- Avance Controles Mitigadores: {$statsMit['promedio_mit']}% (✅{$statsMit['validados_mit']} validados, 🟡{$statsMit['observaciones_mit']} con obs)\n";
+        // Validaciones
+        $stmt = $pdo->query("SELECT 
+            SUM(CASE WHEN estado_validacion='validado' THEN 1 ELSE 0 END) as val,
+            SUM(CASE WHEN estado_validacion='con_observaciones' THEN 1 ELSE 0 END) as obs
+            FROM carpeta_linea_base WHERE activo=1");
+        $r = $stmt->fetch();
+        $data['validados'] = $r['val'] ?? 0;
+        $data['con_observaciones'] = $r['obs'] ?? 0;
         
-    } catch (PDOException $e) {
-        $resumen .= "Error obteniendo resumen.\n";
-    }
+        // Tareas
+        $stmt = $pdo->query("SELECT 
+            SUM(CASE WHEN estado='pendiente' THEN 1 ELSE 0 END) as pend,
+            SUM(CASE WHEN estado='en_progreso' THEN 1 ELSE 0 END) as prog,
+            SUM(CASE WHEN prioridad='urgente' AND estado NOT IN ('completada','cancelada') THEN 1 ELSE 0 END) as urg
+            FROM carpeta_tareas WHERE activo=1");
+        $r = $stmt->fetch();
+        $data['tareas_pendientes'] = $r['pend'] ?? 0;
+        $data['tareas_en_progreso'] = $r['prog'] ?? 0;
+        $data['tareas_urgentes'] = $r['urg'] ?? 0;
+        
+    } catch (PDOException $e) {}
     
-    return $resumen;
+    return $data;
 }
 
-/**
- * Análisis detallado por empresa
- */
-function obtenerAnalisisEmpresas($pdo) {
-    $info = "\n### 🏢 ANÁLISIS DETALLADO POR EMPRESA:\n\n";
-    
+function getEmpresas($pdo) {
+    $empresas = [];
     try {
         $stmt = $pdo->query("
             SELECT 
-                c.id,
                 c.nombre as empresa,
-                p.nombre as riesgo_critico,
-                -- Controles Preventivos
-                COUNT(DISTINCT lb.id) as ctrl_prev_total,
-                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as prev_avance,
-                SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as prev_validados,
-                SUM(CASE WHEN lb.estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as prev_observaciones,
-                SUM(CASE WHEN lb.criticidad = 'Crítico' THEN 1 ELSE 0 END) as prev_criticos,
-                -- Controles Mitigadores
-                COUNT(DISTINCT lbm.id) as ctrl_mit_total,
-                ROUND(AVG(COALESCE(lbm.porcentaje_avance, 0)), 1) as mit_avance,
-                SUM(CASE WHEN lbm.estado_validacion = 'validado' THEN 1 ELSE 0 END) as mit_validados,
-                SUM(CASE WHEN lbm.estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as mit_observaciones
+                p.nombre as riesgo,
+                COUNT(lb.id) as controles,
+                ROUND(AVG(COALESCE(lb.porcentaje_avance,0)),1) as avance,
+                SUM(CASE WHEN lb.estado_validacion='validado' THEN 1 ELSE 0 END) as validados,
+                SUM(CASE WHEN lb.estado_validacion='con_observaciones' THEN 1 ELSE 0 END) as obs
             FROM carpetas c
             LEFT JOIN carpetas p ON c.carpeta_padre_id = p.id
             LEFT JOIN carpeta_linea_base lb ON lb.carpeta_id = c.id AND lb.activo = 1
-            LEFT JOIN carpeta_linea_base_mitigadores lbm ON lbm.carpeta_id = c.id AND lbm.activo = 1
             WHERE c.nivel = 2 AND c.activo = 1
             GROUP BY c.id, c.nombre, p.nombre
-            HAVING ctrl_prev_total > 0 OR ctrl_mit_total > 0
-            ORDER BY prev_avance DESC, mit_avance DESC
+            HAVING controles > 0
+            ORDER BY avance DESC
         ");
         $empresas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($empresas) > 0) {
-            foreach ($empresas as $e) {
-                $totalAvance = 0;
-                $count = 0;
-                if ($e['ctrl_prev_total'] > 0) { $totalAvance += $e['prev_avance']; $count++; }
-                if ($e['ctrl_mit_total'] > 0) { $totalAvance += $e['mit_avance']; $count++; }
-                $promedioGlobal = $count > 0 ? round($totalAvance / $count, 1) : 0;
-                
-                $barra = str_repeat("█", round($promedioGlobal / 10)) . str_repeat("░", 10 - round($promedioGlobal / 10));
-                $emoji = $promedioGlobal >= 80 ? "🟢" : ($promedioGlobal >= 50 ? "🟡" : "🔴");
-                
-                $info .= "{$emoji} **{$e['empresa']}** ({$e['riesgo_critico']})\n";
-                $info .= "   📊 Avance Global: **{$promedioGlobal}%** [{$barra}]\n";
-                
-                if ($e['ctrl_prev_total'] > 0) {
-                    $info .= "   🛡️ Preventivos: {$e['prev_avance']}% | Total: {$e['ctrl_prev_total']} (✅{$e['prev_validados']} 🟡{$e['prev_observaciones']} ⚠️{$e['prev_criticos']} críticos)\n";
-                }
-                if ($e['ctrl_mit_total'] > 0) {
-                    $info .= "   🔧 Mitigadores: {$e['mit_avance']}% | Total: {$e['ctrl_mit_total']} (✅{$e['mit_validados']} 🟡{$e['mit_observaciones']})\n";
-                }
-                $info .= "\n";
-            }
-        }
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
+    } catch (PDOException $e) {}
+    return $empresas;
 }
 
-/**
- * Análisis por dimensión (Diseño, Implementación, Entrenamiento)
- */
-function obtenerAnalisisDimensiones($pdo) {
-    $info = "\n### 📐 ANÁLISIS POR DIMENSIÓN DE VERIFICACIÓN:\n\n";
-    
-    try {
-        // Análisis de controles preventivos por dimensión
-        $stmt = $pdo->query("
-            SELECT 
-                COALESCE(lb.dimension, 'Sin dimensión') as dimension,
-                COUNT(*) as total,
-                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as promedio,
-                SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados,
-                SUM(CASE WHEN lb.estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as observaciones,
-                SUM(CASE WHEN lb.implementado_estandar = 'Sí' OR lb.implementado_estandar = 'SI' THEN 1 ELSE 0 END) as implementados
-            FROM carpeta_linea_base lb
-            WHERE lb.activo = 1 AND lb.dimension IS NOT NULL AND lb.dimension != ''
-            GROUP BY lb.dimension
-            ORDER BY promedio DESC
-        ");
-        $dimensiones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $info .= "**🛡️ CONTROLES PREVENTIVOS POR DIMENSIÓN:**\n";
-        foreach ($dimensiones as $d) {
-            $icono = '';
-            $dim = strtoupper($d['dimension']);
-            if (strpos($dim, 'DISEÑO') !== false || strpos($dim, 'DISENO') !== false) $icono = '📝';
-            elseif (strpos($dim, 'IMPLEMENT') !== false) $icono = '🔧';
-            elseif (strpos($dim, 'ENTRENA') !== false || strpos($dim, 'CAPACIT') !== false) $icono = '👨‍🎓';
-            else $icono = '📋';
-            
-            $barra = str_repeat("█", round($d['promedio'] / 10)) . str_repeat("░", 10 - round($d['promedio'] / 10));
-            $info .= "{$icono} **{$d['dimension']}**: {$d['promedio']}% [{$barra}]\n";
-            $info .= "   Total: {$d['total']} | ✅{$d['validados']} validados | 🟡{$d['observaciones']} obs | 🔧{$d['implementados']} implementados\n";
-        }
-        
-        // Mitigadores por dimensión
-        $stmt = $pdo->query("
-            SELECT 
-                COALESCE(lbm.dimension, 'Sin dimensión') as dimension,
-                COUNT(*) as total,
-                ROUND(AVG(COALESCE(lbm.porcentaje_avance, 0)), 1) as promedio,
-                SUM(CASE WHEN lbm.estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados
-            FROM carpeta_linea_base_mitigadores lbm
-            WHERE lbm.activo = 1 AND lbm.dimension IS NOT NULL AND lbm.dimension != ''
-            GROUP BY lbm.dimension
-            ORDER BY promedio DESC
-        ");
-        $dimMit = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($dimMit) > 0) {
-            $info .= "\n**🔧 CONTROLES MITIGADORES POR DIMENSIÓN:**\n";
-            foreach ($dimMit as $d) {
-                $barra = str_repeat("█", round($d['promedio'] / 10)) . str_repeat("░", 10 - round($d['promedio'] / 10));
-                $info .= "📋 **{$d['dimension']}**: {$d['promedio']}% [{$barra}] | Total: {$d['total']} | ✅{$d['validados']}\n";
-            }
-        }
-        
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
-}
-
-/**
- * Análisis de criticidad de controles
- */
-function obtenerAnalisisCriticidad($pdo) {
-    $info = "\n### ⚠️ ANÁLISIS DE CRITICIDAD:\n\n";
-    
-    try {
-        // Preventivos por criticidad
-        $stmt = $pdo->query("
-            SELECT 
-                COALESCE(lb.criticidad, 'Sin definir') as criticidad,
-                COUNT(*) as total,
-                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as promedio,
-                SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as validados,
-                SUM(CASE WHEN COALESCE(lb.porcentaje_avance, 0) < 50 THEN 1 ELSE 0 END) as bajo_avance
-            FROM carpeta_linea_base lb
-            WHERE lb.activo = 1
-            GROUP BY lb.criticidad
-            ORDER BY 
-                CASE lb.criticidad 
-                    WHEN 'Crítico' THEN 1 
-                    WHEN 'Alto' THEN 2 
-                    WHEN 'Medio' THEN 3 
-                    WHEN 'Bajo' THEN 4 
-                    ELSE 5 
-                END
-        ");
-        $criticidades = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $info .= "**🛡️ CONTROLES PREVENTIVOS POR CRITICIDAD:**\n";
-        foreach ($criticidades as $c) {
-            $emoji = '';
-            $crit = strtolower($c['criticidad']);
-            if (strpos($crit, 'crític') !== false || strpos($crit, 'critic') !== false) $emoji = '🔴';
-            elseif (strpos($crit, 'alto') !== false) $emoji = '🟠';
-            elseif (strpos($crit, 'medio') !== false) $emoji = '🟡';
-            else $emoji = '🟢';
-            
-            $barra = str_repeat("█", round($c['promedio'] / 10)) . str_repeat("░", 10 - round($c['promedio'] / 10));
-            $info .= "{$emoji} **{$c['criticidad']}**: {$c['promedio']}% [{$barra}]\n";
-            $info .= "   Total: {$c['total']} | ✅{$c['validados']} validados | ⚠️{$c['bajo_avance']} con bajo avance\n";
-        }
-        
-        // Controles críticos con bajo avance (ALERTA)
-        $stmt = $pdo->query("
-            SELECT 
-                lb.codigo,
-                lb.pregunta,
-                lb.porcentaje_avance,
-                lb.criticidad,
-                c.nombre as empresa,
-                p.nombre as riesgo
-            FROM carpeta_linea_base lb
-            JOIN carpetas c ON lb.carpeta_id = c.id
-            JOIN carpetas p ON c.carpeta_padre_id = p.id
-            WHERE lb.activo = 1 
-            AND (lb.criticidad LIKE '%Crítico%' OR lb.criticidad LIKE '%crítico%')
-            AND COALESCE(lb.porcentaje_avance, 0) < 50
-            ORDER BY lb.porcentaje_avance ASC
-            LIMIT 10
-        ");
-        $alertas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($alertas) > 0) {
-            $info .= "\n**🚨 ALERTA: CONTROLES CRÍTICOS CON BAJO AVANCE (<50%):**\n";
-            foreach ($alertas as $a) {
-                $info .= "⚠️ **{$a['codigo']}** ({$a['empresa']}): {$a['porcentaje_avance']}%\n";
-            }
-        }
-        
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
-}
-
-/**
- * Análisis de jerarquía de controles
- */
-function obtenerAnalisisJerarquia($pdo) {
-    $info = "\n### 🔺 ANÁLISIS POR JERARQUÍA DE CONTROLES:\n\n";
-    
+function getDimensiones($pdo) {
+    $dims = [];
     try {
         $stmt = $pdo->query("
             SELECT 
-                COALESCE(cp.jerarquia, 'Sin definir') as jerarquia,
+                dimension,
                 COUNT(*) as total,
-                SUM(CASE WHEN cp.criticidad LIKE '%Crítico%' THEN 1 ELSE 0 END) as criticos
-            FROM bowtie_controles_preventivos cp
-            WHERE cp.activo = 1
-            GROUP BY cp.jerarquia
-            ORDER BY 
-                CASE cp.jerarquia 
-                    WHEN 'Eliminación' THEN 1 
-                    WHEN 'Sustitución' THEN 2 
-                    WHEN 'Ingeniería' THEN 3 
-                    WHEN 'Administrativo' THEN 4 
-                    WHEN 'EPP' THEN 5 
-                    ELSE 6 
-                END
+                ROUND(AVG(COALESCE(porcentaje_avance,0)),1) as avance,
+                SUM(CASE WHEN estado_validacion='validado' THEN 1 ELSE 0 END) as validados
+            FROM carpeta_linea_base 
+            WHERE activo=1 AND dimension IS NOT NULL AND dimension != ''
+            GROUP BY dimension ORDER BY avance DESC
         ");
-        $jerarquias = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $info .= "**🛡️ CONTROLES PREVENTIVOS (BOWTIE):**\n";
-        $emojis = ['Eliminación' => '🚫', 'Sustitución' => '🔄', 'Ingeniería' => '⚙️', 'Administrativo' => '📋', 'EPP' => '🦺'];
-        foreach ($jerarquias as $j) {
-            $emoji = $emojis[$j['jerarquia']] ?? '📌';
-            $info .= "{$emoji} **{$j['jerarquia']}**: {$j['total']} controles ({$j['criticos']} críticos)\n";
-        }
-        
-        // Mitigadores
-        $stmt = $pdo->query("
-            SELECT 
-                COALESCE(cm.jerarquia, 'Sin definir') as jerarquia,
-                COUNT(*) as total
-            FROM bowtie_controles_mitigadores cm
-            WHERE cm.activo = 1
-            GROUP BY cm.jerarquia
-        ");
-        $jerarquiasMit = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($jerarquiasMit) > 0) {
-            $info .= "\n**🔧 CONTROLES MITIGADORES (BOWTIE):**\n";
-            foreach ($jerarquiasMit as $j) {
-                $emoji = $emojis[$j['jerarquia']] ?? '📌';
-                $info .= "{$emoji} **{$j['jerarquia']}**: {$j['total']} controles\n";
-            }
-        }
-        
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
+        $dims = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+    return $dims;
 }
 
-/**
- * Análisis de tareas
- */
-function obtenerAnalisisTareas($pdo) {
-    $info = "\n### 📋 ANÁLISIS DE TAREAS:\n\n";
-    
+function getCriticidad($pdo) {
+    $crit = [];
     try {
-        // Resumen de tareas
         $stmt = $pdo->query("
             SELECT 
-                estado,
-                prioridad,
-                COUNT(*) as total
-            FROM carpeta_tareas
-            WHERE activo = 1
-            GROUP BY estado, prioridad
-            ORDER BY 
-                FIELD(estado, 'pendiente', 'en_progreso', 'completada', 'cancelada'),
-                FIELD(prioridad, 'urgente', 'alta', 'media', 'baja')
+                COALESCE(criticidad,'Sin definir') as criticidad,
+                COUNT(*) as total,
+                ROUND(AVG(COALESCE(porcentaje_avance,0)),1) as avance,
+                SUM(CASE WHEN COALESCE(porcentaje_avance,0) < 50 THEN 1 ELSE 0 END) as bajo_avance
+            FROM carpeta_linea_base WHERE activo=1
+            GROUP BY criticidad ORDER BY avance ASC
+        ");
+        $crit = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+    return $crit;
+}
+
+function getTareas($pdo) {
+    $tareas = [];
+    try {
+        $stmt = $pdo->query("
+            SELECT t.titulo, t.estado, t.prioridad, t.fecha_vencimiento, c.nombre as carpeta, u.nombre as asignado
+            FROM carpeta_tareas t
+            JOIN carpetas c ON t.carpeta_id = c.id
+            LEFT JOIN usuarios u ON t.asignado_a = u.id
+            WHERE t.activo = 1 AND t.estado NOT IN ('completada','cancelada')
+            ORDER BY FIELD(t.prioridad,'urgente','alta','media','baja'), t.fecha_vencimiento
+            LIMIT 20
         ");
         $tareas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+    return $tareas;
+}
+
+function getAlertas($pdo) {
+    $alertas = [];
+    try {
+        // Críticos con bajo avance
+        $stmt = $pdo->query("SELECT COUNT(*) as t FROM carpeta_linea_base WHERE activo=1 AND criticidad LIKE '%rítico%' AND COALESCE(porcentaje_avance,0)<50");
+        $n = $stmt->fetch()['t'];
+        if ($n > 0) $alertas[] = ['tipo' => 'critico', 'mensaje' => "$n controles CRÍTICOS con avance menor al 50%"];
         
-        $porEstado = [];
-        $porPrioridad = [];
-        foreach ($tareas as $t) {
-            if (!isset($porEstado[$t['estado']])) $porEstado[$t['estado']] = 0;
-            $porEstado[$t['estado']] += $t['total'];
-            
-            if (!isset($porPrioridad[$t['prioridad']])) $porPrioridad[$t['prioridad']] = 0;
-            $porPrioridad[$t['prioridad']] += $t['total'];
-        }
-        
-        $emojisEstado = ['pendiente' => '⏳', 'en_progreso' => '🔄', 'completada' => '✅', 'cancelada' => '❌'];
-        $emojisPrioridad = ['urgente' => '🔴', 'alta' => '🟠', 'media' => '🟡', 'baja' => '🟢'];
-        
-        $info .= "**📊 POR ESTADO:**\n";
-        foreach ($porEstado as $estado => $total) {
-            $emoji = $emojisEstado[$estado] ?? '📌';
-            $info .= "{$emoji} " . ucfirst($estado) . ": {$total}\n";
-        }
-        
-        $info .= "\n**🎯 POR PRIORIDAD:**\n";
-        foreach ($porPrioridad as $prioridad => $total) {
-            $emoji = $emojisPrioridad[$prioridad] ?? '📌';
-            $info .= "{$emoji} " . ucfirst($prioridad) . ": {$total}\n";
-        }
+        // Con observaciones
+        $stmt = $pdo->query("SELECT COUNT(*) as t FROM carpeta_linea_base WHERE activo=1 AND estado_validacion='con_observaciones'");
+        $n = $stmt->fetch()['t'];
+        if ($n > 0) $alertas[] = ['tipo' => 'observacion', 'mensaje' => "$n controles con observaciones pendientes"];
         
         // Tareas vencidas
-        $stmt = $pdo->query("
-            SELECT 
-                t.titulo,
-                t.prioridad,
-                t.fecha_vencimiento,
-                c.nombre as carpeta,
-                u.nombre as asignado
-            FROM carpeta_tareas t
-            JOIN carpetas c ON t.carpeta_id = c.id
-            LEFT JOIN usuarios u ON t.asignado_a = u.id
-            WHERE t.activo = 1 
-            AND t.estado NOT IN ('completada', 'cancelada')
-            AND t.fecha_vencimiento < NOW()
-            ORDER BY t.fecha_vencimiento ASC
-            LIMIT 10
-        ");
-        $vencidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $pdo->query("SELECT COUNT(*) as t FROM carpeta_tareas WHERE activo=1 AND estado NOT IN ('completada','cancelada') AND fecha_vencimiento < NOW()");
+        $n = $stmt->fetch()['t'];
+        if ($n > 0) $alertas[] = ['tipo' => 'vencida', 'mensaje' => "$n tareas vencidas sin completar"];
         
-        if (count($vencidas) > 0) {
-            $info .= "\n**🚨 TAREAS VENCIDAS:**\n";
-            foreach ($vencidas as $t) {
-                $emoji = $emojisPrioridad[$t['prioridad']] ?? '📌';
-                $info .= "{$emoji} **{$t['titulo']}** ({$t['carpeta']})\n";
-                $info .= "   Vencida: {$t['fecha_vencimiento']} | Asignado: " . ($t['asignado'] ?? 'Sin asignar') . "\n";
-            }
-        }
+        // Urgentes
+        $stmt = $pdo->query("SELECT COUNT(*) as t FROM carpeta_tareas WHERE activo=1 AND estado='pendiente' AND prioridad='urgente'");
+        $n = $stmt->fetch()['t'];
+        if ($n > 0) $alertas[] = ['tipo' => 'urgente', 'mensaje' => "$n tareas URGENTES pendientes"];
         
-        // Tareas urgentes pendientes
-        $stmt = $pdo->query("
-            SELECT 
-                t.titulo,
-                t.fecha_vencimiento,
-                c.nombre as carpeta,
-                u.nombre as asignado
-            FROM carpeta_tareas t
-            JOIN carpetas c ON t.carpeta_id = c.id
-            LEFT JOIN usuarios u ON t.asignado_a = u.id
-            WHERE t.activo = 1 
-            AND t.estado = 'pendiente'
-            AND t.prioridad = 'urgente'
-            LIMIT 10
-        ");
-        $urgentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($urgentes) > 0) {
-            $info .= "\n**⚡ TAREAS URGENTES PENDIENTES:**\n";
-            foreach ($urgentes as $t) {
-                $info .= "🔴 **{$t['titulo']}** ({$t['carpeta']})\n";
-                $info .= "   Vence: " . ($t['fecha_vencimiento'] ?? 'Sin fecha') . " | Asignado: " . ($t['asignado'] ?? 'Sin asignar') . "\n";
-            }
-        }
-        
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
+    } catch (PDOException $e) {}
+    return $alertas;
 }
 
-/**
- * Análisis de responsables y validadores
- */
-function obtenerAnalisisResponsables($pdo) {
-    $info = "\n### 👥 ANÁLISIS POR RESPONSABLE:\n\n";
-    
+function getRiesgos($pdo) {
+    $riesgos = [];
     try {
-        // Validadores más activos
         $stmt = $pdo->query("
-            SELECT 
-                COALESCE(lb.usuario_validacion, 'Sin asignar') as validador,
-                COUNT(*) as total_validaciones,
-                SUM(CASE WHEN lb.estado_validacion = 'validado' THEN 1 ELSE 0 END) as aprobados,
-                SUM(CASE WHEN lb.estado_validacion = 'con_observaciones' THEN 1 ELSE 0 END) as con_observaciones
-            FROM carpeta_linea_base lb
-            WHERE lb.activo = 1 AND lb.usuario_validacion IS NOT NULL AND lb.usuario_validacion != ''
-            GROUP BY lb.usuario_validacion
-            ORDER BY total_validaciones DESC
-            LIMIT 10
+            SELECT c.nombre, c.evento_no_deseado,
+                (SELECT COUNT(*) FROM bowtie_causas bc JOIN carpeta_bowtie cb ON bc.bowtie_id=cb.id WHERE cb.carpeta_id=c.id AND bc.activo=1) as causas,
+                (SELECT COUNT(*) FROM bowtie_controles_preventivos bcp JOIN carpeta_bowtie cb ON bcp.bowtie_id=cb.id WHERE cb.carpeta_id=c.id AND bcp.activo=1) as ctrl_prev,
+                (SELECT COUNT(*) FROM bowtie_controles_mitigadores bcm JOIN carpeta_bowtie cb ON bcm.bowtie_id=cb.id WHERE cb.carpeta_id=c.id AND bcm.activo=1) as ctrl_mit,
+                (SELECT COUNT(*) FROM bowtie_consecuencias bco JOIN carpeta_bowtie cb ON bco.bowtie_id=cb.id WHERE cb.carpeta_id=c.id AND bco.activo=1) as consecuencias
+            FROM carpetas c WHERE c.nivel=1 AND c.activo=1 ORDER BY c.nombre
         ");
-        $validadores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($validadores) > 0) {
-            $info .= "**✅ VALIDADORES MÁS ACTIVOS (PREVENTIVOS):**\n";
-            foreach ($validadores as $v) {
-                $info .= "👤 **{$v['validador']}**: {$v['total_validaciones']} validaciones (✅{$v['aprobados']} 🟡{$v['con_observaciones']})\n";
-            }
-        }
-        
-        // Verificadores responsables
-        $stmt = $pdo->query("
-            SELECT 
-                COALESCE(lb.verificador_responsable, 'Sin asignar') as verificador,
-                COUNT(*) as total,
-                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as promedio_avance
-            FROM carpeta_linea_base lb
-            WHERE lb.activo = 1 AND lb.verificador_responsable IS NOT NULL AND lb.verificador_responsable != ''
-            GROUP BY lb.verificador_responsable
-            ORDER BY promedio_avance DESC
-            LIMIT 10
-        ");
-        $verificadores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($verificadores) > 0) {
-            $info .= "\n**🔍 VERIFICADORES RESPONSABLES:**\n";
-            foreach ($verificadores as $v) {
-                $barra = str_repeat("█", round($v['promedio_avance'] / 10)) . str_repeat("░", 10 - round($v['promedio_avance'] / 10));
-                $info .= "👤 **{$v['verificador']}**: {$v['total']} controles | Avance: {$v['promedio_avance']}% [{$barra}]\n";
-            }
-        }
-        
-        // Dueños de control
-        $stmt = $pdo->query("
-            SELECT 
-                COALESCE(lb.nombre_dueno_control, 'Sin asignar') as dueno,
-                COUNT(*) as total,
-                ROUND(AVG(COALESCE(lb.porcentaje_avance, 0)), 1) as promedio
-            FROM carpeta_linea_base lb
-            WHERE lb.activo = 1 AND lb.nombre_dueno_control IS NOT NULL AND lb.nombre_dueno_control != ''
-            GROUP BY lb.nombre_dueno_control
-            ORDER BY total DESC
-            LIMIT 10
-        ");
-        $duenos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($duenos) > 0) {
-            $info .= "\n**👔 DUEÑOS DE CONTROL:**\n";
-            foreach ($duenos as $d) {
-                $info .= "👤 **{$d['dueno']}**: {$d['total']} controles | Avance promedio: {$d['promedio']}%\n";
-            }
-        }
-        
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
+        $riesgos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+    return $riesgos;
 }
 
-/**
- * Análisis de BOWTIE (causas y consecuencias)
- */
-function obtenerAnalisisBowtie($pdo) {
-    $info = "\n### 🎯 ANÁLISIS DE BOWTIE:\n\n";
-    
-    try {
-        // Resumen por riesgo crítico
-        $stmt = $pdo->query("
-            SELECT 
-                c.nombre as riesgo,
-                c.evento_no_deseado,
-                (SELECT COUNT(*) FROM bowtie_causas bc WHERE bc.bowtie_id = cb.id AND bc.activo = 1) as causas,
-                (SELECT COUNT(*) FROM bowtie_consecuencias bco WHERE bco.bowtie_id = cb.id AND bco.activo = 1) as consecuencias,
-                (SELECT COUNT(*) FROM bowtie_controles_preventivos bcp WHERE bcp.bowtie_id = cb.id AND bcp.activo = 1) as ctrl_prev,
-                (SELECT COUNT(*) FROM bowtie_controles_mitigadores bcm WHERE bcm.bowtie_id = cb.id AND bcm.activo = 1) as ctrl_mit
-            FROM carpeta_bowtie cb
-            JOIN carpetas c ON cb.carpeta_id = c.id
-            WHERE cb.activo = 1 AND c.activo = 1
-            ORDER BY c.nombre
-        ");
-        $bowties = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (count($bowties) > 0) {
-            foreach ($bowties as $b) {
-                $info .= "**🎯 {$b['riesgo']}**\n";
-                if ($b['evento_no_deseado']) {
-                    $info .= "   ⚠️ Evento: " . substr($b['evento_no_deseado'], 0, 100) . "\n";
-                }
-                $info .= "   🔴 Causas: {$b['causas']} | 🛡️ Ctrl Prev: {$b['ctrl_prev']} | 🔧 Ctrl Mit: {$b['ctrl_mit']} | 🔵 Consecuencias: {$b['consecuencias']}\n\n";
-            }
-        }
-        
-        // Total de elementos Bowtie
-        $stmt = $pdo->query("
-            SELECT 
-                (SELECT COUNT(*) FROM bowtie_causas WHERE activo = 1) as total_causas,
-                (SELECT COUNT(*) FROM bowtie_consecuencias WHERE activo = 1) as total_consecuencias,
-                (SELECT COUNT(*) FROM bowtie_controles_preventivos WHERE activo = 1) as total_prev,
-                (SELECT COUNT(*) FROM bowtie_controles_mitigadores WHERE activo = 1) as total_mit,
-                (SELECT COUNT(*) FROM bowtie_dimensiones WHERE activo = 1) as total_dimensiones,
-                (SELECT COUNT(*) FROM bowtie_preguntas WHERE activo = 1) as total_preguntas
-        ");
-        $totales = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        $info .= "**📊 TOTALES GLOBALES BOWTIE:**\n";
-        $info .= "- 🔴 Causas identificadas: {$totales['total_causas']}\n";
-        $info .= "- 🔵 Consecuencias identificadas: {$totales['total_consecuencias']}\n";
-        $info .= "- 🛡️ Controles Preventivos: {$totales['total_prev']}\n";
-        $info .= "- 🔧 Controles Mitigadores: {$totales['total_mit']}\n";
-        $info .= "- 📐 Dimensiones: {$totales['total_dimensiones']}\n";
-        $info .= "- ❓ Preguntas de verificación: {$totales['total_preguntas']}\n";
-        
-    } catch (PDOException $e) {
-        $info .= "Error: " . $e->getMessage() . "\n";
-    }
-    
-    return $info;
-}
+// =====================================================
+// GENERAR RESPUESTA FORMATEADA
+// =====================================================
 
-/**
- * Alertas y problemas detectados
- */
-function obtenerAlertas($pdo) {
-    $info = "\n### 🚨 ALERTAS Y PROBLEMAS DETECTADOS:\n\n";
-    $alertas = [];
+function generarRespuestaDirecta($pdo, $mensaje) {
+    $msg = mb_strtolower($mensaje, 'UTF-8');
+    $respuesta = "";
     
-    try {
-        // 1. Controles críticos con bajo avance
-        $stmt = $pdo->query("
-            SELECT COUNT(*) as total
-            FROM carpeta_linea_base 
-            WHERE activo = 1 
-            AND (criticidad LIKE '%Crítico%' OR criticidad LIKE '%crítico%')
-            AND COALESCE(porcentaje_avance, 0) < 50
-        ");
-        $criticos = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-        if ($criticos > 0) {
-            $alertas[] = "🔴 **{$criticos} controles CRÍTICOS** con avance menor al 50%";
-        }
+    // RESUMEN EJECUTIVO
+    if (preg_match('/(resumen|ejecutivo|general|dashboard|estado del sistema|cómo está|como esta)/i', $mensaje)) {
+        $d = getDatosResumen($pdo);
+        $respuesta = "## 📊 RESUMEN EJECUTIVO DEL SISTEMA\n\n";
+        $respuesta .= "### 📈 Indicadores Principales\n\n";
+        $respuesta .= "| Indicador | Valor |\n";
+        $respuesta .= "|-----------|-------|\n";
+        $respuesta .= "| Riesgos Críticos | **{$d['riesgos_criticos']}** |\n";
+        $respuesta .= "| Empresas/Contratistas | **{$d['empresas']}** |\n";
+        $respuesta .= "| Controles Preventivos | **{$d['ctrl_preventivos']}** ({$d['avance_preventivos']}% avance) |\n";
+        $respuesta .= "| Controles Mitigadores | **{$d['ctrl_mitigadores']}** ({$d['avance_mitigadores']}% avance) |\n";
+        $respuesta .= "| Controles Validados | **{$d['validados']}** ✅ |\n";
+        $respuesta .= "| Con Observaciones | **{$d['con_observaciones']}** 🟡 |\n\n";
         
-        // 2. Controles con observaciones sin resolver
-        $stmt = $pdo->query("
-            SELECT COUNT(*) as total
-            FROM carpeta_linea_base 
-            WHERE activo = 1 AND estado_validacion = 'con_observaciones'
-        ");
-        $obsTotal = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-        if ($obsTotal > 0) {
-            $alertas[] = "🟡 **{$obsTotal} controles** con observaciones pendientes de resolver";
-        }
+        $respuesta .= "### 📋 Tareas\n\n";
+        $respuesta .= "- ⏳ Pendientes: **{$d['tareas_pendientes']}**\n";
+        $respuesta .= "- 🔄 En progreso: **{$d['tareas_en_progreso']}**\n";
+        $respuesta .= "- 🔴 Urgentes: **{$d['tareas_urgentes']}**\n\n";
         
-        // 3. Tareas vencidas
-        $stmt = $pdo->query("
-            SELECT COUNT(*) as total
-            FROM carpeta_tareas 
-            WHERE activo = 1 
-            AND estado NOT IN ('completada', 'cancelada')
-            AND fecha_vencimiento < NOW()
-        ");
-        $tareasVencidas = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-        if ($tareasVencidas > 0) {
-            $alertas[] = "⏰ **{$tareasVencidas} tareas vencidas** sin completar";
-        }
-        
-        // 4. Tareas urgentes pendientes
-        $stmt = $pdo->query("
-            SELECT COUNT(*) as total
-            FROM carpeta_tareas 
-            WHERE activo = 1 
-            AND estado = 'pendiente'
-            AND prioridad = 'urgente'
-        ");
-        $urgentes = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-        if ($urgentes > 0) {
-            $alertas[] = "⚡ **{$urgentes} tareas URGENTES** pendientes";
-        }
-        
-        // 5. Empresas con bajo cumplimiento
-        $stmt = $pdo->query("
-            SELECT COUNT(*) as total FROM (
-                SELECT c.id
-                FROM carpetas c
-                LEFT JOIN carpeta_linea_base lb ON lb.carpeta_id = c.id AND lb.activo = 1
-                WHERE c.nivel = 2 AND c.activo = 1
-                GROUP BY c.id
-                HAVING AVG(COALESCE(lb.porcentaje_avance, 0)) < 30 AND COUNT(lb.id) > 0
-            ) as empresas_bajo
-        ");
-        $empresasBajo = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-        if ($empresasBajo > 0) {
-            $alertas[] = "📉 **{$empresasBajo} empresas** con cumplimiento menor al 30%";
-        }
-        
-        // 6. Controles sin verificador asignado
-        $stmt = $pdo->query("
-            SELECT COUNT(*) as total
-            FROM carpeta_linea_base 
-            WHERE activo = 1 
-            AND (verificador_responsable IS NULL OR verificador_responsable = '')
-        ");
-        $sinVerificador = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-        if ($sinVerificador > 0) {
-            $alertas[] = "👤 **{$sinVerificador} controles** sin verificador responsable asignado";
-        }
-        
+        $alertas = getAlertas($pdo);
         if (count($alertas) > 0) {
-            foreach ($alertas as $alerta) {
-                $info .= "• {$alerta}\n";
+            $respuesta .= "### 🚨 Alertas Activas\n\n";
+            foreach ($alertas as $a) {
+                $emoji = $a['tipo'] == 'critico' ? '🔴' : ($a['tipo'] == 'urgente' ? '⚡' : '🟡');
+                $respuesta .= "- {$emoji} {$a['mensaje']}\n";
+            }
+        }
+        return $respuesta;
+    }
+    
+    // EMPRESAS / CUMPLIMIENTO
+    if (preg_match('/(empresa|contratista|cumplimiento|ranking|comparar|quién|quien|mejor|peor)/i', $mensaje)) {
+        $empresas = getEmpresas($pdo);
+        $respuesta = "## 🏢 CUMPLIMIENTO POR EMPRESA\n\n";
+        
+        if (count($empresas) > 0) {
+            $respuesta .= "| # | Empresa | Riesgo | Avance | Controles | Validados | Obs |\n";
+            $respuesta .= "|---|---------|--------|--------|-----------|-----------|-----|\n";
+            
+            foreach ($empresas as $i => $e) {
+                $pos = $i + 1;
+                $emoji = $e['avance'] >= 80 ? '🟢' : ($e['avance'] >= 50 ? '🟡' : '🔴');
+                $respuesta .= "| {$pos} | **{$e['empresa']}** | {$e['riesgo']} | {$emoji} {$e['avance']}% | {$e['controles']} | {$e['validados']} | {$e['obs']} |\n";
+            }
+            
+            // Calcular promedios
+            $totalAvance = array_sum(array_column($empresas, 'avance'));
+            $promedio = round($totalAvance / count($empresas), 1);
+            $respuesta .= "\n**📊 Promedio Global: {$promedio}%**\n\n";
+            
+            // Top y Bottom
+            $mejor = $empresas[0];
+            $peor = end($empresas);
+            $respuesta .= "🏆 **Mejor:** {$mejor['empresa']} ({$mejor['avance']}%)\n";
+            $respuesta .= "⚠️ **Requiere atención:** {$peor['empresa']} ({$peor['avance']}%)\n";
+        } else {
+            $respuesta .= "No hay datos de empresas con controles registrados.\n";
+        }
+        return $respuesta;
+    }
+    
+    // DIMENSIONES
+    if (preg_match('/(dimensión|dimension|diseño|implementación|implementacion|entrenamiento)/i', $mensaje)) {
+        $dims = getDimensiones($pdo);
+        $respuesta = "## 📐 AVANCE POR DIMENSIÓN\n\n";
+        
+        if (count($dims) > 0) {
+            $respuesta .= "| Dimensión | Avance | Total | Validados |\n";
+            $respuesta .= "|-----------|--------|-------|----------|\n";
+            
+            foreach ($dims as $d) {
+                $emoji = $d['avance'] >= 80 ? '🟢' : ($d['avance'] >= 50 ? '🟡' : '🔴');
+                $icono = '';
+                if (stripos($d['dimension'], 'diseño') !== false) $icono = '📝';
+                elseif (stripos($d['dimension'], 'implement') !== false) $icono = '🔧';
+                elseif (stripos($d['dimension'], 'entrena') !== false) $icono = '👨‍🎓';
+                else $icono = '📋';
+                
+                $respuesta .= "| {$icono} **{$d['dimension']}** | {$emoji} {$d['avance']}% | {$d['total']} | {$d['validados']} ✅ |\n";
             }
         } else {
-            $info .= "✅ No se detectaron alertas críticas en este momento.\n";
+            $respuesta .= "No hay datos de dimensiones registrados.\n";
         }
-        
-    } catch (PDOException $e) {
-        $info .= "Error verificando alertas.\n";
+        return $respuesta;
     }
     
-    return $info;
+    // CRITICIDAD
+    if (preg_match('/(crítico|critico|criticidad|prioridad|riesgo alto|urgente)/i', $mensaje)) {
+        $crit = getCriticidad($pdo);
+        $respuesta = "## ⚠️ ANÁLISIS POR CRITICIDAD\n\n";
+        
+        if (count($crit) > 0) {
+            $respuesta .= "| Criticidad | Avance | Total | Bajo Avance (<50%) |\n";
+            $respuesta .= "|------------|--------|-------|-------------------|\n";
+            
+            foreach ($crit as $c) {
+                $emoji = '';
+                if (stripos($c['criticidad'], 'crítico') !== false) $emoji = '🔴';
+                elseif (stripos($c['criticidad'], 'alto') !== false) $emoji = '🟠';
+                elseif (stripos($c['criticidad'], 'medio') !== false) $emoji = '🟡';
+                else $emoji = '🟢';
+                
+                $respuesta .= "| {$emoji} **{$c['criticidad']}** | {$c['avance']}% | {$c['total']} | {$c['bajo_avance']} ⚠️ |\n";
+            }
+        }
+        return $respuesta;
+    }
+    
+    // TAREAS
+    if (preg_match('/(tarea|pendiente|asignación|asignacion|vencida|urgente)/i', $mensaje)) {
+        $tareas = getTareas($pdo);
+        $respuesta = "## 📋 TAREAS PENDIENTES\n\n";
+        
+        if (count($tareas) > 0) {
+            $respuesta .= "| Prioridad | Tarea | Carpeta | Asignado | Vence |\n";
+            $respuesta .= "|-----------|-------|---------|----------|-------|\n";
+            
+            foreach ($tareas as $t) {
+                $emoji = '';
+                if ($t['prioridad'] == 'urgente') $emoji = '🔴';
+                elseif ($t['prioridad'] == 'alta') $emoji = '🟠';
+                elseif ($t['prioridad'] == 'media') $emoji = '🟡';
+                else $emoji = '🟢';
+                
+                $asig = $t['asignado'] ?? 'Sin asignar';
+                $vence = $t['fecha_vencimiento'] ? date('d/m/Y', strtotime($t['fecha_vencimiento'])) : '-';
+                $titulo = mb_substr($t['titulo'], 0, 30, 'UTF-8');
+                
+                $respuesta .= "| {$emoji} {$t['prioridad']} | {$titulo} | {$t['carpeta']} | {$asig} | {$vence} |\n";
+            }
+        } else {
+            $respuesta .= "✅ No hay tareas pendientes.\n";
+        }
+        return $respuesta;
+    }
+    
+    // ALERTAS
+    if (preg_match('/(alerta|problema|atención|atencion|revisar)/i', $mensaje)) {
+        $alertas = getAlertas($pdo);
+        $respuesta = "## 🚨 ALERTAS DEL SISTEMA\n\n";
+        
+        if (count($alertas) > 0) {
+            foreach ($alertas as $a) {
+                $emoji = $a['tipo'] == 'critico' ? '🔴' : ($a['tipo'] == 'urgente' ? '⚡' : ($a['tipo'] == 'vencida' ? '⏰' : '🟡'));
+                $respuesta .= "### {$emoji} {$a['mensaje']}\n\n";
+            }
+        } else {
+            $respuesta .= "✅ **No hay alertas activas.** Todo está en orden.\n";
+        }
+        return $respuesta;
+    }
+    
+    // BOWTIE / RIESGOS
+    if (preg_match('/(bowtie|riesgo|causa|consecuencia|preventivo|mitigador)/i', $mensaje)) {
+        $riesgos = getRiesgos($pdo);
+        $respuesta = "## 🎯 ANÁLISIS BOWTIE POR RIESGO\n\n";
+        
+        if (count($riesgos) > 0) {
+            $respuesta .= "| Riesgo Crítico | Causas | Ctrl Prev | Ctrl Mit | Consec |\n";
+            $respuesta .= "|----------------|--------|-----------|----------|--------|\n";
+            
+            foreach ($riesgos as $r) {
+                $nombre = mb_substr($r['nombre'], 0, 25, 'UTF-8');
+                $respuesta .= "| **{$nombre}** | {$r['causas']} | {$r['ctrl_prev']} | {$r['ctrl_mit']} | {$r['consecuencias']} |\n";
+            }
+            
+            $respuesta .= "\n**Leyenda:** Ctrl Prev = Controles Preventivos, Ctrl Mit = Controles Mitigadores, Consec = Consecuencias\n";
+        }
+        return $respuesta;
+    }
+    
+    // AYUDA
+    if (preg_match('/(ayuda|help|qué puedes|que puedes|cómo funciona|como funciona)/i', $mensaje)) {
+        $respuesta = "## 🤖 ¿Qué puedo hacer?\n\n";
+        $respuesta .= "Soy tu asistente de análisis de Riesgos Críticos. Puedo responder:\n\n";
+        $respuesta .= "| Pregunta | Qué obtienes |\n";
+        $respuesta .= "|----------|-------------|\n";
+        $respuesta .= "| \"Dame un resumen ejecutivo\" | Dashboard con todos los indicadores |\n";
+        $respuesta .= "| \"¿Cuál es el cumplimiento por empresa?\" | Ranking de empresas con % avance |\n";
+        $respuesta .= "| \"Analiza por dimensión\" | Avance en Diseño, Implementación, Entrenamiento |\n";
+        $respuesta .= "| \"¿Qué controles críticos hay?\" | Análisis por criticidad |\n";
+        $respuesta .= "| \"¿Qué tareas hay pendientes?\" | Lista de tareas con prioridad |\n";
+        $respuesta .= "| \"¿Hay alertas?\" | Problemas que requieren atención |\n";
+        $respuesta .= "| \"Análisis Bowtie\" | Resumen de riesgos con causas y controles |\n";
+        return $respuesta;
+    }
+    
+    return null; // No se detectó intención, usar Gemini
 }
 
-/**
- * Generar contexto completo del sistema para Gemini
- */
-function generarContextoSistema($pdo, $carpetaId = null) {
-    $contexto = "
-# SISTEMA DE GESTIÓN DE RIESGOS CRÍTICOS - CODELCO
+// =====================================================
+// LLAMAR A GEMINI (solo si no hay respuesta directa)
+// =====================================================
 
-Eres un asistente experto en Gestión de Riesgos Críticos, Seguridad Industrial y la metodología Bowtie. 
-Tu rol es analizar datos y proporcionar insights valiosos sobre el estado del sistema SSO.
+function llamarGemini($mensaje, $datos, $apiKey, $apiUrl) {
+    $contexto = "Eres un asistente experto en gestión de riesgos críticos y seguridad industrial.
+    
+DATOS ACTUALES DEL SISTEMA:
+" . json_encode($datos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "
 
-## 📊 DATOS EN TIEMPO REAL DEL SISTEMA:
-";
-    
-    // Agregar datos reales
-    $contexto .= obtenerResumenEjecutivo($pdo);
-    $contexto .= obtenerAlertas($pdo);
-    
-    // Si hay carpeta específica, agregar su contexto
-    if ($carpetaId) {
-        $contexto .= obtenerContextoCarpetaDetallado($pdo, $carpetaId);
-    }
-    
-    $contexto .= "
-
-## 🎯 INSTRUCCIONES:
+INSTRUCCIONES:
 1. Responde SIEMPRE en español
-2. Usa los datos reales proporcionados arriba
-3. Sé específico con números y porcentajes
-4. Identifica problemas y sugiere mejoras
-5. Usa emojis para hacer las respuestas más claras
-6. Si te piden análisis específicos, genera las estadísticas relevantes
-7. Prioriza la seguridad en tus recomendaciones
-";
-    
-    return $contexto;
-}
+2. Usa los datos proporcionados para dar respuestas específicas
+3. Formatea con markdown: usa ## para títulos, **negrita**, tablas, listas
+4. Sé conciso pero completo
+5. Incluye números y porcentajes cuando sea relevante
+6. Usa emojis para hacer la respuesta más visual
 
-/**
- * Obtener contexto detallado de una carpeta
- */
-function obtenerContextoCarpetaDetallado($pdo, $carpetaId) {
-    $contexto = "\n### 📂 CONTEXTO DE LA CARPETA ACTUAL:\n";
-    
-    try {
-        $stmt = $pdo->prepare("SELECT * FROM carpetas WHERE id = ?");
-        $stmt->execute([$carpetaId]);
-        $carpeta = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($carpeta) {
-            $contexto .= "Nombre: {$carpeta['nombre']}\n";
-            $contexto .= "Nivel: {$carpeta['nivel']}\n";
-            if ($carpeta['evento_no_deseado']) $contexto .= "Evento No Deseado: {$carpeta['evento_no_deseado']}\n";
-            if ($carpeta['evento_riesgo']) $contexto .= "Evento de Riesgo: {$carpeta['evento_riesgo']}\n";
-        }
-    } catch (PDOException $e) {}
-    
-    return $contexto;
-}
+PREGUNTA DEL USUARIO: " . $mensaje;
 
-/**
- * Buscar información relevante según la pregunta
- */
-function buscarInformacionRelevante($pdo, $mensaje) {
-    $info = "";
-    $mensajeLower = mb_strtolower($mensaje, 'UTF-8');
-    
-    // Detectar tipo de análisis solicitado
-    if (preg_match('/(resumen|ejecutivo|general|dashboard|overview)/i', $mensaje)) {
-        $info .= obtenerResumenEjecutivo($pdo);
-    }
-    
-    if (preg_match('/(empresa|contratista|cumplimiento|ranking|comparar)/i', $mensaje)) {
-        $info .= obtenerAnalisisEmpresas($pdo);
-    }
-    
-    if (preg_match('/(dimensión|dimension|diseño|implementación|entrenamiento)/i', $mensaje)) {
-        $info .= obtenerAnalisisDimensiones($pdo);
-    }
-    
-    if (preg_match('/(crítico|critico|criticidad|prioridad|riesgo alto)/i', $mensaje)) {
-        $info .= obtenerAnalisisCriticidad($pdo);
-    }
-    
-    if (preg_match('/(jerarquía|jerarquia|eliminación|sustitución|ingeniería|epp)/i', $mensaje)) {
-        $info .= obtenerAnalisisJerarquia($pdo);
-    }
-    
-    if (preg_match('/(tarea|pendiente|vencida|asignación|urgente)/i', $mensaje)) {
-        $info .= obtenerAnalisisTareas($pdo);
-    }
-    
-    if (preg_match('/(responsable|validador|verificador|dueño|quien|quién)/i', $mensaje)) {
-        $info .= obtenerAnalisisResponsables($pdo);
-    }
-    
-    if (preg_match('/(bowtie|causa|consecuencia|preventivo|mitigador)/i', $mensaje)) {
-        $info .= obtenerAnalisisBowtie($pdo);
-    }
-    
-    if (preg_match('/(alerta|problema|atención|urgente|crítico)/i', $mensaje)) {
-        $info .= obtenerAlertas($pdo);
-    }
-    
-    // Si no se detectó nada específico, dar resumen general
-    if (empty($info)) {
-        $info .= obtenerResumenEjecutivo($pdo);
-        $info .= obtenerAlertas($pdo);
-    }
-    
-    return $info;
-}
-
-/**
- * Llamar a la API de Gemini
- */
-function llamarGeminiAPI($mensaje, $contexto, $apiKey, $apiUrl) {
-    if (empty($apiKey) || $apiKey === 'TU_API_KEY_AQUI') {
-        return null;
-    }
-    
-    $url = $apiUrl . "?key=" . $apiKey;
-    
     $data = [
-        'contents' => [
-            [
-                'parts' => [
-                    ['text' => $contexto . "\n\n---\n\n## PREGUNTA DEL USUARIO:\n" . $mensaje]
-                ]
-            ]
-        ],
+        'contents' => [['parts' => [['text' => $contexto]]]],
         'generationConfig' => [
             'temperature' => 0.7,
-            'topK' => 40,
-            'topP' => 0.95,
-            'maxOutputTokens' => 4096,
+            'maxOutputTokens' => 2048,
         ]
     ];
     
-    $ch = curl_init($url);
+    $ch = curl_init($apiUrl . "?key=" . $apiKey);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -854,64 +436,52 @@ function llamarGeminiAPI($mensaje, $contexto, $apiKey, $apiUrl) {
 }
 
 // =====================================================
-// PROCESAR SOLICITUDES
+// PROCESAR SOLICITUD
 // =====================================================
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     $message = trim($data['message'] ?? '');
-    $carpetaId = $data['carpeta_id'] ?? null;
     
     if (empty($message)) {
-        http_response_code(400);
         echo json_encode(['error' => 'Mensaje vacío'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     
-    try {
-        // Generar contexto base
-        $contexto = generarContextoSistema($pdo, $carpetaId);
-        
-        // Buscar información específica según la pregunta
-        $infoRelevante = buscarInformacionRelevante($pdo, $message);
-        $contexto .= "\n\n## 📈 DATOS ESPECÍFICOS PARA TU CONSULTA:\n" . $infoRelevante;
-        
-        // Llamar a Gemini
-        $respuesta = llamarGeminiAPI($message, $contexto, $GEMINI_API_KEY, $GEMINI_API_URL);
-        
-        if ($respuesta) {
-            echo json_encode([
-                'success' => true,
-                'response' => $respuesta,
-                'sugerencias' => [
-                    "Dame un resumen ejecutivo del sistema",
-                    "¿Cuáles empresas tienen menor cumplimiento?",
-                    "¿Qué controles críticos necesitan atención?",
-                    "Analiza las tareas pendientes",
-                    "¿Cómo está el avance por dimensión?",
-                    "¿Qué alertas hay en el sistema?"
-                ],
-                'source' => 'gemini'
-            ], JSON_UNESCAPED_UNICODE);
-        } else {
-            // Fallback: devolver los datos directamente
-            echo json_encode([
-                'success' => true,
-                'response' => "📊 **Análisis del Sistema:**\n" . $infoRelevante,
-                'sugerencias' => [
-                    "Dame el resumen ejecutivo",
-                    "Análisis por empresa",
-                    "Ver alertas del sistema"
-                ],
-                'source' => 'local'
-            ], JSON_UNESCAPED_UNICODE);
-        }
-        
-    } catch (Exception $e) {
-        http_response_code(500);
+    // Intentar respuesta directa primero
+    $respuestaDirecta = generarRespuestaDirecta($pdo, $message);
+    
+    if ($respuestaDirecta) {
         echo json_encode([
-            'success' => false,
-            'error' => 'Error: ' . $e->getMessage()
+            'success' => true,
+            'response' => $respuestaDirecta,
+            'source' => 'sistema'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    // Si no hay respuesta directa, usar Gemini
+    $datos = [
+        'resumen' => getDatosResumen($pdo),
+        'alertas' => getAlertas($pdo),
+        'empresas' => array_slice(getEmpresas($pdo), 0, 10),
+        'dimensiones' => getDimensiones($pdo)
+    ];
+    
+    $respuestaGemini = llamarGemini($message, $datos, $GEMINI_API_KEY, $GEMINI_API_URL);
+    
+    if ($respuestaGemini) {
+        echo json_encode([
+            'success' => true,
+            'response' => $respuestaGemini,
+            'source' => 'gemini'
+        ], JSON_UNESCAPED_UNICODE);
+    } else {
+        // Fallback: mostrar resumen
+        echo json_encode([
+            'success' => true,
+            'response' => generarRespuestaDirecta($pdo, 'resumen ejecutivo'),
+            'source' => 'fallback'
         ], JSON_UNESCAPED_UNICODE);
     }
     exit;
@@ -922,17 +492,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode([
         'success' => true,
         'sugerencias' => [
-            "Dame un resumen ejecutivo del sistema",
-            "¿Cuál es el cumplimiento global por empresa?",
-            "¿Qué controles críticos tienen bajo avance?",
-            "Analiza el avance por dimensión (Diseño, Implementación, Entrenamiento)",
-            "¿Qué tareas están vencidas o urgentes?",
-            "¿Quiénes son los validadores más activos?",
-            "Muéstrame las alertas del sistema",
-            "Analiza la jerarquía de controles"
+            "Dame un resumen ejecutivo",
+            "¿Cuál es el cumplimiento por empresa?",
+            "Analiza el avance por dimensión",
+            "¿Qué controles críticos tienen problemas?",
+            "¿Qué tareas están pendientes?",
+            "¿Hay alertas en el sistema?",
+            "Análisis Bowtie de los riesgos"
         ],
-        'mensaje_bienvenida' => "¡Hola! 👋 Soy tu asistente de análisis de Riesgos Críticos. Tengo acceso a todos los datos del sistema y puedo darte insights sobre cumplimiento, alertas, tareas y más. ¿Qué te gustaría analizar?",
-        'gemini_activo' => true
+        'mensaje_bienvenida' => "¡Hola! 👋 Soy tu asistente de análisis. Pregúntame sobre el estado del sistema, cumplimiento, tareas o alertas."
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
