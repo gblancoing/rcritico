@@ -108,12 +108,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $subido_por_nombre = $_POST['usuario_nombre'] ?? '';
     
     if (!$linea_base_id || !$subido_por) {
-        echo json_encode(['success' => false, 'error' => 'linea_base_id y usuario_id son requeridos']);
+        echo json_encode(['success' => false, 'error' => 'linea_base_id y usuario_id son requeridos. Recibido: linea_base_id=' . $linea_base_id . ', usuario_id=' . $subido_por]);
         exit();
     }
     
-    if (!isset($_FILES['archivos']) || empty($_FILES['archivos']['name'][0])) {
-        echo json_encode(['success' => false, 'error' => 'No se recibieron archivos']);
+    // Verificar si se recibieron archivos
+    if (!isset($_FILES['archivos'])) {
+        // Verificar límites de PHP
+        $maxSize = ini_get('upload_max_filesize');
+        $postMax = ini_get('post_max_size');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'No se recibieron archivos. Límites del servidor: upload_max_filesize=' . $maxSize . ', post_max_size=' . $postMax,
+            'debug' => [
+                'FILES' => $_FILES,
+                'POST' => $_POST
+            ]
+        ]);
+        exit();
+    }
+    
+    if (empty($_FILES['archivos']['name'][0])) {
+        echo json_encode(['success' => false, 'error' => 'Los archivos llegaron vacíos']);
         exit();
     }
     
@@ -137,7 +153,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Validar error de subida
         if ($fileError !== UPLOAD_ERR_OK) {
-            $errores[] = "Error al subir $fileName: código $fileError";
+            $errorMessages = [
+                1 => 'El archivo excede upload_max_filesize (' . ini_get('upload_max_filesize') . ')',
+                2 => 'El archivo excede MAX_FILE_SIZE del formulario',
+                3 => 'El archivo solo se subió parcialmente',
+                4 => 'No se subió ningún archivo',
+                6 => 'Falta la carpeta temporal',
+                7 => 'Error al escribir en disco',
+                8 => 'Una extensión PHP detuvo la subida'
+            ];
+            $errores[] = "Error al subir $fileName: " . ($errorMessages[$fileError] ?? "código $fileError");
             continue;
         }
         
