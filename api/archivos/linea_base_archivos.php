@@ -1,8 +1,27 @@
 <?php
 /**
  * API para gestión de archivos de documentos en Línea Base
- * Permite subir, listar y eliminar archivos
  */
+
+// Capturar errores fatales y convertirlos a JSON
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => 'Error fatal del servidor: ' . $error['message'],
+            'file' => $error['file'],
+            'line' => $error['line']
+        ], JSON_UNESCAPED_UNICODE);
+    }
+});
+
+// Desactivar display de errores para evitar HTML mezclado con JSON
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -14,14 +33,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-require_once __DIR__ . '/../config/db.php';
+try {
+    require_once __DIR__ . '/../config/db.php';
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'error' => 'Error de conexión a BD: ' . $e->getMessage()]);
+    exit();
+}
 
-// Configuración - Usar rutas absolutas para que funcione en cualquier servidor
-// __DIR__ es la carpeta donde está este archivo (api/archivos/)
-// Subimos 2 niveles para llegar a la raíz del proyecto
-$baseDir = dirname(dirname(__DIR__)); // Equivale a ../../ pero de forma absoluta
+// Configuración
+$baseDir = dirname(dirname(__DIR__));
 $uploadDir = $baseDir . '/uploads/documentos_linea_base/';
-$maxFileSize = 50 * 1024 * 1024; // 50MB
+$maxFileSize = 100 * 1024 * 1024; // 100MB
+
 $allowedTypes = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
     'application/pdf',
@@ -30,16 +53,20 @@ $allowedTypes = [
     'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'text/plain', 'text/csv',
     'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+    'application/octet-stream', // Para archivos genéricos
     'video/mp4', 'video/mpeg', 'video/quicktime',
     'audio/mpeg', 'audio/wav', 'audio/ogg'
 ];
 
-// Crear directorio si no existe
+// Crear directorio base si no existe
 if (!file_exists($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
+    if (!@mkdir($uploadDir, 0755, true)) {
+        echo json_encode(['success' => false, 'error' => 'No se pudo crear el directorio de uploads: ' . $uploadDir]);
+        exit();
+    }
 }
 
-// Verificar/crear tabla si no existe
+// Verificar/crear tabla
 function verificarTabla($pdo) {
     try {
         $stmt = $pdo->query("SHOW TABLES LIKE 'linea_base_archivos'");
@@ -65,7 +92,7 @@ function verificarTabla($pdo) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
         }
     } catch (PDOException $e) {
-        // Tabla ya existe, ignorar
+        // Ignorar si tabla ya existe
     }
 }
 
@@ -89,54 +116,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $stmt = $pdo->prepare("SELECT * FROM linea_base_archivos WHERE linea_base_id = ? AND carpeta_id = ? AND activo = 1 ORDER BY nombre_original ASC");
             $stmt->execute([$linea_base_id, $carpeta_id]);
         }
-        $archivos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        echo json_encode(['success' => true, 'archivos' => $archivos], JSON_UNESCAPED_UNICODE);
-        
+        echo json_encode(['success' => true, 'archivos' => $stmt->fetchAll(PDO::FETCH_ASSOC)], JSON_UNESCAPED_UNICODE);
     } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'error' => 'Error BD: ' . $e->getMessage()]);
     }
     exit();
 }
 
 // POST: Subir archivo(s)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    
+    // Verificar límites de PHP
+    $uploadMaxSize = ini_get('upload_max_filesize');
+    $postMaxSize = ini_get('post_max_size');
+    
     $linea_base_id = intval($_POST['linea_base_id'] ?? 0);
     $carpeta_id = isset($_POST['carpeta_id']) && $_POST['carpeta_id'] !== '' && $_POST['carpeta_id'] !== 'null' ? intval($_POST['carpeta_id']) : null;
     $subido_por = intval($_POST['usuario_id'] ?? 0);
     $subido_por_nombre = $_POST['usuario_nombre'] ?? '';
     
     if (!$linea_base_id || !$subido_por) {
-        echo json_encode(['success' => false, 'error' => 'linea_base_id y usuario_id son requeridos. Recibido: linea_base_id=' . $linea_base_id . ', usuario_id=' . $subido_por]);
-        exit();
-    }
-    
-    // Verificar si se recibieron archivos
-    if (!isset($_FILES['archivos'])) {
-        // Verificar límites de PHP
-        $maxSize = ini_get('upload_max_filesize');
-        $postMax = ini_get('post_max_size');
         echo json_encode([
             'success' => false, 
-            'error' => 'No se recibieron archivos. Límites del servidor: upload_max_filesize=' . $maxSize . ', post_max_size=' . $postMax,
+            'error' => 'Parámetros requeridos faltantes',
             'debug' => [
-                'FILES' => $_FILES,
-                'POST' => $_POST
+                'linea_base_id' => $linea_base_id,
+                'usuario_id' => $subido_por,
+                'POST' => $_POST,
+                'FILES' => isset($_FILES) ? array_keys($_FILES) : 'no FILES'
             ]
         ]);
         exit();
     }
     
-    if (empty($_FILES['archivos']['name'][0])) {
-        echo json_encode(['success' => false, 'error' => 'Los archivos llegaron vacíos']);
+    // Verificar si llegaron archivos
+    if (!isset($_FILES['archivos'])) {
+        echo json_encode([
+            'success' => false, 
+            'error' => 'No se recibieron archivos. Posible causa: archivo muy grande.',
+            'limits' => [
+                'upload_max_filesize' => $uploadMaxSize,
+                'post_max_size' => $postMaxSize
+            ],
+            'FILES' => $_FILES,
+            'POST_keys' => array_keys($_POST)
+        ]);
         exit();
     }
     
-    // Crear subdirectorio por linea_base_id
+    if (empty($_FILES['archivos']['name'][0])) {
+        echo json_encode(['success' => false, 'error' => 'Array de archivos vacío']);
+        exit();
+    }
+    
+    // Crear subdirectorio
     $subDir = $uploadDir . "lb_$linea_base_id/";
     if (!file_exists($subDir)) {
-        mkdir($subDir, 0755, true);
+        if (!@mkdir($subDir, 0755, true)) {
+            echo json_encode(['success' => false, 'error' => 'No se pudo crear subdirectorio: ' . $subDir]);
+            exit();
+        }
     }
     
     $archivosSubidos = [];
@@ -154,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Validar error de subida
         if ($fileError !== UPLOAD_ERR_OK) {
             $errorMessages = [
-                1 => 'El archivo excede upload_max_filesize (' . ini_get('upload_max_filesize') . ')',
+                1 => 'El archivo excede upload_max_filesize (' . $uploadMaxSize . ')',
                 2 => 'El archivo excede MAX_FILE_SIZE del formulario',
                 3 => 'El archivo solo se subió parcialmente',
                 4 => 'No se subió ningún archivo',
@@ -162,44 +201,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 7 => 'Error al escribir en disco',
                 8 => 'Una extensión PHP detuvo la subida'
             ];
-            $errores[] = "Error al subir $fileName: " . ($errorMessages[$fileError] ?? "código $fileError");
+            $errores[] = "Error con $fileName: " . ($errorMessages[$fileError] ?? "código $fileError");
             continue;
         }
         
         // Validar tamaño
         if ($fileSize > $maxFileSize) {
-            $errores[] = "El archivo $fileName excede el tamaño máximo (50MB)";
+            $errores[] = "El archivo $fileName excede el tamaño máximo (100MB)";
             continue;
         }
         
-        // Validar tipo
+        // Obtener tipo MIME
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mimeType = finfo_file($finfo, $fileTmp);
         finfo_close($finfo);
         
-        if (!in_array($mimeType, $allowedTypes)) {
-            $errores[] = "Tipo de archivo no permitido: $fileName ($mimeType)";
+        // Permitir más tipos si la extensión es conocida
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $extensionesPermitidas = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'jpg', 'jpeg', 'png', 'gif', 'zip', 'rar'];
+        
+        if (!in_array($mimeType, $allowedTypes) && !in_array($extension, $extensionesPermitidas)) {
+            $errores[] = "Tipo no permitido: $fileName ($mimeType)";
             continue;
         }
         
         // Generar nombre único
-        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $nombreUnico = uniqid('doc_') . '_' . time() . '.' . $extension;
         $rutaDestino = $subDir . $nombreUnico;
         
         // Mover archivo
         if (move_uploaded_file($fileTmp, $rutaDestino)) {
-            // Verificar que el archivo se guardó correctamente
-            if (!file_exists($rutaDestino)) {
-                $errores[] = "Error: El archivo $fileName se movió pero no existe en destino";
-                continue;
-            }
             try {
                 $stmt = $pdo->prepare("INSERT INTO linea_base_archivos 
                     (linea_base_id, carpeta_id, nombre_original, nombre_archivo, ruta, tipo_mime, tamano_bytes, extension, subido_por, subido_por_nombre) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 
-                // Guardar ruta relativa desde la raíz del proyecto
                 $rutaRelativa = 'uploads/documentos_linea_base/lb_' . $linea_base_id . '/' . $nombreUnico;
                 $stmt->execute([
                     $linea_base_id, 
@@ -219,29 +255,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'nombre_original' => $fileName,
                     'nombre_archivo' => $nombreUnico,
                     'ruta' => $rutaRelativa,
-                    'tipo_mime' => $mimeType,
-                    'tamano_bytes' => $fileSize,
-                    'extension' => $extension
+                    'tamano_bytes' => $fileSize
                 ];
                 
             } catch (PDOException $e) {
-                $errores[] = "Error al registrar $fileName: " . $e->getMessage();
-                // Eliminar archivo si falla el registro
-                unlink($rutaDestino);
+                $errores[] = "Error BD para $fileName: " . $e->getMessage();
+                @unlink($rutaDestino);
             }
         } else {
-            // Diagnóstico detallado para producción
-            $diagnostico = [
-                'archivo' => $fileName,
-                'uploadDir' => $uploadDir,
-                'subDir' => $subDir,
-                'rutaDestino' => $rutaDestino,
-                'dir_exists' => file_exists($subDir),
-                'dir_writable' => is_writable($subDir),
-                'tmp_exists' => file_exists($fileTmp),
-                'baseDir' => $baseDir
-            ];
-            $errores[] = "Error al guardar $fileName. Diagnóstico: " . json_encode($diagnostico);
+            $errores[] = "Error al mover $fileName al servidor";
         }
     }
     
@@ -250,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'success' => true,
             'archivos' => $archivosSubidos,
             'errores' => $errores,
-            'mensaje' => count($archivosSubidos) . ' archivo(s) subido(s) correctamente'
+            'mensaje' => count($archivosSubidos) . ' archivo(s) subido(s)'
         ], JSON_UNESCAPED_UNICODE);
     } else {
         echo json_encode([
@@ -265,7 +287,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // DELETE: Eliminar archivo
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $data = json_decode(file_get_contents('php://input'), true);
-    
     $id = intval($data['id'] ?? 0);
     
     if (!$id) {
@@ -274,14 +295,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     }
     
     try {
-        // Soft delete
         $stmt = $pdo->prepare("UPDATE linea_base_archivos SET activo = 0 WHERE id = ?");
         $stmt->execute([$id]);
-        
         echo json_encode(['success' => true, 'mensaje' => 'Archivo eliminado'], JSON_UNESCAPED_UNICODE);
-        
     } catch (PDOException $e) {
-        http_response_code(500);
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit();
@@ -290,8 +307,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
 http_response_code(405);
 echo json_encode(['error' => 'Método no permitido']);
 ?>
-
-
-
-
-
