@@ -89,6 +89,48 @@ const esImagen = (archivo) => {
   return extensionesImagen.includes(extension) || tipoMime.startsWith('image/');
 };
 
+// Función para construir la URL correcta del icono de carpeta
+const construirUrlIcono = (iconoUrl) => {
+  if (!iconoUrl) return null;
+  
+  // Si ya es una URL completa (http/https), usarla directamente
+  if (iconoUrl.startsWith('http')) {
+    return iconoUrl;
+  }
+  
+  // Determinar la base URL
+  let baseUrl = '';
+  if (process.env.NODE_ENV === 'development' && ['3000', '3001', '3002'].includes(window.location.port)) {
+    baseUrl = 'http://localhost/rcritico';
+  } else {
+    baseUrl = window.location.origin;
+  }
+  
+  // Si es solo el nombre del archivo (icono_xxx.png), agregar la ruta /img/iconos/
+  if (iconoUrl.match(/^icono_[a-f0-9]+_\d+\.(png|jpg|jpeg|gif|svg|webp)$/i)) {
+    return `${baseUrl}/img/iconos/${iconoUrl}`;
+  }
+  
+  // Si empieza con /api/uploads/iconos_carpetas/, cambiar a /img/iconos/
+  if (iconoUrl.includes('/api/uploads/iconos_carpetas/') || iconoUrl.includes('/api/archivos/uploads/iconos_carpetas/')) {
+    const nombreArchivo = iconoUrl.split('/').pop();
+    return `${baseUrl}/img/iconos/${nombreArchivo}`;
+  }
+  
+  // Si empieza con /img/iconos/, usar directamente
+  if (iconoUrl.startsWith('/img/iconos/')) {
+    return baseUrl + iconoUrl;
+  }
+  
+  // Si empieza con /, concatenar con baseUrl
+  if (iconoUrl.startsWith('/')) {
+    return baseUrl + iconoUrl;
+  }
+  
+  // Si no tiene /, agregar /img/iconos/ como prefijo por defecto
+  return `${baseUrl}/img/iconos/${iconoUrl}`;
+};
+
 // Función para formatear el último usuario que editó con fecha y hora
 const formatearUltimoUsuarioEdito = (usuarioString) => {
   if (!usuarioString || usuarioString === '-') return '-';
@@ -5548,25 +5590,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 {/* Icono de la carpeta */}
                 {carpetaActual.icono_url ? (
                   <img 
-                    src={(() => {
-                      if (carpetaActual.icono_url.startsWith('http')) {
-                        return carpetaActual.icono_url;
-                      }
-                      if (carpetaActual.icono_url.startsWith('/api/')) {
-                        const baseUrl = API_BASE.replace('/api', '');
-                        return baseUrl + carpetaActual.icono_url;
-                      }
-                      if (carpetaActual.icono_url.startsWith('/')) {
-                        if (process.env.NODE_ENV === 'development' && (window.location.port === '3001' || window.location.port === '3000' || window.location.port === '3002')) {
-                          return 'http://localhost/rcritico' + carpetaActual.icono_url;
-                        }
-                        return (APP_URL || BASE_URL) + carpetaActual.icono_url;
-                      }
-                      const baseUrl = process.env.NODE_ENV === 'development' && (window.location.port === '3001' || window.location.port === '3000' || window.location.port === '3002')
-                        ? 'http://localhost/rcritico'
-                        : (APP_URL || BASE_URL);
-                      return baseUrl + '/' + carpetaActual.icono_url;
-                    })()} 
+                    src={construirUrlIcono(carpetaActual.icono_url)} 
                     alt={carpetaActual.nombre}
                     style={{
                       width: '48px',
@@ -5843,37 +5867,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 }}>
                   {carpeta.icono_url ? (
                     <img 
-                      src={(() => {
-                        // Si ya es una URL completa (http/https), usarla directamente
-                        if (carpeta.icono_url.startsWith('http')) {
-                          return carpeta.icono_url;
-                        }
-                        
-                        // Construir la URL completa
-                        // En desarrollo con React dev server, siempre usar localhost/rcritico
-                        let baseUrl = '';
-                        if (process.env.NODE_ENV === 'development' && (window.location.port === '3001' || window.location.port === '3000' || window.location.port === '3002')) {
-                          baseUrl = 'http://localhost/rcritico';
-                        } else {
-                          // En producción, usar la URL base sin puerto
-                          baseUrl = window.location.origin;
-                          // Si el pathname incluye /rcritico o /ssocaren, agregarlo
-                          const pathname = window.location.pathname;
-                          if (pathname.includes('/rcritico')) {
-                            baseUrl += '/rcritico';
-                          } else if (pathname.includes('/ssocaren')) {
-                            baseUrl += '/ssocaren';
-                          }
-                        }
-                        
-                        // Si la ruta del icono ya empieza con /, concatenar directamente
-                        if (carpeta.icono_url.startsWith('/')) {
-                          return baseUrl + carpeta.icono_url;
-                        }
-                        
-                        // Si no, agregar el separador
-                        return baseUrl + '/' + carpeta.icono_url;
-                      })()} 
+                      src={construirUrlIcono(carpeta.icono_url)} 
                       alt={carpeta.nombre}
                       style={{
                         width: '100%',
