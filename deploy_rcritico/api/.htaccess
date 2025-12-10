@@ -1,27 +1,11 @@
-# Configuración específica para el directorio api/
-RewriteEngine On
+# Aumentar límites de subida de archivos
+php_value upload_max_filesize 100M
+php_value post_max_size 100M
+php_value max_execution_time 300
+php_value max_input_time 300
+php_value memory_limit 256M
 
-# Manejar peticiones a /api/uploads/ y redirigirlas al script PHP
-RewriteCond %{REQUEST_URI} ^/api/uploads/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
-
-# También manejar /rcritico/api/uploads/
-RewriteCond %{REQUEST_URI} ^/rcritico/api/uploads/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
-
-# También manejar /ssocaren/api/uploads/
-RewriteCond %{REQUEST_URI} ^/ssocaren/api/uploads/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
-
-# Regla genérica: cualquier petición a uploads/ que no sea un archivo físico
-RewriteCond %{REQUEST_URI} /uploads/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^uploads/(.+)$ uploads.php?file=$1 [L,QSA]
-
+# Habilitar CORS si es necesario
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>

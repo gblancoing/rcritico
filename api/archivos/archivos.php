@@ -50,8 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== 0) {
+        $errorCode = $_FILES['archivo']['error'] ?? -1;
+        $errorMessages = [
+            0 => 'Sin error',
+            1 => 'El archivo excede el límite de tamaño del servidor (upload_max_filesize: ' . ini_get('upload_max_filesize') . ')',
+            2 => 'El archivo excede el límite MAX_FILE_SIZE del formulario',
+            3 => 'El archivo solo se subió parcialmente',
+            4 => 'No se subió ningún archivo',
+            6 => 'Falta la carpeta temporal del servidor',
+            7 => 'Error al escribir el archivo en el disco',
+            8 => 'Una extensión de PHP detuvo la subida'
+        ];
+        $errorMsg = $errorMessages[$errorCode] ?? 'Error desconocido (' . $errorCode . ')';
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Error archivo: ' . ($_FILES['archivo']['error'] ?? 'no recibido')]); exit;
+        echo json_encode(['success' => false, 'error' => $errorMsg]); exit;
     }
     
     $archivo = $_FILES['archivo'];
