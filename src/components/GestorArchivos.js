@@ -98,27 +98,37 @@ const construirUrlIcono = (iconoUrl) => {
     return iconoUrl;
   }
   
-  // Determinar la base URL
-  let baseUrl = '';
+  // Determinar la base URL - SIEMPRE usar window.location.origin en producción
+  let baseUrl = window.location.origin;
+  
+  // En desarrollo local, usar localhost/rcritico
   if (process.env.NODE_ENV === 'development' && ['3000', '3001', '3002'].includes(window.location.port)) {
     baseUrl = 'http://localhost/rcritico';
-  } else {
-    baseUrl = window.location.origin;
   }
   
-  // Si es solo el nombre del archivo (icono_xxx.png), agregar la ruta /img/iconos/
-  if (iconoUrl.match(/^icono_[a-f0-9]+_\d+\.(png|jpg|jpeg|gif|svg|webp)$/i)) {
-    return `${baseUrl}/img/iconos/${iconoUrl}`;
+  // Extraer solo el nombre del archivo si viene con ruta
+  let nombreArchivo = iconoUrl;
+  if (iconoUrl.includes('/')) {
+    nombreArchivo = iconoUrl.split('/').pop();
   }
   
-  // Si empieza con /api/uploads/iconos_carpetas/, cambiar a /img/iconos/
-  if (iconoUrl.includes('/api/uploads/iconos_carpetas/') || iconoUrl.includes('/api/archivos/uploads/iconos_carpetas/')) {
-    const nombreArchivo = iconoUrl.split('/').pop();
+  // Si es un icono de carpeta (icono_xxx.png), usar /img/iconos/
+  if (nombreArchivo.match(/^icono_[a-f0-9]+_\d+\.(png|jpg|jpeg|gif|svg|webp)$/i)) {
     return `${baseUrl}/img/iconos/${nombreArchivo}`;
   }
   
-  // Si empieza con /img/iconos/, usar directamente
-  if (iconoUrl.startsWith('/img/iconos/')) {
+  // Si parece ser una imagen de empresa u otro tipo, usar /img/
+  if (nombreArchivo.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i) && !nombreArchivo.startsWith('icono_')) {
+    // Si la ruta original incluye /img/, mantenerla
+    if (iconoUrl.startsWith('/img/')) {
+      return baseUrl + iconoUrl;
+    }
+    // Si no, asumir que está en /img/
+    return `${baseUrl}/img/${nombreArchivo}`;
+  }
+  
+  // Si empieza con /img/, usar directamente
+  if (iconoUrl.startsWith('/img/')) {
     return baseUrl + iconoUrl;
   }
   
@@ -127,7 +137,7 @@ const construirUrlIcono = (iconoUrl) => {
     return baseUrl + iconoUrl;
   }
   
-  // Si no tiene /, agregar /img/iconos/ como prefijo por defecto
+  // Por defecto, agregar /img/iconos/
   return `${baseUrl}/img/iconos/${iconoUrl}`;
 };
 
