@@ -402,7 +402,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
   };
 
   // Función helper para limpiar texto para Mermaid
-  const limpiarTexto = (texto, maxLen = 40) => {
+  const limpiarTexto = (texto, maxLen = 60) => {
     if (!texto) return '';
     // Limpiar caracteres problemáticos para Mermaid
     const limpio = texto.replace(/["\n\r<>{}[\]|]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -424,19 +424,19 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
     const limiteCarpetasDoc = completo ? 999 : 2;
     
     // Nodo principal - Riesgo Crítico
-    mermaidCode += `  ${carpetaId}["🎯 ${limpiarTexto(carpetaActual.nombre, 40)}"]\n`;
+    mermaidCode += `  ${carpetaId}["🎯 ${limpiarTexto(carpetaActual.nombre, 60)}"]\n`;
     mermaidCode += `  style ${carpetaId} fill:#dc3545,stroke:#a71d2a,color:#fff,stroke-width:3px\n`;
     
     // Evento No Deseado
     const eventoId = 'END';
-    mermaidCode += `  ${eventoId}["⚠️ ${limpiarTexto(eventoNoDeseado, 50)}"]\n`;
+    mermaidCode += `  ${eventoId}["⚠️ ${limpiarTexto(eventoNoDeseado, 80)}"]\n`;
     mermaidCode += `  style ${eventoId} fill:#ffc107,stroke:#e0a800,color:#000,stroke-width:2px\n`;
     mermaidCode += `  ${carpetaId} --> ${eventoId}\n`;
     
     // Evento de Riesgo si existe
     if (eventoRiesgo) {
       const riesgoId = 'ER';
-      mermaidCode += `  ${riesgoId}["🔥 ${limpiarTexto(eventoRiesgo, 50)}"]\n`;
+      mermaidCode += `  ${riesgoId}["🔥 ${limpiarTexto(eventoRiesgo, 80)}"]\n`;
       mermaidCode += `  style ${riesgoId} fill:#fd7e14,stroke:#dc6000,color:#fff,stroke-width:2px\n`;
       mermaidCode += `  ${eventoId} --> ${riesgoId}\n`;
     }
@@ -492,7 +492,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
       
       subcarpetasNivel2.forEach((sub, idx) => {
         const subId = `EMP${idx}`;
-        mermaidCode += `  ${subId}["📂 ${limpiarTexto(sub.nombre, 25)}"]\n`;
+        mermaidCode += `  ${subId}["📂 ${limpiarTexto(sub.nombre, 50)}"]\n`;
         mermaidCode += `  style ${subId} fill:#495057,stroke:#343a40,color:#fff\n`;
         mermaidCode += `  EMPRESAS --> ${subId}\n`;
         
@@ -510,7 +510,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
           // Mostrar carpetas de archivos
           datosEmpresa.carpetasArchivos.slice(0, limiteCarpetasArchivos).forEach((carpArch, archIdx) => {
             const carpArchId = `CARCH${idx}_${archIdx}`;
-            mermaidCode += `  ${carpArchId}["📂 ${limpiarTexto(carpArch.nombre, 20)}"]\n`;
+            mermaidCode += `  ${carpArchId}["📂 ${limpiarTexto(carpArch.nombre, 40)}"]\n`;
             mermaidCode += `  style ${carpArchId} fill:#fff3e0,stroke:#ffcc80,color:#e65100\n`;
             mermaidCode += `  ${archGrupoId} --> ${carpArchId}\n`;
           });
@@ -535,7 +535,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
           datosEmpresa.registrosLineaBase.slice(0, limiteRegistrosLB).forEach((registro, regIdx) => {
             const regId = `REG${idx}_${regIdx}`;
             const codigoReg = registro.codigo || `Ctrl ${regIdx + 1}`;
-            mermaidCode += `  ${regId}["📝 ${limpiarTexto(codigoReg, 20)}"]\n`;
+            mermaidCode += `  ${regId}["📝 ${limpiarTexto(codigoReg, 40)}"]\n`;
             mermaidCode += `  style ${regId} fill:#fce4ec,stroke:#f48fb1,color:#880e4f\n`;
             mermaidCode += `  ${lbGroupId} --> ${regId}\n`;
             
@@ -550,7 +550,7 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
               // Mostrar carpetas de documentos
               carpetasDocLB.slice(0, limiteCarpetasDoc).forEach((carpDoc, docIdx) => {
                 const carpDocId = `CDOC${idx}_${regIdx}_${docIdx}`;
-                mermaidCode += `  ${carpDocId}["📄 ${limpiarTexto(carpDoc.nombre, 18)}"]\n`;
+                mermaidCode += `  ${carpDocId}["📄 ${limpiarTexto(carpDoc.nombre, 40)}"]\n`;
                 mermaidCode += `  style ${carpDocId} fill:#e7f1ff,stroke:#b6d4fe,color:#0d6efd\n`;
                 mermaidCode += `  ${docGroupId} --> ${carpDocId}\n`;
               });
