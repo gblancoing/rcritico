@@ -1,0 +1,6 @@
+# Manejo de rutas para React Router
+# Redirigir todas las rutas que no sean archivos estáticos a index.html
+/*    /index.html   200
+
+# Redirigir peticiones de API a la carpeta api
+/api/*    /api/:splat    200 

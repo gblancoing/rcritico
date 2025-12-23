@@ -35,8 +35,20 @@ const CentrosPorRegion = ({ user, centros, onLogout }) => {
           throw new Error(`HTTP error! status: ${responseRegiones.status} - ${errorText}`);
         }
         
-        const dataRegiones = await responseRegiones.json();
+        // Obtener el texto de la respuesta primero para debugging
+        const responseText = await responseRegiones.text();
+        console.log('Respuesta texto de regiones:', responseText);
+        
+        // Intentar parsear JSON
+        let dataRegiones;
+        try {
+          dataRegiones = JSON.parse(responseText);
         console.log('Datos de regiones recibidos:', dataRegiones);
+        } catch (jsonError) {
+          console.error('Error parseando JSON de regiones:', jsonError);
+          console.error('Texto recibido:', responseText);
+          throw new Error(`Error al parsear JSON: ${jsonError.message}. Respuesta: ${responseText.substring(0, 200)}`);
+        }
         
         // Verificar si hay un error en la respuesta
         if (dataRegiones.error) {

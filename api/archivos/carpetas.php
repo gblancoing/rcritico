@@ -84,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                            c.color_primario,
                            c.color_secundario,
                            c.icono_url,
+                           c.imagen_portada_url,
                            c.evento_no_deseado,
                            c.evento_riesgo,
                            c.controles_supervisor,
@@ -204,6 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                            c.color_primario,
                            c.color_secundario,
                            c.icono_url,
+                           c.imagen_portada_url,
                            COUNT(DISTINCT a.id) as cantidad_archivos,
                            COUNT(DISTINCT sc.id) as cantidad_subcarpetas
                     FROM carpetas c
@@ -247,6 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                                                c.color_primario,
                                                c.color_secundario,
                                                c.icono_url,
+                           c.imagen_portada_url,
                                                COUNT(DISTINCT a.id) as cantidad_archivos,
                                                COUNT(DISTINCT sc.id) as cantidad_subcarpetas
                                         FROM carpetas c
@@ -290,6 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                            c.color_primario,
                            c.color_secundario,
                            c.icono_url,
+                           c.imagen_portada_url,
                            COUNT(DISTINCT a.id) as cantidad_archivos,
                            COUNT(DISTINCT sc.id) as cantidad_subcarpetas
                     FROM carpetas c
@@ -383,6 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                                                c.color_primario,
                                                c.color_secundario,
                                                c.icono_url,
+                           c.imagen_portada_url,
                                                COUNT(DISTINCT a.id) as cantidad_archivos,
                                                COUNT(DISTINCT sc.id) as cantidad_subcarpetas
                                         FROM carpetas c
@@ -404,6 +409,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                                                c.color_primario,
                                                c.color_secundario,
                                                c.icono_url,
+                           c.imagen_portada_url,
                                                COUNT(DISTINCT a.id) as cantidad_archivos,
                                                COUNT(DISTINCT sc.id) as cantidad_subcarpetas
                                         FROM carpetas c
@@ -605,6 +611,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $descripcion = trim($data['descripcion'] ?? '');
     $usuario_id = intval($data['usuario_id'] ?? 0);
     $icono_url = isset($data['icono_url']) && !empty($data['icono_url']) ? $data['icono_url'] : null;
+    $imagen_portada_url = isset($data['imagen_portada_url']) && !empty($data['imagen_portada_url']) ? $data['imagen_portada_url'] : null;
     $color_primario = isset($data['color_primario']) && !empty($data['color_primario']) ? trim($data['color_primario']) : null;
     $color_secundario = isset($data['color_secundario']) && !empty($data['color_secundario']) ? trim($data['color_secundario']) : null;
     
@@ -682,6 +689,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         if ($icono_url !== null) {
             $sql .= ", icono_url = ?";
             $params[] = $icono_url;
+        }
+        
+        // Si imagen_portada_url se proporciona, incluirlo en la actualización
+        if ($imagen_portada_url !== null) {
+            $sql .= ", imagen_portada_url = ?";
+            $params[] = $imagen_portada_url;
         }
         
         $sql .= " WHERE id = ? AND activo = 1";

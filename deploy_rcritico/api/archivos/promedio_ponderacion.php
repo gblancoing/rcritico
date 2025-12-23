@@ -111,6 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $promedio_preventivos = $resultado_preventivos['promedio'] !== null ? floatval($resultado_preventivos['promedio']) : 0;
         $promedio_mitigadores = $resultado_mitigadores['promedio'] !== null ? floatval($resultado_mitigadores['promedio']) : 0;
         
+        // IMPORTANTE: Si no hay registros de mitigadores, el promedio debe ser 0%
+        if ($total_mitigadores === 0) {
+            $promedio_mitigadores = 0;
+        }
+        
         // Calcular promedio general: suma total de ambas tablas / total de registros
         $suma_preventivos = floatval($resultado_preventivos['suma_total'] ?? 0);
         $suma_mitigadores = floatval($resultado_mitigadores['suma_total'] ?? 0);
@@ -119,6 +124,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $promedio_general = 0;
         if ($total_registros > 0) {
             $promedio_general = $suma_total / $total_registros;
+        }
+        
+        // Si todos los registros de mitigadores tienen ponderación 0, el promedio debe ser 0%
+        if ($total_mitigadores > 0 && $suma_mitigadores == 0) {
+            $promedio_mitigadores = 0;
         }
         
         echo json_encode([

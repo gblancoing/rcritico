@@ -1,4 +1,9 @@
 <?php
+// Limpiar cualquier salida previa
+if (ob_get_level()) {
+    ob_clean();
+}
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
@@ -9,8 +14,8 @@ header('Content-Type: application/json; charset=utf-8');
 if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || 
     strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false) {
     // Solo mostrar errores en desarrollo local
-    ini_set('display_errors', 1);
-    ini_set('display_startup_errors', 1);
+    ini_set('display_errors', 0); // Desactivar display para evitar HTML en JSON
+    ini_set('display_startup_errors', 0);
     error_reporting(E_ALL);
 } else {
     // En producción, ocultar errores
@@ -18,7 +23,14 @@ if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) ||
     ini_set('display_startup_errors', 0);
     error_reporting(0);
 }
+
+try {
 require_once __DIR__ . '/../config/db.php';
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Error al cargar configuración: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 try {
     // Verificar que la conexión funciona
@@ -62,14 +74,44 @@ try {
         $region['cantidad_proyectos'] = (int)$region['cantidad_proyectos'];
     }
     
+    // Asegurar que siempre devolvamos JSON válido
+    $json = json_encode($regiones, JSON_UNESCAPED_UNICODE);
+    
+    if ($json === false) {
+        throw new Exception('Error al codificar JSON: ' . json_last_error_msg());
+    }
+    
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($regiones, JSON_UNESCAPED_UNICODE);
+    echo $json;
+    exit;
 } catch (PDOException $e) {
+    // Limpiar cualquier salida previa
+    if (ob_get_level()) {
+        ob_clean();
+    }
     http_response_code(500);
     error_log('Error en regiones.php: ' . $e->getMessage());
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Error en la consulta de regiones: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
 } catch (Exception $e) {
+    // Limpiar cualquier salida previa
+    if (ob_get_level()) {
+        ob_clean();
+    }
     http_response_code(500);
     error_log('Error general en regiones.php: ' . $e->getMessage());
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Error: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+} catch (Error $e) {
+    // Limpiar cualquier salida previa
+    if (ob_get_level()) {
+        ob_clean();
+    }
+    http_response_code(500);
+    error_log('Error fatal en regiones.php: ' . $e->getMessage());
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Error fatal: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
 }

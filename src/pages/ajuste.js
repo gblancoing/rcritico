@@ -421,10 +421,39 @@ const Ajuste = ({ user }) => {
     try {
       const url = `${API_BASE}/empresas/empresas.php`;
       const method = editingItem ? 'PUT' : 'POST';
-      const payload = {
-        ...formEmpresa,
-        empresa_id: editingItem ? editingItem.empresa_id : undefined // empresa_id es el RUT
-      };
+      
+      // Preparar payload según si es creación o edición
+      let payload;
+      if (editingItem) {
+        // Para edición: empresa_id es el RUT original, rut es el nuevo RUT (puede ser el mismo)
+        payload = {
+          empresa_id: editingItem.empresa_id || editingItem.rut, // RUT original (ID actual en BD)
+          nombre: formEmpresa.nombre,
+          rut: formEmpresa.rut, // Nuevo RUT (puede ser el mismo)
+          direccion: formEmpresa.direccion || null,
+          telefono: formEmpresa.telefono || null,
+          email: formEmpresa.email || null,
+          contacto_nombre: formEmpresa.contacto_nombre || null,
+          contacto_telefono: formEmpresa.contacto_telefono || null,
+          contacto_email: formEmpresa.contacto_email || null,
+          regiones: formEmpresa.regiones || [],
+          proyectos: formEmpresa.proyectos || []
+        };
+      } else {
+        // Para creación: solo enviar los campos necesarios
+        payload = {
+          nombre: formEmpresa.nombre,
+          rut: formEmpresa.rut,
+          direccion: formEmpresa.direccion || null,
+          telefono: formEmpresa.telefono || null,
+          email: formEmpresa.email || null,
+          contacto_nombre: formEmpresa.contacto_nombre || null,
+          contacto_telefono: formEmpresa.contacto_telefono || null,
+          contacto_email: formEmpresa.contacto_email || null,
+          regiones: formEmpresa.regiones || [],
+          proyectos: formEmpresa.proyectos || []
+        };
+      }
       
       const response = await fetch(url, {
         method,
@@ -452,15 +481,26 @@ const Ajuste = ({ user }) => {
           });
           cargarDatos();
         } else {
-          showStatusMessage(data.error || 'Error al procesar empresa', 'error');
+          const errorMsg = data.error || 'Error al procesar empresa';
+          showStatusMessage(errorMsg, 'error');
+          console.error('Error del servidor:', data);
         }
       } else {
-        const errorData = await response.json();
-        showStatusMessage(errorData.error || 'Error al procesar empresa', 'error');
+        let errorData;
+        try {
+          const text = await response.text();
+          errorData = text ? JSON.parse(text) : { error: `Error HTTP ${response.status}` };
+        } catch (e) {
+          errorData = { error: `Error HTTP ${response.status}: ${response.statusText}` };
+        }
+        const errorMsg = errorData.error || `Error al procesar empresa (${response.status})`;
+        showStatusMessage(errorMsg, 'error');
+        console.error('Error HTTP:', response.status, errorData);
       }
     } catch (error) {
-      showStatusMessage('Error al procesar empresa', 'error');
-      console.error('Error:', error);
+      const errorMsg = error.message || 'Error de conexión al procesar empresa';
+      showStatusMessage(errorMsg, 'error');
+      console.error('Error en handleSubmitEmpresa:', error);
     }
   };
 
@@ -1488,7 +1528,7 @@ const Ajuste = ({ user }) => {
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Crear/Editar/Eliminar Usuarios</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                       </tr>
@@ -1503,12 +1543,19 @@ const Ajuste = ({ user }) => {
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Crear Carpetas</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                       </tr>
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Subir Archivos</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Editar Archivos/Carpetas</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
@@ -1517,7 +1564,7 @@ const Ajuste = ({ user }) => {
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Eliminar Archivos/Carpetas</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                       </tr>
@@ -1539,14 +1586,14 @@ const Ajuste = ({ user }) => {
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Editar todos los campos</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                       </tr>
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Validar/Agregar Observaciones</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
                       </tr>
@@ -1574,6 +1621,13 @@ const Ajuste = ({ user }) => {
                       </tr>
                       <tr>
                         <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Validar/Agregar Observaciones</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #dee2e6' }}>Eliminar Registros de Línea Base</td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#28a745', fontSize: '1.2rem' }}>✓</span></td>
                         <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #dee2e6' }}><span style={{ color: '#dc3545', fontSize: '1.2rem' }}>✗</span></td>

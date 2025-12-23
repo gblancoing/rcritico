@@ -14,83 +14,156 @@ const InformesStockholders = ({ proyectoId, sidebarCollapsed }) => {
     destinatarios: '',
     tipo: 'Ejecutivo'
   });
+  
+  // Parámetros de personalización del reporte
+  const [parametrosReporte, setParametrosReporte] = useState({
+    incluirPortada: true,
+    incluirResumenEjecutivo: true,
+    incluirKPIs: true,
+    incluirAvancePorEmpresa: true,
+    incluirResumenRiesgos: true,
+    incluirInformacionProyecto: true,
+    nivelDetalle: 'normal', // 'basico', 'normal', 'detallado'
+    formato: 'pdf' // 'pdf', 'html'
+  });
 
-  // Cargar informes (simulado por ahora)
+  // Cargar informes desde la API
   useEffect(() => {
-    cargarInformes();
+    if (proyectoId) {
+      cargarInformes();
+    }
   }, [proyectoId]);
 
-  const cargarInformes = () => {
+  const cargarInformes = async () => {
     setLoading(true);
-    // Simulación de datos - Aquí conectarías con la API real
-    setTimeout(() => {
-      setInformes([
-        {
-          id: 1,
-          titulo: 'Informe Trimestral Q3 2024',
-          descripcion: 'Resumen ejecutivo del desempeño financiero y operacional del tercer trimestre',
-          fecha: '2024-09-30',
-          periodo: 'Q3 2024',
-          destinatarios: 'Accionistas, Board of Directors',
-          tipo: 'Ejecutivo',
-          paginas: 42,
-          estado: 'Publicado',
-          portada: '/img/imagen_jej.jpg'
-        },
-        {
-          id: 2,
-          titulo: 'Análisis de Valor Ganado - Septiembre',
-          descripcion: 'Reporte técnico de EVM con proyecciones y análisis de tendencias',
-          fecha: '2024-10-05',
-          periodo: 'Septiembre 2024',
-          destinatarios: 'Inversionistas, PMO',
-          tipo: 'Técnico',
-          paginas: 28,
-          estado: 'En Revisión',
-          portada: '/img/muro.jpg'
-        },
-        {
-          id: 3,
-          titulo: 'Estado del Proyecto - Noviembre 2024',
-          descripcion: 'Dashboard ejecutivo con KPIs principales y alertas críticas',
-          fecha: '2024-11-10',
-          periodo: 'Noviembre 2024',
-          destinatarios: 'Stakeholders, Sponsors',
-          tipo: 'Ejecutivo',
-          paginas: 18,
-          estado: 'Borrador',
-          portada: '/img/fondo-codelco.png'
-        }
-      ]);
+    try {
+      const response = await fetch(`${API_BASE}/stockholders/informes.php?proyecto_id=${proyectoId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setInformes(data);
+      } else {
+        console.error('Error cargando informes');
+        setInformes([]);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setInformes([]);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
-  const handleCrearInforme = () => {
-    // Aquí conectarías con la API para crear el informe
-    const informeNuevo = {
-      id: informes.length + 1,
-      ...nuevoInforme,
-      paginas: 0,
-      estado: 'Borrador',
-      portada: '/img/fondo-codelco.png'
-    };
-    
-    setInformes([...informes, informeNuevo]);
-    setModalCrearInforme(false);
-    setNuevoInforme({
-      titulo: '',
-      descripcion: '',
-      fecha: new Date().toISOString().split('T')[0],
-      periodo: '',
-      destinatarios: '',
-      tipo: 'Ejecutivo'
-    });
+  const handleCrearInforme = async () => {
+    try {
+      // Generar URL del reporte personalizado
+      const params = new URLSearchParams({
+        proyecto_id: proyectoId,
+        pdf: parametrosReporte.formato === 'pdf' ? '1' : '0',
+        ...Object.entries(parametrosReporte).reduce((acc, [key, value]) => {
+          if (typeof value === 'boolean') {
+            acc[key] = value ? '1' : '0';
+          } else {
+            acc[key] = value;
+          }
+          return acc;
+        }, {})
+      });
+      
+      const rutaReporte = `/rcritico/api/dashboard/generar_reporte_pdf.php?${params.toString()}`;
+      
+      const response = await fetch(`${API_BASE}/stockholders/informes.php?proyecto_id=${proyectoId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...nuevoInforme,
+          ruta_pdf: rutaReporte,
+          parametros_reporte: parametrosReporte
+        })
+      });
+      
+      if (response.ok) {
+        const informeCreado = await response.json();
+        setInformes([informeCreado, ...informes]);
+        setModalCrearInforme(false);
+        setNuevoInforme({
+          titulo: '',
+          descripcion: '',
+          fecha: new Date().toISOString().split('T')[0],
+          periodo: '',
+          destinatarios: '',
+          tipo: 'Ejecutivo'
+        });
+        setParametrosReporte({
+          incluirPortada: true,
+          incluirResumenEjecutivo: true,
+          incluirKPIs: true,
+          incluirAvancePorEmpresa: true,
+          incluirResumenRiesgos: true,
+          incluirInformacionProyecto: true,
+          nivelDetalle: 'normal',
+          formato: 'pdf'
+        });
+        alert('Informe creado correctamente');
+      } else {
+        const error = await response.json();
+        alert('Error al crear el informe: ' + (error.error || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al crear el informe');
+    }
   };
 
-  const handleEliminarInforme = (id) => {
+  const handleEliminarInforme = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este informe?')) {
-      setInformes(informes.filter(i => i.id !== id));
+      try {
+        const response = await fetch(`${API_BASE}/stockholders/informes.php?id=${id}&proyecto_id=${proyectoId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          setInformes(informes.filter(i => i.id !== id));
+          alert('Informe eliminado correctamente');
+        } else {
+          const error = await response.json();
+          alert('Error al eliminar el informe: ' + (error.error || 'Error desconocido'));
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error al eliminar el informe');
+      }
+    }
+  };
+
+  const handleAsociarReporteEjecutivo = async (informeId) => {
+    if (window.confirm('¿Deseas asociar el reporte ejecutivo del proyecto a este informe?')) {
+      try {
+        const response = await fetch(`${API_BASE}/stockholders/asociar_reporte.php`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            informe_id: informeId,
+            proyecto_id: proyectoId
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          // Recargar informes para ver el cambio
+          cargarInformes();
+          alert('Reporte ejecutivo asociado correctamente');
+        } else {
+          const error = await response.json();
+          alert('Error al asociar el reporte: ' + (error.error || 'Error desconocido'));
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error al asociar el reporte ejecutivo');
+      }
     }
   };
 
@@ -314,10 +387,12 @@ const InformesStockholders = ({ proyectoId, sidebarCollapsed }) => {
                   <i className="fa fa-users" style={{ color: '#0a6ebd', width: '14px' }}></i>
                   <span>{informe.destinatarios}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <i className="fa fa-file-pdf" style={{ color: '#0a6ebd', width: '14px' }}></i>
-                  <span>{informe.paginas} páginas</span>
-                </div>
+                {informe.ruta_pdf && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981' }}>
+                    <i className="fa fa-check-circle" style={{ width: '14px' }}></i>
+                    <span>Reporte ejecutivo asociado</span>
+                  </div>
+                )}
               </div>
 
               {/* Acciones */}
@@ -326,30 +401,77 @@ const InformesStockholders = ({ proyectoId, sidebarCollapsed }) => {
                 gap: '8px',
                 marginTop: '12px',
                 paddingTop: '12px',
-                borderTop: '1px solid #e2e8f0'
+                borderTop: '1px solid #e2e8f0',
+                flexWrap: 'wrap'
               }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    alert('Función de descargar no implementada');
-                  }}
-                  style={{
-                    flex: 1,
-                    background: '#f0f9ff',
-                    color: '#0a6ebd',
-                    border: 'none',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = '#dbeafe'}
-                  onMouseOut={e => e.currentTarget.style.background = '#f0f9ff'}
-                >
-                  <i className="fa fa-download"></i> Descargar
-                </button>
+                {informe.ruta_pdf ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Si la ruta ya incluye el dominio completo, usarla directamente
+                      // Si es relativa, construir la URL completa
+                      let url = informe.ruta_pdf;
+                      if (url.startsWith('/')) {
+                        // Ruta relativa, usar API_BASE si no incluye /rcritico
+                        if (!url.startsWith('/rcritico')) {
+                          url = `${API_BASE}${url}`;
+                        } else {
+                          // Ya incluye /rcritico, construir URL completa
+                          // Si estamos en puerto de React (3000, 3001, etc.), usar localhost sin puerto (puerto 80)
+                          const port = window.location.port;
+                          if (port && (port === '3000' || port === '3001' || port === '3002')) {
+                            url = `http://localhost${url}`;
+                          } else {
+                            // Usar el host actual
+                            const protocol = window.location.protocol;
+                            const host = window.location.host;
+                            url = `${protocol}//${host}${url}`;
+                          }
+                        }
+                      }
+                      window.open(url, '_blank');
+                    }}
+                    style={{
+                      flex: 1,
+                      background: '#f0f9ff',
+                      color: '#0a6ebd',
+                      border: 'none',
+                      padding: '8px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = '#dbeafe'}
+                    onMouseOut={e => e.currentTarget.style.background = '#f0f9ff'}
+                  >
+                    <i className="fa fa-download"></i> Ver PDF
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAsociarReporteEjecutivo(informe.id);
+                    }}
+                    style={{
+                      flex: 1,
+                      background: '#fff7ed',
+                      color: '#f59e0b',
+                      border: 'none',
+                      padding: '8px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = '#ffedd5'}
+                    onMouseOut={e => e.currentTarget.style.background = '#fff7ed'}
+                  >
+                    <i className="fa fa-link"></i> Asociar Reporte
+                  </button>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -643,6 +765,7 @@ const InformesStockholders = ({ proyectoId, sidebarCollapsed }) => {
                   value={nuevoInforme.destinatarios}
                   onChange={(e) => setNuevoInforme({ ...nuevoInforme, destinatarios: e.target.value })}
                   placeholder="Ej: Accionistas, Board of Directors"
+                  placeholder="Ej: Accionistas, Board of Directors"
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -652,6 +775,155 @@ const InformesStockholders = ({ proyectoId, sidebarCollapsed }) => {
                     boxSizing: 'border-box'
                   }}
                 />
+              </div>
+
+              {/* Sección de Personalización del Reporte */}
+              <div style={{
+                marginTop: '24px',
+                padding: '20px',
+                background: '#f8f9fa',
+                borderRadius: '12px',
+                border: '2px solid #e5e7eb'
+              }}>
+                <h3 style={{
+                  margin: '0 0 16px 0',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  color: '#0a3265',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <i className="fa fa-cog"></i>
+                  Personalización del Reporte
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Secciones a incluir */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '8px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#4b5563'
+                    }}>
+                      Secciones a Incluir:
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { key: 'incluirPortada', label: 'Portada', icon: 'fa-file' },
+                        { key: 'incluirResumenEjecutivo', label: 'Resumen Ejecutivo', icon: 'fa-chart-line' },
+                        { key: 'incluirKPIs', label: 'Indicadores Clave (KPIs)', icon: 'fa-chart-pie' },
+                        { key: 'incluirAvancePorEmpresa', label: 'Avance por Empresa', icon: 'fa-building' },
+                        { key: 'incluirResumenRiesgos', label: 'Resumen por Riesgo Crítico', icon: 'fa-exclamation-triangle' },
+                        { key: 'incluirInformacionProyecto', label: 'Información del Proyecto', icon: 'fa-info-circle' }
+                      ].map(seccion => (
+                        <label key={seccion.key} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          cursor: 'pointer',
+                          padding: '8px',
+                          borderRadius: '6px',
+                          transition: 'background 0.2s ease'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = '#ffffff'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={parametrosReporte[seccion.key]}
+                            onChange={(e) => setParametrosReporte({
+                              ...parametrosReporte,
+                              [seccion.key]: e.target.checked
+                            })}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <i className={`fa ${seccion.icon}`} style={{ color: '#0a6ebd', width: '16px' }}></i>
+                          <span style={{ fontSize: '13px', color: '#374151' }}>{seccion.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Nivel de detalle */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '8px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#4b5563'
+                    }}>
+                      Nivel de Detalle:
+                    </label>
+                    <select
+                      value={parametrosReporte.nivelDetalle}
+                      onChange={(e) => setParametrosReporte({
+                        ...parametrosReporte,
+                        nivelDetalle: e.target.value
+                      })}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        background: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="basico">Básico (Solo resumen)</option>
+                      <option value="normal">Normal (Resumen + KPIs principales)</option>
+                      <option value="detallado">Detallado (Todas las métricas y análisis)</option>
+                    </select>
+                  </div>
+
+                  {/* Formato */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      marginBottom: '8px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#4b5563'
+                    }}>
+                      Formato de Salida:
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      {['pdf', 'html'].map(formato => (
+                        <label key={formato} style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '10px',
+                          border: `2px solid ${parametrosReporte.formato === formato ? '#0a6ebd' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: parametrosReporte.formato === formato ? '#eff6ff' : 'white',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <input
+                            type="radio"
+                            name="formato"
+                            value={formato}
+                            checked={parametrosReporte.formato === formato}
+                            onChange={(e) => setParametrosReporte({
+                              ...parametrosReporte,
+                              formato: e.target.value
+                            })}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <i className={`fa fa-file-${formato === 'pdf' ? 'pdf' : 'code'}`} style={{ color: '#0a6ebd' }}></i>
+                          <span style={{ fontSize: '13px', fontWeight: '600', textTransform: 'uppercase' }}>{formato}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -879,41 +1151,111 @@ const InformesStockholders = ({ proyectoId, sidebarCollapsed }) => {
                 paddingTop: '24px',
                 borderTop: '2px solid #f3f4f6'
               }}>
-                <button
-                  onClick={() => alert('Función de visualizar no implementada')}
-                  style={{
+                {modalVerInforme.ruta_pdf ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        // Construir URL del PDF
+                        let url = modalVerInforme.ruta_pdf;
+                        if (url.startsWith('/')) {
+                          // Ruta relativa, construir URL completa
+                          if (!url.startsWith('/rcritico')) {
+                            url = `${API_BASE}${url}`;
+                          } else {
+                            // Ya incluye /rcritico, construir URL completa
+                            // Si estamos en puerto de React (3000, 3001, etc.), usar localhost sin puerto (puerto 80)
+                            const port = window.location.port;
+                            if (port && (port === '3000' || port === '3001' || port === '3002')) {
+                              url = `http://localhost${url}`;
+                            } else {
+                              // Usar el host actual
+                              const protocol = window.location.protocol;
+                              const host = window.location.host;
+                              url = `${protocol}//${host}${url}`;
+                            }
+                          }
+                        }
+                        // Abrir en nueva pestaña
+                        window.open(url, '_blank');
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '14px',
+                        background: 'linear-gradient(135deg, #0a6ebd 0%, #0a3265 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.background = 'linear-gradient(135deg, #0a5aa8 0%, #0a2855 100%)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'linear-gradient(135deg, #0a6ebd 0%, #0a3265 100%)'}
+                    >
+                      <i className="fa fa-eye"></i> Ver Informe
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Construir URL del PDF
+                        let url = modalVerInforme.ruta_pdf;
+                        if (url.startsWith('/')) {
+                          // Ruta relativa, construir URL completa
+                          if (!url.startsWith('/rcritico')) {
+                            url = `${API_BASE}${url}`;
+                          } else {
+                            // Ya incluye /rcritico, construir URL completa
+                            // Si estamos en puerto de React (3000, 3001, etc.), usar localhost sin puerto (puerto 80)
+                            const port = window.location.port;
+                            if (port && (port === '3000' || port === '3001' || port === '3002')) {
+                              url = `http://localhost${url}`;
+                            } else {
+                              // Usar el host actual
+                              const protocol = window.location.protocol;
+                              const host = window.location.host;
+                              url = `${protocol}//${host}${url}`;
+                            }
+                          }
+                        }
+                        // Forzar descarga agregando parámetro o usando download
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `reporte_${modalVerInforme.titulo.replace(/\s+/g, '_')}_${modalVerInforme.fecha}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      style={{
+                        padding: '14px 20px',
+                        background: '#f0f9ff',
+                        color: '#0a6ebd',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.background = '#dbeafe'}
+                      onMouseOut={e => e.currentTarget.style.background = '#f0f9ff'}
+                    >
+                      <i className="fa fa-download"></i>
+                    </button>
+                  </>
+                ) : (
+                  <div style={{
                     flex: 1,
                     padding: '14px',
-                    background: 'linear-gradient(135deg, #0a6ebd 0%, #0a3265 100%)',
-                    color: 'white',
+                    background: '#f3f4f6',
+                    color: '#6b7280',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <i className="fa fa-eye"></i> Ver Informe
-                </button>
-                <button
-                  onClick={() => alert('Función de descargar no implementada')}
-                  style={{
-                    padding: '14px 20px',
-                    background: '#f0f9ff',
-                    color: '#0a6ebd',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = '#dbeafe'}
-                  onMouseOut={e => e.currentTarget.style.background = '#f0f9ff'}
-                >
-                  <i className="fa fa-download"></i>
-                </button>
+                    textAlign: 'center'
+                  }}>
+                    No hay reporte asociado
+                  </div>
+                )}
               </div>
             </div>
           </div>

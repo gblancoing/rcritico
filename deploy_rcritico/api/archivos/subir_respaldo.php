@@ -32,6 +32,41 @@ if (!file_exists($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
+/**
+ * Obtener tipo MIME de forma compatible (sin depender de fileinfo)
+ */
+function obtenerMimeType($filePath, $fileName) {
+    $mimeTypes = [
+        'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+        'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $mimeType = finfo_file($finfo, $filePath);
+            finfo_close($finfo);
+            if ($mimeType && $mimeType !== 'application/octet-stream') {
+                return $mimeType;
+            }
+        }
+    }
+    
+    if (function_exists('mime_content_type')) {
+        $mimeType = @mime_content_type($filePath);
+        if ($mimeType && $mimeType !== 'application/octet-stream') {
+            return $mimeType;
+        }
+    }
+    
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    return $mimeTypes[$extension] ?? 'application/octet-stream';
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'error' => 'Método no permitido']);
     exit();
@@ -72,10 +107,8 @@ try {
             continue;
         }
         
-        // Validar tipo
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $fileTmp);
-        finfo_close($finfo);
+        // Validar tipo (compatible con servidores sin fileinfo)
+        $mimeType = obtenerMimeType($fileTmp, $fileName);
         
         if (!in_array($mimeType, $allowedTypes)) {
             $errores[] = "Tipo de archivo no permitido: $fileName ($mimeType)";

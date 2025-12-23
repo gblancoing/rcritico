@@ -98,9 +98,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // PUT - Actualizar empresa
 if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
-    $data = json_decode(file_get_contents('php://input'), true);
-    if (!isset($data['empresa_id'], $data['nombre'], $data['rut']) || empty($data['rut'])) {
-        echo json_encode(['success' => false, 'error' => 'Datos incompletos: empresa_id, nombre y RUT son obligatorios'], JSON_UNESCAPED_UNICODE);
+    $rawInput = file_get_contents('php://input');
+    $data = json_decode($rawInput, true);
+    
+    // Validar que el JSON se decodificó correctamente
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false, 
+            'error' => 'JSON inválido: ' . json_last_error_msg(),
+            'raw_input' => substr($rawInput, 0, 200)
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    // Validar campos requeridos
+    if (!isset($data['empresa_id']) || empty($data['empresa_id'])) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false, 
+            'error' => 'empresa_id es obligatorio',
+            'data_received' => array_keys($data)
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    if (!isset($data['nombre']) || empty(trim($data['nombre']))) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'El nombre es obligatorio'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    if (!isset($data['rut']) || empty(trim($data['rut']))) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'El RUT es obligatorio'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     

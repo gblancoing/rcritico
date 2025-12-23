@@ -141,6 +141,26 @@ const construirUrlIcono = (iconoUrl) => {
   return `${baseUrl}/img/iconos/${iconoUrl}`;
 };
 
+// Función para obtener la URL del icono basándose en el nombre de la carpeta
+const obtenerIconoPorNombre = (nombreCarpeta) => {
+  if (!nombreCarpeta) return null;
+  
+  // Extraer el código de la carpeta (ej: "RC01" -> "rc01")
+  const codigoMatch = nombreCarpeta.match(/RC(\d+)/i);
+  if (!codigoMatch) return null;
+  
+  const numero = codigoMatch[1].padStart(2, '0'); // Asegurar 2 dígitos
+  const nombreIcono = `rc${numero}.png`;
+  
+  // Determinar la base URL
+  let baseUrl = window.location.origin;
+  if (process.env.NODE_ENV === 'development' && ['3000', '3001', '3002'].includes(window.location.port)) {
+    baseUrl = 'http://localhost/rcritico';
+  }
+  
+  return `${baseUrl}/img/iconos/${nombreIcono}`;
+};
+
 // Función para formatear el último usuario que editó con fecha y hora
 const formatearUltimoUsuarioEdito = (usuarioString) => {
   if (!usuarioString || usuarioString === '-') return '-';
@@ -264,9 +284,16 @@ const puedeEditarBowtie = (user, rutaNavegacion) => {
 // trabajador solo puede editar columnas específicas en nivel 2
 const puedeEditarLineaBase = (user, rutaNavegacion) => {
   if (!user) return false;
+  
+  // super_admin puede editar/validar en cualquier nivel
   if (user.rol === 'super_admin') return true;
-  if (user.rol === 'admin' && rutaNavegacion.length === 2) return true; // Solo nivel 2
-  if (user.rol === 'trabajador' && rutaNavegacion.length === 2) return true; // Solo nivel 2
+  
+  // admin puede editar/validar en nivel 1 (Proyecto Principal) y nivel 2
+  if (user.rol === 'admin' && (rutaNavegacion.length === 1 || rutaNavegacion.length === 2)) return true;
+  
+  // trabajador puede editar/validar solo en nivel 2
+  if (user.rol === 'trabajador' && rutaNavegacion.length === 2) return true;
+  
   return false;
 };
 
@@ -278,8 +305,8 @@ const puedeEditarColumnaLineaBase = (user, rutaNavegacion, columna) => {
   // super_admin puede editar todas las columnas en cualquier nivel
   if (user.rol === 'super_admin') return true;
   
-  // admin puede editar todas las columnas solo en nivel 2
-  if (user.rol === 'admin' && rutaNavegacion.length === 2) return true;
+  // admin puede editar todas las columnas en nivel 1 (Proyecto Principal) y nivel 2
+  if (user.rol === 'admin' && (rutaNavegacion.length === 1 || rutaNavegacion.length === 2)) return true;
   
   // trabajador solo puede editar columnas específicas en nivel 2
   if (user.rol === 'trabajador' && rutaNavegacion.length === 2) {
@@ -953,7 +980,9 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [modalAsignarUsuario, setModalAsignarUsuario] = useState(null);
   const [filtroEmpresaAsignar, setFiltroEmpresaAsignar] = useState(''); // Filtro de empresa para asignar usuarios
   const [empresasContratistas, setEmpresasContratistas] = useState([]); // Lista de empresas contratistas
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState(''); // Empresa seleccionada para nivel 1
   const [modalEditarCarpeta, setModalEditarCarpeta] = useState(null);
+  const [modalEditarArchivo, setModalEditarArchivo] = useState(null); // Modal para editar nombre de archivo
   const [archivoPreview, setArchivoPreview] = useState(null); // Archivo para previsualizar
   const [pdfError, setPdfError] = useState(false); // Error al cargar PDF
   const [pdfPages, setPdfPages] = useState([]); // Páginas del PDF renderizadas
@@ -994,6 +1023,7 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [pdfLoading, setPdfLoading] = useState(false); // Estado de carga del PDF
   const [pdfViewUrl, setPdfViewUrl] = useState(null); // URL efectiva del PDF en preview
   const [previewMaximizado, setPreviewMaximizado] = useState(false); // Estado para maximizar previsualización
+  const [officeViewerError, setOfficeViewerError] = useState({ word: false, excel: false, powerpoint: false }); // Errores de visores de Office
   const [uploadProgress, setUploadProgress] = useState(null); // { archivo: nombre, progreso: 0-100, estado: 'subiendo'|'completado'|'error' }
   const [archivosSubiendo, setArchivosSubiendo] = useState([]); // Lista de archivos en proceso de subida
   const [vistaArchivos, setVistaArchivos] = useState('lista'); // Opciones: 'lista', 'iconos_grandes', 'iconos_medianos', 'detalles'
@@ -1015,6 +1045,10 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   
   // Estado para menú de acciones de carpeta
   const [menuAccionesCarpeta, setMenuAccionesCarpeta] = useState(null); // ID de carpeta con menú abierto
+  
+  // Estado para código secreto al eliminar carpetas nivel 1
+  const [modalEliminarCarpetaNivel1, setModalEliminarCarpetaNivel1] = useState(null); // { id, nombre }
+  const [codigoSecretoEliminarCarpeta, setCodigoSecretoEliminarCarpeta] = useState('');
   
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -1145,6 +1179,9 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
       const extension = archivoPreview.nombre_original.split('.').pop().toLowerCase();
       const tipoMime = archivoPreview.tipo_mime || '';
       
+      // Resetear errores de visores de Office cuando cambia el archivo
+      setOfficeViewerError({ word: false, excel: false, powerpoint: false });
+      
       if (extension === 'pdf' || tipoMime.includes('pdf')) {
         // Construir URL completa para el endpoint de visualización
         let resolvedPdfUrl;
@@ -1167,6 +1204,7 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
       // Resetear estado de maximizado cuando se cierra el preview
       setPreviewMaximizado(false);
       setPdfViewUrl(null);
+      setOfficeViewerError({ word: false, excel: false, powerpoint: false });
     }
   }, [archivoPreview?.id, previewMaximizado]);
   
@@ -1257,6 +1295,10 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
     icono_url: ''
   });
   const [iconoPreview, setIconoPreview] = useState(null); // Preview del icono seleccionado
+  const [iconoFileEditar, setIconoFileEditar] = useState(null); // Archivo de icono para editar
+  const [iconoPreviewEditar, setIconoPreviewEditar] = useState(null); // Preview del icono en edición
+  const [imagenPortadaPreview, setImagenPortadaPreview] = useState(null); // Preview de imagen de portada
+  const [imagenPortadaFile, setImagenPortadaFile] = useState(null); // Archivo de imagen de portada
 const [rutaNavegacion, setRutaNavegacion] = useState([]); // Breadcrumb
 const [modalEliminacionExito, setModalEliminacionExito] = useState(null); // { nombre, archivos, subcarpetas }
 
@@ -2622,15 +2664,25 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       
       console.log('[Línea Base] Total controles encontrados:', controlesPreventivos.length);
       
+      // Siempre intentar cargar línea base existente desde API primero
+      let lineaBaseDirecta = null;
+      try {
+        const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaId}`);
+        const dataLineaBase = await resLineaBase.json();
+        
+        if (dataLineaBase.success && dataLineaBase.linea_base && dataLineaBase.linea_base.length > 0) {
+          lineaBaseDirecta = dataLineaBase.linea_base;
+        }
+      } catch (error) {
+        console.error('[Línea Base] Error cargando línea base desde API:', error);
+      }
+      
       if (controlesPreventivos.length > 0) {
-        // Intentar cargar línea base existente desde API (si existe)
+        // Intentar sincronizar línea base con controles preventivos
         try {
-          const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaId}`);
-          const dataLineaBase = await resLineaBase.json();
-          
-          if (dataLineaBase.success && dataLineaBase.linea_base && dataLineaBase.linea_base.length > 0) {
+          if (lineaBaseDirecta && lineaBaseDirecta.length > 0) {
             // Si hay línea base guardada, sincronizar con controles preventivos actuales
-            const lineaBaseExistente = dataLineaBase.linea_base;
+            const lineaBaseExistente = lineaBaseDirecta;
             // Crear una fila por cada dimensión-pregunta de cada control
             const nuevaLineaBase = [];
             
@@ -2778,6 +2830,39 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
             setTimeout(() => {
               console.log('[Línea Base] Estado verificado después de setLineaBase:', nuevaLineaBase.length);
             }, 0);
+          } else if (lineaBaseDirecta && lineaBaseDirecta.length > 0) {
+            // Si hay datos de línea base pero no se pudieron sincronizar con controles preventivos,
+            // usar directamente los datos de la API
+            console.log('[Línea Base] No se pudo sincronizar con controles preventivos, usando datos directos de API');
+            const nuevaLineaBase = lineaBaseDirecta.map(lb => ({
+              id: lb.id || null,
+              control_preventivo_id: lb.control_preventivo_id || null,
+              codigo: lb.codigo || '',
+              control_critico_preventivo: lb.control_critico_preventivo || '',
+              dimension: lb.dimension || '',
+              pregunta: lb.pregunta || '',
+              evidencia: lb.evidencia || '',
+              verificador_responsable: lb.verificador_responsable || '',
+              fecha_verificacion: lb.fecha_verificacion || '',
+              implementado_estandar_desempeno: (lb.implementado_estandar || lb.implementado_estandar_desempeno) || '',
+              accion_a_ejecutar: lb.accion_ejecutar || '',
+              responsable_cierre_accion: lb.responsable_cierre || '',
+              fecha_cierre: lb.fecha_cierre || '',
+              criticidad: lb.criticidad || '',
+              porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
+              nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
+              comentario_trabajador: lb.comentario_trabajador || '',
+              archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
+              conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
+              ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
+              estado_validacion: lb.estado_validacion || null,
+              comentario_validacion: lb.comentario_validacion || '',
+              usuario_validacion: lb.usuario_validacion || '',
+              fecha_validacion: lb.fecha_validacion || '',
+              ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
+            }));
+            console.log('[Línea Base] Línea base cargada directamente desde API:', nuevaLineaBase.length, 'elementos');
+            setLineaBase(nuevaLineaBase);
           } else {
             // Si no hay línea base guardada, crear desde controles preventivos
             // Crear una fila por cada dimensión-pregunta de cada control
@@ -3005,9 +3090,52 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           }, 0);
         }
       } else {
-        // Si no hay controles preventivos, limpiar línea base
-        console.log('[Línea Base] No hay controles preventivos, limpiando línea base');
-        setLineaBase([]);
+        // Si no hay controles preventivos, intentar cargar línea base directamente desde API
+        console.log('[Línea Base] No hay controles preventivos, intentando cargar línea base directamente desde API');
+        try {
+          const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaId}`);
+          const dataLineaBase = await resLineaBase.json();
+          
+          if (dataLineaBase.success && dataLineaBase.linea_base && dataLineaBase.linea_base.length > 0) {
+            // Usar directamente los datos de la API sin sincronizar con controles preventivos
+            const nuevaLineaBase = dataLineaBase.linea_base.map(lb => ({
+              id: lb.id || null,
+              control_preventivo_id: lb.control_preventivo_id || null,
+              codigo: lb.codigo || '',
+              control_critico_preventivo: lb.control_critico_preventivo || '',
+              dimension: lb.dimension || '',
+              pregunta: lb.pregunta || '',
+              evidencia: lb.evidencia || '',
+              verificador_responsable: lb.verificador_responsable || '',
+              fecha_verificacion: lb.fecha_verificacion || '',
+              implementado_estandar_desempeno: (lb.implementado_estandar || lb.implementado_estandar_desempeno) || '',
+              accion_a_ejecutar: lb.accion_ejecutar || '',
+              responsable_cierre_accion: lb.responsable_cierre || '',
+              fecha_cierre: lb.fecha_cierre || '',
+              criticidad: lb.criticidad || '',
+              porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
+              nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
+              comentario_trabajador: lb.comentario_trabajador || '',
+              archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
+              conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
+              ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
+              estado_validacion: lb.estado_validacion || null,
+              comentario_validacion: lb.comentario_validacion || '',
+              usuario_validacion: lb.usuario_validacion || '',
+              fecha_validacion: lb.fecha_validacion || '',
+              ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
+            }));
+            
+            console.log('[Línea Base] Línea base cargada directamente desde API (sin controles preventivos):', nuevaLineaBase.length, 'elementos');
+            setLineaBase(nuevaLineaBase);
+          } else {
+            console.log('[Línea Base] No hay línea base en la API, limpiando');
+            setLineaBase([]);
+          }
+        } catch (error) {
+          console.error('[Línea Base] Error cargando línea base directamente:', error);
+          setLineaBase([]);
+        }
       }
     } catch (error) {
       console.error('[Línea Base] Error cargando línea base:', error);
@@ -3419,11 +3547,26 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         mostrarNotificacion(`✓ ${data.archivos.length} archivo(s) subido(s)`, 'success');
         cargarDocumentosLineaBase(lineaBaseId, documentosCarpetaActual);
       } else {
-        mostrarNotificacion('✗ Error: ' + (data.error || data.errores?.join(', ')), 'error');
+        // Mostrar error detallado en consola para diagnóstico
+        console.error('Error subida documentos:', data);
+        let mensajeError = data.error || 'Error desconocido';
+        if (data.errores && data.errores.length > 0) {
+          mensajeError += ' - ' + data.errores.join(', ');
+        }
+        if (data.debug) {
+          console.error('Debug info:', data.debug);
+          // Mostrar info de debug relevante al usuario
+          if (!data.debug.uploadDir_writable) {
+            mensajeError = 'El directorio de uploads no tiene permisos de escritura';
+          } else if (!data.debug.uploadDir_exists) {
+            mensajeError = 'El directorio de uploads no existe';
+          }
+        }
+        mostrarNotificacion('✗ ' + mensajeError, 'error');
       }
     } catch (error) {
-      console.error('Error subiendo archivos:', error);
-      mostrarNotificacion('✗ Error al subir archivos', 'error');
+      console.error('Error subiendo archivos (catch):', error);
+      mostrarNotificacion('✗ Error de conexión al subir archivos', 'error');
     } finally {
       setCargandoDocumentos(false);
     }
@@ -4958,6 +5101,49 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
   };
 
+  const editarArchivosCarpeta = async () => {
+    if (!modalEditarArchivosCarpeta || !modalEditarArchivosCarpeta.nombre.trim()) {
+      alert('El nombre de la carpeta no puede estar vacío');
+      return;
+    }
+    
+    try {
+      const res = await fetch(`${API_BASE}/archivos/archivos_carpetas.php`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: modalEditarArchivosCarpeta.id,
+          nombre: modalEditarArchivosCarpeta.nombre.trim(),
+          descripcion: modalEditarArchivosCarpeta.descripcion || ''
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setModalEditarArchivosCarpeta(null);
+        cargarArchivosCarpetas(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : null);
+        // Actualizar también en la ruta si está ahí
+        if (archivosCarpetaActual && archivosCarpetaActual.id === modalEditarArchivosCarpeta.id) {
+          setArchivosCarpetaActual({ ...archivosCarpetaActual, nombre: modalEditarArchivosCarpeta.nombre.trim() });
+        }
+        const nuevaRuta = rutaArchivosCarpetas.map(c => 
+          c.id === modalEditarArchivosCarpeta.id 
+            ? { ...c, nombre: modalEditarArchivosCarpeta.nombre.trim() }
+            : c
+        );
+        setRutaArchivosCarpetas(nuevaRuta);
+      } else {
+        alert(data.error || 'Error al editar la carpeta');
+      }
+    } catch (error) {
+      console.error('Error editando carpeta de archivos:', error);
+      alert('Error al editar la carpeta');
+    }
+  };
+
   const navegarArchivosCarpeta = async (carpeta) => {
     if (carpeta === null) {
       // Volver a la raíz
@@ -5120,6 +5306,15 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
   };
 
+  // Cargar empresas cuando se abre el modal en nivel 1
+  useEffect(() => {
+    if (modalCrearCarpeta && rutaNavegacion.length === 1) {
+      if (empresasContratistas.length === 0) {
+        cargarEmpresasContratistas();
+      }
+    }
+  }, [modalCrearCarpeta, rutaNavegacion.length]);
+
   const cargarUsuariosAsignados = async (carpetaId) => {
     try {
       const res = await fetch(`${API_BASE}/archivos/carpeta_usuarios.php?carpeta_id=${carpetaId}`);
@@ -5179,6 +5374,23 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
   };
 
   const handleCrearCarpeta = async () => {
+    // Validación especial para nivel 1: debe seleccionar una empresa
+    if (rutaNavegacion.length === 1) {
+      if (!empresaSeleccionada) {
+        alert('Debe seleccionar una empresa');
+        return;
+      }
+      const empresa = empresasContratistas.find(emp => emp.empresa_id === empresaSeleccionada);
+      if (!empresa) {
+        alert('La empresa seleccionada no es válida');
+        return;
+      }
+      // Asegurar que el nombre sea el de la empresa
+      if (nuevaCarpeta.nombre !== empresa.nombre) {
+        setNuevaCarpeta({ ...nuevaCarpeta, nombre: empresa.nombre });
+      }
+    }
+    
     if (!nuevaCarpeta.nombre.trim()) {
       alert('El nombre de la carpeta es requerido');
       return;
@@ -5268,6 +5480,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         setModalCrearCarpeta(false);
         setNuevaCarpeta({ nombre: '', descripcion: '', color_primario: '', color_secundario: '', icono_url: '' });
         setIconoPreview(null);
+        setEmpresaSeleccionada('');
         cargarCarpetas();
       } else {
         const errorMsg = data.error || 'Error desconocido';
@@ -5280,6 +5493,36 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
   };
 
+  // Función para editar nombre de archivo
+  const handleEditarArchivo = async () => {
+    if (!modalEditarArchivo || !modalEditarArchivo.nombre_original.trim()) {
+      alert('El nombre del archivo es requerido');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/archivos/archivos.php`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: modalEditarArchivo.id,
+          nombre_original: modalEditarArchivo.nombre_original
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setModalEditarArchivo(null);
+        cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root');
+      } else {
+        alert('Error al actualizar el nombre: ' + (data.error || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('Error actualizando archivo:', error);
+      alert('Error al actualizar el nombre: ' + (error.message || 'Error de conexión'));
+    }
+  };
+
   const handleEditarCarpeta = async () => {
     if (!modalEditarCarpeta || !modalEditarCarpeta.nombre.trim()) {
       alert('El nombre de la carpeta es requerido');
@@ -5287,6 +5530,50 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
 
     try {
+      let imagen_portada_url = modalEditarCarpeta.imagen_portada_url || null;
+      let icono_url = modalEditarCarpeta.icono_url || null;
+      
+      // Si hay un icono para subir, subirlo primero
+      if (iconoFileEditar) {
+        const formDataIcono = new FormData();
+        formDataIcono.append('icono', iconoFileEditar);
+        formDataIcono.append('carpeta_id', modalEditarCarpeta.id);
+        formDataIcono.append('usuario_id', user.id);
+        
+        const uploadResIcono = await fetch(`${API_BASE}/archivos/subir_icono_carpeta.php`, {
+          method: 'POST',
+          body: formDataIcono
+        });
+        
+        const uploadDataIcono = await uploadResIcono.json();
+        if (uploadDataIcono.success) {
+          icono_url = uploadDataIcono.icono_url;
+        } else {
+          alert('Error al subir el icono: ' + (uploadDataIcono.error || 'Error desconocido'));
+          return;
+        }
+      }
+      
+      // Si hay una imagen de portada para subir, subirla primero
+      if (imagenPortadaFile) {
+        const formData = new FormData();
+        formData.append('imagen', imagenPortadaFile);
+        formData.append('carpeta_id', modalEditarCarpeta.id);
+        
+        const uploadRes = await fetch(`${API_BASE}/archivos/subir_imagen_portada.php`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const uploadData = await uploadRes.json();
+        if (uploadData.success) {
+          imagen_portada_url = uploadData.imagen_portada_url;
+        } else {
+          alert('Error al subir la imagen: ' + (uploadData.error || 'Error desconocido'));
+          return;
+        }
+      }
+      
       const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -5296,16 +5583,22 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           descripcion: modalEditarCarpeta.descripcion,
           usuario_id: user.id,
           color_primario: user.rol === 'super_admin' ? (modalEditarCarpeta.color_primario || null) : null,
-          color_secundario: user.rol === 'super_admin' ? (modalEditarCarpeta.color_secundario || null) : null
+          color_secundario: user.rol === 'super_admin' ? (modalEditarCarpeta.color_secundario || null) : null,
+          imagen_portada_url: imagen_portada_url,
+          icono_url: icono_url
         })
       });
 
       const data = await res.json();
       if (data.success) {
         setModalEditarCarpeta(null);
+        setImagenPortadaPreview(null);
+        setImagenPortadaFile(null);
+        setIconoPreviewEditar(null);
+        setIconoFileEditar(null);
         cargarCarpetas();
         if (carpetaActual && carpetaActual.id === modalEditarCarpeta.id) {
-          setCarpetaActual({ ...carpetaActual, nombre: modalEditarCarpeta.nombre, descripcion: modalEditarCarpeta.descripcion });
+          setCarpetaActual({ ...carpetaActual, nombre: modalEditarCarpeta.nombre, descripcion: modalEditarCarpeta.descripcion, imagen_portada_url, icono_url });
         }
       } else {
         alert('Error al editar carpeta: ' + (data.error || 'Error desconocido'));
@@ -5357,6 +5650,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     const carpeta = carpetas.find(c => c.id === carpetaId);
     const nombreCarpeta = carpeta ? carpeta.nombre : 'esta carpeta';
     
+    // Verificar si es una carpeta del nivel 1 (carpeta_padre_id es null y estamos en la raíz)
+    const esNivel1 = (!carpeta?.carpeta_padre_id && rutaNavegacion.length === 0) || 
+                     (carpeta?.carpeta_padre_id === null && rutaNavegacion.length === 0);
+    
+    // Si es nivel 1 y es super_admin, requerir código secreto
+    if (esNivel1 && user && user.rol === 'super_admin') {
+      setModalEliminarCarpetaNivel1({ id: carpetaId, nombre: nombreCarpeta });
+      return;
+    }
+    
     const mensaje = `¿Estás seguro de eliminar la carpeta "${nombreCarpeta}"?\n\n` +
                    `⚠️ ADVERTENCIA: Esta acción eliminará en cascada:\n` +
                    `• Todos los archivos dentro de la carpeta\n` +
@@ -5367,6 +5670,11 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     if (!window.confirm(mensaje)) {
       return;
     }
+    
+    await ejecutarEliminacionCarpeta(carpetaId, nombreCarpeta);
+  };
+  
+  const ejecutarEliminacionCarpeta = async (carpetaId, nombreCarpeta) => {
 
     try {
       const url = `${API_BASE}/archivos/carpetas.php?id=${carpetaId}&usuario_id=${user.id}`;
@@ -5419,6 +5727,29 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       console.error('URL intentada:', `${API_BASE}/archivos/carpetas.php?id=${carpetaId}&usuario_id=${user.id}`);
       alert('Error al eliminar carpeta: ' + (error.message || 'Error de conexión') + '\n\nVerifica la consola del navegador (F12) para más detalles.');
     }
+  };
+  
+  // Función para confirmar eliminación de carpeta nivel 1 con código secreto
+  const confirmarEliminacionCarpetaNivel1 = async () => {
+    if (!modalEliminarCarpetaNivel1 || !user || user.rol !== 'super_admin') {
+      return;
+    }
+    
+    // Verificar código secreto (mismo que para eliminar documentos)
+    const CODIGO_SECRETO = 'eliminar2024';
+    if (codigoSecretoEliminarCarpeta !== CODIGO_SECRETO) {
+      alert('❌ Código secreto incorrecto. No se puede eliminar la carpeta.');
+      setCodigoSecretoEliminarCarpeta('');
+      return;
+    }
+    
+    // Cerrar modal y proceder con la eliminación
+    const carpetaId = modalEliminarCarpetaNivel1.id;
+    const nombreCarpeta = modalEliminarCarpetaNivel1.nombre;
+    setModalEliminarCarpetaNivel1(null);
+    setCodigoSecretoEliminarCarpeta('');
+    
+    await ejecutarEliminacionCarpeta(carpetaId, nombreCarpeta);
   };
 
   // Función para duplicar carpeta
@@ -5829,42 +6160,141 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 e.currentTarget.style.borderColor = tieneContenido ? colores.primary + '30' : 'rgba(0,0,0,0.08)';
               }}
             >
-              {/* Icono destacado en la parte superior */}
+              {/* Imagen de portada o icono destacado en la parte superior */}
               <div
                 style={{
-                  background: tieneContenido 
-                    ? `linear-gradient(135deg, ${colores.primary} 0%, ${colores.secondary} 100%)` 
-                    : 'linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 100%)',
-                  padding: '1.25rem 1rem',
+                  background: carpeta.imagen_portada_url 
+                    ? 'transparent'
+                    : tieneContenido 
+                      ? `linear-gradient(135deg, ${colores.primary} 0%, ${colores.secondary} 100%)` 
+                      : 'linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 100%)',
+                  padding: carpeta.imagen_portada_url ? '0' : '1.25rem 1rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   position: 'relative',
                   overflow: 'hidden',
-                  minHeight: '100px'
+                  minHeight: '100px',
+                  height: carpeta.imagen_portada_url ? '100px' : 'auto'
                 }}
               >
-                {/* Efecto de brillo sutil */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-30%',
-                  right: '-30%',
-                  width: '150%',
-                  height: '150%',
-                  background: tieneContenido 
-                    ? `radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%)` 
-                    : 'none',
-                  pointerEvents: 'none'
-                }}></div>
-                
-                {/* Icono grande y destacado */}
-                <div style={{
-                  fontSize: '56px',
-                  color: tieneContenido ? '#ffffff' : '#999',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '80px',
+                {/* Si hay imagen de portada, mostrarla con overlay y icono */}
+                {carpeta.imagen_portada_url ? (
+                  <>
+                    {/* Imagen de fondo */}
+                    <img 
+                      src={carpeta.imagen_portada_url.startsWith('http') 
+                        ? carpeta.imagen_portada_url 
+                        : `${window.location.origin}${carpeta.imagen_portada_url}`}
+                      alt={carpeta.nombre}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        zIndex: 0
+                      }}
+                      onError={(e) => {
+                        // Si falla la carga, ocultar la imagen
+                        e.target.style.display = 'none';
+                        e.target.parentElement.style.background = tieneContenido 
+                          ? `linear-gradient(135deg, ${colores.primary} 0%, ${colores.secondary} 100%)` 
+                          : 'linear-gradient(135deg, #e8e8e8 0%, #f0f0f0 100%)';
+                        e.target.parentElement.style.padding = '1.25rem 1rem';
+                      }}
+                    />
+                    {/* Overlay oscuro (40% opacidad) */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      zIndex: 1
+                    }}></div>
+                    {/* Icono centrado encima del overlay */}
+                    <div style={{
+                      position: 'relative',
+                      zIndex: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: '100%'
+                    }}>
+                      <div style={{
+                        fontSize: '56px',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '80px',
+                        height: '80px',
+                        background: 'rgba(255,255,255,0.2)',
+                        borderRadius: '16px',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                        overflow: 'hidden',
+                        backdropFilter: 'blur(10px)',
+                        border: '2px solid rgba(255,255,255,0.3)'
+                      }}>
+                        {(carpeta.icono_url || obtenerIconoPorNombre(carpeta.nombre)) ? (
+                          <img 
+                            src={carpeta.icono_url 
+                              ? construirUrlIcono(carpeta.icono_url) 
+                              : obtenerIconoPorNombre(carpeta.nombre)} 
+                            alt={carpeta.nombre}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              padding: '8px'
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              const iconElement = e.target.parentElement.querySelector('i.fa');
+                              if (iconElement) {
+                                iconElement.style.display = 'flex';
+                              }
+                            }}
+                          />
+                        ) : null}
+                        <i 
+                          className={`fa ${tieneContenido ? 'fa-folder-open' : 'fa-folder'}`}
+                          style={{ 
+                            display: (carpeta.icono_url || obtenerIconoPorNombre(carpeta.nombre)) ? 'none' : 'flex',
+                            fontSize: '48px',
+                            color: '#ffffff'
+                          }}
+                        ></i>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Efecto de brillo sutil */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-30%',
+                      right: '-30%',
+                      width: '150%',
+                      height: '150%',
+                      background: tieneContenido 
+                        ? `radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%)` 
+                        : 'none',
+                      pointerEvents: 'none'
+                    }}></div>
+                    
+                    {/* Icono grande y destacado */}
+                    <div style={{
+                      fontSize: '56px',
+                      color: tieneContenido ? '#ffffff' : '#999',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '80px',
                   height: '80px',
                   background: tieneContenido ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.6)',
                   borderRadius: '16px',
@@ -5875,9 +6305,11 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   backdropFilter: 'blur(10px)',
                   border: tieneContenido ? '2px solid rgba(255,255,255,0.3)' : 'none'
                 }}>
-                  {carpeta.icono_url ? (
+                  {(carpeta.icono_url || obtenerIconoPorNombre(carpeta.nombre)) ? (
                     <img 
-                      src={construirUrlIcono(carpeta.icono_url)} 
+                      src={carpeta.icono_url 
+                        ? construirUrlIcono(carpeta.icono_url) 
+                        : obtenerIconoPorNombre(carpeta.nombre)} 
                       alt={carpeta.nombre}
                       style={{
                         width: '100%',
@@ -5889,6 +6321,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         // Si falla la carga del icono, ocultar la imagen y mostrar el icono por defecto
                         console.error('Error cargando icono:', {
                           icono_url: carpeta.icono_url,
+                          nombre_carpeta: carpeta.nombre,
                           url_intentada: e.target.src,
                           api_base: API_BASE,
                           app_url: APP_URL,
@@ -5907,11 +6340,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   <i 
                     className={`fa ${tieneContenido ? 'fa-folder-open' : 'fa-folder'}`}
                     style={{ 
-                      display: carpeta.icono_url ? 'none' : 'flex',
+                      display: (carpeta.icono_url || obtenerIconoPorNombre(carpeta.nombre)) ? 'none' : 'flex',
                       fontSize: '48px'
                     }}
                   ></i>
                 </div>
+                  </>
+                )}
               </div>
 
               {/* Contenido compacto */}
@@ -6112,11 +6547,27 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {canEditFiles(user) && (
+                        {((user && (user.rol === 'super_admin' || user.rol === 'admin')) || canEditFiles(user)) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setModalEditarCarpeta(carpeta);
+                              // Inicializar preview del icono si existe
+                              if (carpeta.icono_url) {
+                                setIconoPreviewEditar(construirUrlIcono(carpeta.icono_url));
+                              } else {
+                                setIconoPreviewEditar(null);
+                              }
+                              setIconoFileEditar(null);
+                              // Inicializar preview de imagen de portada si existe
+                              if (carpeta.imagen_portada_url) {
+                                setImagenPortadaPreview(carpeta.imagen_portada_url.startsWith('http') 
+                                  ? carpeta.imagen_portada_url 
+                                  : `${window.location.origin}${carpeta.imagen_portada_url}`);
+                              } else {
+                                setImagenPortadaPreview(null);
+                              }
+                              setImagenPortadaFile(null);
                               setMenuAccionesCarpeta(null);
                             }}
                             style={{
@@ -9291,31 +9742,64 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
-                    {/* Botón eliminar */}
-                    {canDeleteFiles(user) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          eliminarArchivosCarpeta(carpetaArchivo.id, carpetaArchivo.nombre);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '5px',
-                          right: '5px',
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#dc3545',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          borderRadius: '4px',
-                          opacity: 0.6
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
-                        title="Eliminar carpeta"
-                      >
-                        <i className="fa fa-trash"></i>
-                      </button>
+                    {/* Botones de acción */}
+                    {(canEditFiles(user) || canDeleteFiles(user)) && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '5px',
+                        right: '5px',
+                        display: 'flex',
+                        gap: '4px'
+                      }}>
+                        {canEditFiles(user) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModalEditarArchivosCarpeta({
+                                id: carpetaArchivo.id,
+                                nombre: carpetaArchivo.nombre,
+                                descripcion: carpetaArchivo.descripcion || ''
+                              });
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#17a2b8',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              opacity: 0.6
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+                            title="Editar nombre de carpeta"
+                          >
+                            <i className="fa fa-pencil"></i>
+                          </button>
+                        )}
+                        {canDeleteFiles(user) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              eliminarArchivosCarpeta(carpetaArchivo.id, carpetaArchivo.nombre);
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#dc3545',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              opacity: 0.6
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+                            title="Eliminar carpeta"
+                          >
+                            <i className="fa fa-trash"></i>
+                          </button>
+                        )}
+                      </div>
                     )}
                     <i 
                       className="fa fa-folder" 
@@ -9414,6 +9898,9 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               <button onClick={() => window.open(`${API_BASE}/descargar_archivo.php?id=${archivo.id}&accion=descargar`, '_blank')} style={{ background: '#17a2b8', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }} title="Descargar"><i className="fa fa-download"></i></button>
                             </>
                           )}
+                          {(user && (user.rol === 'super_admin' || user.rol === 'admin')) && (
+                            <button onClick={() => setModalEditarArchivo({ ...archivo })} style={{ background: '#ff9800', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }} title="Editar nombre"><i className="fa fa-pencil"></i></button>
+                          )}
                           {canDeleteFiles(user) && (
                             <button onClick={async () => { if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } else { alert('Error: ' + data.error); } } catch (e) { alert('Error: ' + e.message); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px' }} title="Eliminar"><i className="fa fa-trash"></i></button>
                         )}
@@ -9464,6 +9951,9 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                     <button onClick={() => window.open(`${API_BASE}/descargar_archivo.php?id=${archivo.id}&accion=descargar`, '_blank')} style={{ background: '#17a2b8', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }} title="Descargar"><i className="fa fa-download"></i></button>
                       </>
                     )}
+                    {(user && (user.rol === 'super_admin' || user.rol === 'admin')) && (
+                      <button onClick={() => setModalEditarArchivo({ ...archivo })} style={{ background: '#ff9800', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }} title="Editar nombre"><i className="fa fa-pencil"></i></button>
+                    )}
                     {canDeleteFiles(user) && (
                                   <button onClick={async () => { if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } else { alert('Error: ' + data.error); } } catch (e) { alert('Error: ' + e.message); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }} title="Eliminar"><i className="fa fa-trash"></i></button>
                                 )}
@@ -9494,6 +9984,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         <div style={{ fontSize: '10px', color: '#999', marginTop: '5px' }}>{archivo.tamaño ? `${(archivo.tamaño / 1024).toFixed(1)} KB` : ''}</div>
                         <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', marginTop: '8px' }}>
                           {canDownloadFiles(user) && <button onClick={(e) => { e.stopPropagation(); window.open(`${API_BASE}/descargar_archivo.php?id=${archivo.id}&accion=descargar`, '_blank'); }} style={{ background: '#17a2b8', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} title="Descargar"><i className="fa fa-download"></i></button>}
+                          {(user && (user.rol === 'super_admin' || user.rol === 'admin')) && <button onClick={(e) => { e.stopPropagation(); setModalEditarArchivo({ ...archivo }); }} style={{ background: '#ff9800', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} title="Editar nombre"><i className="fa fa-pencil"></i></button>}
                           {canDeleteFiles(user) && <button onClick={async (e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } } catch (err) { alert('Error'); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} title="Eliminar"><i className="fa fa-trash"></i></button>}
                         </div>
                       </div>
@@ -9525,6 +10016,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               <button onClick={(e) => { e.stopPropagation(); window.open(`${API_BASE}/descargar_archivo.php?id=${archivo.id}&accion=descargar`, '_blank'); }} style={{ background: '#17a2b8', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '500' }} title="Descargar"><i className="fa fa-download"></i></button>
                             </>
                           )}
+                          {(user && (user.rol === 'super_admin' || user.rol === 'admin')) && <button onClick={(e) => { e.stopPropagation(); setModalEditarArchivo({ ...archivo }); }} style={{ background: '#ff9800', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '500' }} title="Editar nombre"><i className="fa fa-pencil"></i></button>}
                           {canDeleteFiles(user) && <button onClick={async (e) => { e.stopPropagation(); if (window.confirm(`¿Eliminar "${archivo.nombre_original}"?`)) { try { const res = await fetch(`${API_BASE}/archivos/archivos.php?id=${archivo.id}&usuario_id=${user.id}`, { method: 'DELETE' }); const data = await res.json(); if (data.success) { cargarArchivos(carpetaActual.id, archivosCarpetaActual ? archivosCarpetaActual.id : 'root'); } } catch (err) { alert('Error'); } } }} style={{ background: '#dc3545', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '500' }} title="Eliminar"><i className="fa fa-trash"></i></button>}
                   </div>
                 </div>
@@ -10076,7 +10568,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                     </td>
                                     {(user.rol === 'super_admin' || user.rol === 'admin') && (
                                       <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'center' }}>
-                                        {/* admin puede validar solo en nivel 2, super_admin en todos */}
+                                        {/* admin puede validar en nivel 1 y nivel 2, super_admin en todos */}
                                         {puedeEditarLineaBase(user, rutaNavegacion) ? (
                                           <button
                                             onClick={() => {
@@ -10844,7 +11336,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         </td>
                                         {(user.rol === 'super_admin' || user.rol === 'admin') && (
                                           <td style={{ padding: '0.4rem', verticalAlign: 'top', textAlign: 'center' }}>
-                                            {/* admin puede validar solo en nivel 2, super_admin en todos */}
+                                            {/* admin puede validar en nivel 1 y nivel 2, super_admin en todos */}
                                             {puedeEditarLineaBase(user, rutaNavegacion) ? (
                                               <button
                                                 onClick={() => {
@@ -14646,7 +15138,84 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
             {/* Contenido del formulario */}
             <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1 }}>
-            <div style={{ marginBottom: '1rem' }}>
+            {/* Si estamos en nivel 1, mostrar solo select de empresas */}
+            {rutaNavegacion.length === 1 ? (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  fontWeight: '600',
+                  color: '#17a2b8',
+                  fontSize: '0.85rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Seleccionar Empresa <span style={{ color: '#dc3545' }}>*</span>
+                </label>
+                <select
+                  value={empresaSeleccionada}
+                  onChange={(e) => {
+                    const empresaId = e.target.value;
+                    setEmpresaSeleccionada(empresaId);
+                    const empresa = empresasContratistas.find(emp => emp.empresa_id === empresaId);
+                    if (empresa) {
+                      setNuevaCarpeta({ ...nuevaCarpeta, nombre: empresa.nombre });
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '2px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    background: 'white',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#17a2b8';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e0e0e0';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                  autoFocus
+                >
+                  <option value="">-- Seleccione una empresa --</option>
+                  {(() => {
+                    // Obtener nombres de carpetas existentes en la carpeta padre (nivel 0)
+                    const nombresCarpetasExistentes = carpetas
+                      .filter(c => c.carpeta_padre_id === (carpetaActual ? carpetaActual.id : null))
+                      .map(c => c.nombre.trim().toLowerCase());
+                    
+                    // Filtrar empresas que no estén ya creadas como carpetas
+                    const empresasDisponibles = empresasContratistas.filter(emp => 
+                      !nombresCarpetasExistentes.includes(emp.nombre.trim().toLowerCase())
+                    );
+                    
+                    return empresasDisponibles.map(emp => (
+                      <option key={emp.empresa_id} value={emp.empresa_id}>
+                        {emp.nombre}
+                      </option>
+                    ));
+                  })()}
+                </select>
+                {empresasContratistas.filter(emp => {
+                  const nombresCarpetasExistentes = carpetas
+                    .filter(c => c.carpeta_padre_id === (carpetaActual ? carpetaActual.id : null))
+                    .map(c => c.nombre.trim().toLowerCase());
+                  return nombresCarpetasExistentes.includes(emp.nombre.trim().toLowerCase());
+                }).length > 0 && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#ff9800', fontStyle: 'italic' }}>
+                    <i className="fa fa-info-circle" style={{ marginRight: '4px' }}></i>
+                    Algunas empresas ya están creadas como carpetas y no aparecen en la lista.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1rem' }}>
                 <label style={{ 
                   display: 'block', 
                   marginBottom: '6px', 
@@ -14658,190 +15227,196 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 }}>
                   Nombre <span style={{ color: '#dc3545' }}>*</span>
                 </label>
-              <input
-                type="text"
-                value={nuevaCarpeta.nombre}
-                onChange={(e) => setNuevaCarpeta({ ...nuevaCarpeta, nombre: e.target.value })}
-                style={{
-                  width: '100%',
-                    padding: '8px 12px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    transition: 'all 0.2s ease',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#17a2b8';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e0e0e0';
-                    e.target.style.boxShadow = 'none';
-                }}
-                placeholder="Nombre de la carpeta"
-                autoFocus
-              />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-                <label style={{ 
-                  display: 'block', 
-                  marginBottom: '6px', 
-                  fontWeight: '600',
-                  color: '#17a2b8',
-                  fontSize: '0.85rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  Descripción
-                </label>
-              <textarea
-                value={nuevaCarpeta.descripcion}
-                onChange={(e) => setNuevaCarpeta({ ...nuevaCarpeta, descripcion: e.target.value })}
-                style={{
-                  width: '100%',
-                    padding: '8px 12px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '6px',
-                  fontSize: '14px',
-                    minHeight: '70px',
-                    resize: 'vertical',
-                    transition: 'all 0.2s ease',
-                    boxSizing: 'border-box',
-                    fontFamily: 'inherit'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#17a2b8';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e0e0e0';
-                    e.target.style.boxShadow = 'none';
-                }}
-                placeholder="Descripción de la carpeta (opcional)"
-              />
-            </div>
-
-            {/* Campo de carga de icono */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ 
-                display: 'block', 
-                marginBottom: '6px', 
-                fontWeight: '600',
-                color: '#17a2b8',
-                fontSize: '0.85rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                <i className="fa fa-image" style={{ marginRight: '6px' }}></i>
-                Icono de la Carpeta <span style={{ fontWeight: '400', fontSize: '0.75rem', color: '#666' }}>(Opcional)</span>
-              </label>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      // Validar tamaño (máximo 2MB)
-                      if (file.size > 2 * 1024 * 1024) {
-                        alert('El icono no debe superar los 2MB');
-                        e.target.value = '';
-                        return;
-                      }
-                      // Crear preview
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setIconoPreview(reader.result);
-                      };
-                      reader.readAsDataURL(file);
-                      // Guardar el archivo para subirlo después
-                      setNuevaCarpeta({ ...nuevaCarpeta, icono_file: file });
-                    }
-                  }}
-                  style={{ display: 'none' }}
-                  id="icono-input-crear"
-                />
-                <label
-                  htmlFor="icono-input-crear"
+                  type="text"
+                  value={nuevaCarpeta.nombre}
+                  onChange={(e) => setNuevaCarpeta({ ...nuevaCarpeta, nombre: e.target.value })}
                   style={{
-                    padding: '8px 16px',
-                    border: '2px dashed #17a2b8',
-                    borderRadius: '6px',
-                    background: '#f0f7ff',
-                    color: '#17a2b8',
-                    cursor: 'pointer',
-                    fontSize: '13px',
+                    width: '100%',
+                      padding: '8px 12px',
+                      border: '2px solid #e0e0e0',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#17a2b8';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e0e0e0';
+                      e.target.style.boxShadow = 'none';
+                  }}
+                  placeholder="Nombre de la carpeta"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Descripción y otros campos solo si NO estamos en nivel 1 */}
+            {rutaNavegacion.length !== 1 && (
+              <>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '6px', 
                     fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.background = '#e0f0ff';
-                    e.target.style.borderColor = '#8B4513';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.background = '#f0f7ff';
-                    e.target.style.borderColor = '#17a2b8';
-                  }}
-                >
-                  <i className="fa fa-upload"></i>
-                  {iconoPreview ? 'Cambiar Icono' : 'Seleccionar Icono'}
-                </label>
-                {iconoPreview && (
-                  <div style={{ position: 'relative' }}>
-                    <img 
-                      src={iconoPreview} 
-                      alt="Preview" 
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        objectFit: 'contain',
+                    color: '#17a2b8',
+                    fontSize: '0.85rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Descripción
+                  </label>
+                  <textarea
+                    value={nuevaCarpeta.descripcion}
+                    onChange={(e) => setNuevaCarpeta({ ...nuevaCarpeta, descripcion: e.target.value })}
+                    style={{
+                      width: '100%',
+                        padding: '8px 12px',
+                        border: '2px solid #e0e0e0',
                         borderRadius: '6px',
-                        border: '2px solid #17a2b8',
-                        background: 'white',
-                        padding: '4px'
+                      fontSize: '14px',
+                        minHeight: '70px',
+                        resize: 'vertical',
+                        transition: 'all 0.2s ease',
+                        boxSizing: 'border-box',
+                        fontFamily: 'inherit'
                       }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#17a2b8';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e0e0e0';
+                        e.target.style.boxShadow = 'none';
+                    }}
+                    placeholder="Descripción de la carpeta (opcional)"
+                  />
+                </div>
+
+                {/* Campo de carga de icono */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '6px', 
+                    fontWeight: '600',
+                    color: '#17a2b8',
+                    fontSize: '0.85rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    <i className="fa fa-image" style={{ marginRight: '6px' }}></i>
+                    Icono de la Carpeta <span style={{ fontWeight: '400', fontSize: '0.75rem', color: '#666' }}>(Opcional)</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          // Validar tamaño (máximo 2MB)
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert('El icono no debe superar los 2MB');
+                            e.target.value = '';
+                            return;
+                          }
+                          // Crear preview
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setIconoPreview(reader.result);
+                          };
+                          reader.readAsDataURL(file);
+                          // Guardar el archivo para subirlo después
+                          setNuevaCarpeta({ ...nuevaCarpeta, icono_file: file });
+                        }
+                      }}
+                      style={{ display: 'none' }}
+                      id="icono-input-crear"
                     />
-                    <button
-                      onClick={() => {
-                        setIconoPreview(null);
-                        setNuevaCarpeta({ ...nuevaCarpeta, icono_file: null });
-                        document.getElementById('icono-input-crear').value = '';
-                      }}
+                    <label
+                      htmlFor="icono-input-crear"
                       style={{
-                        position: 'absolute',
-                        top: '-8px',
-                        right: '-8px',
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        background: '#dc3545',
-                        color: 'white',
-                        border: 'none',
+                        padding: '8px 16px',
+                        border: '2px dashed #17a2b8',
+                        borderRadius: '6px',
+                        background: '#f0f7ff',
+                        color: '#17a2b8',
                         cursor: 'pointer',
-                        fontSize: '12px',
+                        fontSize: '13px',
+                        fontWeight: '600',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#e0f0ff';
+                        e.target.style.borderColor = '#8B4513';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#f0f7ff';
+                        e.target.style.borderColor = '#17a2b8';
                       }}
                     >
-                      ×
-                    </button>
+                      <i className="fa fa-upload"></i>
+                      {iconoPreview ? 'Cambiar Icono' : 'Seleccionar Icono'}
+                    </label>
+                    {iconoPreview && (
+                      <div style={{ position: 'relative' }}>
+                        <img 
+                          src={iconoPreview} 
+                          alt="Preview" 
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            objectFit: 'contain',
+                            borderRadius: '6px',
+                            border: '2px solid #17a2b8',
+                            background: 'white',
+                            padding: '4px'
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            setIconoPreview(null);
+                            setNuevaCarpeta({ ...nuevaCarpeta, icono_file: null });
+                            document.getElementById('icono-input-crear').value = '';
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#666' }}>
-                Formatos soportados: PNG, JPG, SVG. Tamaño máximo: 2MB. Recomendado: 64x64px o 128x128px
-              </p>
-            </div>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#666' }}>
+                    Formatos soportados: PNG, JPG, SVG. Tamaño máximo: 2MB. Recomendado: 64x64px o 128x128px
+                  </p>
+                </div>
+              </>
+            )}
             
-            {/* Selector de colores solo para super_admin */}
-            {user && user.rol === 'super_admin' && (
+            {/* Selector de colores solo para super_admin y solo si NO estamos en nivel 1 */}
+            {user && user.rol === 'super_admin' && rutaNavegacion.length !== 1 && (
                 <div style={{ 
                   marginBottom: '1rem', 
                   padding: '1rem', 
@@ -15083,6 +15658,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   setModalCrearCarpeta(false);
                   setNuevaCarpeta({ nombre: '', descripcion: '', color_primario: '', color_secundario: '', icono_url: '' });
                   setIconoPreview(null);
+                  setEmpresaSeleccionada('');
                 }}
                 style={{
                   padding: '10px 18px',
@@ -15502,6 +16078,160 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         </div>
       )}
 
+      {/* Modal Editar Carpeta de Archivos */}
+      {modalEditarArchivosCarpeta && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(10, 50, 101, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: 0,
+            borderRadius: '16px',
+            width: '90%',
+            maxWidth: '450px',
+            boxShadow: '0 20px 60px rgba(10, 50, 101, 0.3)',
+            border: '2px solid #17a2b8',
+            overflow: 'hidden',
+            animation: 'slideUp 0.3s ease-out'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #17a2b8 0%, #FF8C00 100%)',
+              padding: '1rem 1.5rem',
+              color: 'white'
+            }}>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '1.1rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <i className="fa fa-pencil"></i>
+                Editar Nombre de Carpeta
+              </h2>
+            </div>
+
+            {/* Contenido */}
+            <div style={{ padding: '1.25rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  fontWeight: '600',
+                  color: '#495057',
+                  fontSize: '0.85rem'
+                }}>
+                  Nombre <span style={{ color: '#dc3545' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={modalEditarArchivosCarpeta.nombre}
+                  onChange={(e) => setModalEditarArchivosCarpeta({ ...modalEditarArchivosCarpeta, nombre: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '2px solid #e0e0e0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                  placeholder="Nombre de la carpeta"
+                  autoFocus
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      editarArchivosCarpeta();
+                    }
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  fontWeight: '600',
+                  color: '#495057',
+                  fontSize: '0.85rem'
+                }}>
+                  Descripción <span style={{ fontWeight: '400', color: '#999' }}>(opcional)</span>
+                </label>
+                <textarea
+                  value={modalEditarArchivosCarpeta.descripcion || ''}
+                  onChange={(e) => setModalEditarArchivosCarpeta({ ...modalEditarArchivosCarpeta, descripcion: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '2px solid #e0e0e0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    minHeight: '60px',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit'
+                  }}
+                  placeholder="Descripción de la carpeta"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ 
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid #e9ecef',
+              background: '#f8f9fa',
+              display: 'flex', 
+              gap: '10px', 
+              justifyContent: 'flex-end' 
+            }}>
+              <button
+                onClick={() => setModalEditarArchivosCarpeta(null)}
+                style={{
+                  padding: '10px 18px',
+                  border: '2px solid #6c757d',
+                  borderRadius: '6px',
+                  background: 'white',
+                  color: '#6c757d',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13px'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={editarArchivosCarpeta}
+                style={{
+                  padding: '10px 18px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: 'linear-gradient(135deg, #17a2b8 0%, #FF8C00 100%)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13px'
+                }}
+              >
+                <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Editar Carpeta */}
       {modalEditarCarpeta && (
         <div style={{
@@ -15644,6 +16374,221 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   }}
                   placeholder="Agrega una descripción opcional para esta carpeta..."
               />
+            </div>
+            
+            {/* Campo de imagen de portada - solo para nivel 0 y 1 */}
+            {(modalEditarCarpeta.nivel === undefined || modalEditarCarpeta.nivel === null || modalEditarCarpeta.nivel <= 1) && (
+              <div style={{ 
+                marginBottom: '1rem', 
+                padding: '1rem', 
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                borderRadius: '8px', 
+                border: '2px solid #2196f3',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+              }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  marginBottom: '10px', 
+                  fontWeight: '600', 
+                  color: '#1565c0',
+                  fontSize: '0.9rem'
+                }}>
+                  <i className="fa fa-image" style={{ marginRight: '8px', fontSize: '0.95rem' }}></i>
+                  Imagen de Portada <span style={{ fontWeight: '400', fontSize: '0.8rem', color: '#666', marginLeft: '5px' }}>(Opcional)</span>
+                </label>
+                
+                {/* Preview de imagen actual o nueva */}
+                {(imagenPortadaPreview || modalEditarCarpeta.imagen_portada_url) && (
+                  <div style={{ 
+                    marginBottom: '10px', 
+                    borderRadius: '8px', 
+                    overflow: 'hidden',
+                    border: '2px solid #2196f3',
+                    position: 'relative'
+                  }}>
+                    <img 
+                      src={imagenPortadaPreview || (modalEditarCarpeta.imagen_portada_url?.startsWith('http') 
+                        ? modalEditarCarpeta.imagen_portada_url 
+                        : `${window.location.origin}${modalEditarCarpeta.imagen_portada_url}`)} 
+                      alt="Preview portada"
+                      style={{ 
+                        width: '100%', 
+                        height: '120px', 
+                        objectFit: 'cover' 
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        setImagenPortadaPreview(null);
+                        setImagenPortadaFile(null);
+                        setModalEditarCarpeta({ ...modalEditarCarpeta, imagen_portada_url: null });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '5px',
+                        right: '5px',
+                        background: 'rgba(220, 53, 69, 0.9)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '28px',
+                        height: '28px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <i className="fa fa-times"></i>
+                    </button>
+                  </div>
+                )}
+                
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setImagenPortadaFile(file);
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setImagenPortadaPreview(reader.result);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '2px dashed #2196f3',
+                    borderRadius: '6px',
+                    background: 'white',
+                    cursor: 'pointer'
+                  }}
+                />
+                <p style={{ 
+                  margin: '8px 0 0 0', 
+                  fontSize: '0.75rem', 
+                  color: '#666',
+                  textAlign: 'center'
+                }}>
+                  Formatos: JPG, PNG, GIF, WEBP (máx. 10MB)
+                </p>
+              </div>
+            )}
+            
+            {/* Campo de icono de carpeta */}
+            <div style={{ 
+              marginBottom: '1rem', 
+              padding: '1rem', 
+              background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+              borderRadius: '8px', 
+              border: '2px solid #ff9800',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                marginBottom: '10px', 
+                fontWeight: '600', 
+                color: '#e65100',
+                fontSize: '0.9rem'
+              }}>
+                <i className="fa fa-picture-o" style={{ marginRight: '8px', fontSize: '0.95rem' }}></i>
+                Icono de Carpeta <span style={{ fontWeight: '400', fontSize: '0.8rem', color: '#666', marginLeft: '5px' }}>(Opcional)</span>
+              </label>
+              
+              {/* Preview de icono actual o nuevo */}
+              {(iconoPreviewEditar || modalEditarCarpeta.icono_url) && (
+                <div style={{ 
+                  marginBottom: '10px', 
+                  borderRadius: '8px', 
+                  overflow: 'hidden',
+                  border: '2px solid #ff9800',
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '100px',
+                  height: '100px'
+                }}>
+                  <img 
+                    src={iconoPreviewEditar || construirUrlIcono(modalEditarCarpeta.icono_url)} 
+                    alt="Preview icono"
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'contain',
+                      padding: '10px',
+                      background: '#f5f5f5'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      setIconoPreviewEditar(null);
+                      setIconoFileEditar(null);
+                      setModalEditarCarpeta({ ...modalEditarCarpeta, icono_url: null });
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '5px',
+                      right: '5px',
+                      background: 'rgba(220, 53, 69, 0.9)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <i className="fa fa-times"></i>
+                  </button>
+                </div>
+              )}
+              
+              <input
+                type="file"
+                id="icono-input-editar"
+                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setIconoFileEditar(file);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setIconoPreviewEditar(reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '2px dashed #ff9800',
+                  borderRadius: '6px',
+                  background: 'white',
+                  cursor: 'pointer'
+                }}
+              />
+              <p style={{ 
+                margin: '8px 0 0 0', 
+                fontSize: '0.75rem', 
+                color: '#666',
+                textAlign: 'center'
+              }}>
+                Formatos: PNG, JPG, GIF, WEBP, SVG (máx. 5MB). Se recomienda 64x64px o 128x128px
+              </p>
             </div>
             
             {/* Selector de colores solo para super_admin */}
@@ -15939,6 +16884,168 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   e.target.style.background = 'linear-gradient(135deg, #17a2b8 0%, #8B4513 100%)';
                   e.target.style.transform = 'translateY(0)';
                   e.target.style.boxShadow = '0 4px 12px rgba(10, 110, 189, 0.3)';
+                }}
+              >
+                <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Archivo */}
+      {modalEditarArchivo && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(10, 50, 101, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: 0,
+            borderRadius: '16px',
+            width: '90%',
+            maxWidth: '500px',
+            boxShadow: '0 20px 60px rgba(10, 50, 101, 0.3)',
+            border: '2px solid #ff9800',
+            overflow: 'hidden',
+            animation: 'slideUp 0.3s ease-out'
+          }}>
+            {/* Header con gradiente */}
+            <div style={{
+              background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+              padding: '1rem 1.5rem',
+              color: 'white',
+              boxShadow: '0 2px 10px rgba(255, 152, 0, 0.3)'
+            }}>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '1.2rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <i className="fa fa-pencil" style={{ fontSize: '1.1rem' }}></i>
+                Editar Nombre del Archivo
+              </h2>
+            </div>
+
+            {/* Contenido del formulario */}
+            <div style={{ padding: '1.25rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  fontWeight: '600',
+                  color: '#ff9800',
+                  fontSize: '0.85rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Nombre del Archivo <span style={{ color: '#dc3545' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={modalEditarArchivo.nombre_original || ''}
+                  onChange={(e) => setModalEditarArchivo({ ...modalEditarArchivo, nombre_original: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '2px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#ff9800';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(255, 152, 0, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e0e0e0';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                  placeholder="Nombre del archivo"
+                  autoFocus
+                />
+              </div>
+            </div>
+            
+            {/* Footer con botones */}
+            <div style={{ 
+              padding: '1rem 1.5rem',
+              borderTop: '2px solid #e9ecef',
+              background: '#f8f9fa',
+              display: 'flex', 
+              gap: '10px', 
+              justifyContent: 'flex-end' 
+            }}>
+              <button
+                onClick={() => setModalEditarArchivo(null)}
+                style={{
+                  padding: '10px 18px',
+                  border: '2px solid #6c757d',
+                  borderRadius: '6px',
+                  background: 'white',
+                  color: '#6c757d',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#6c757d';
+                  e.target.style.color = 'white';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 4px 8px rgba(108, 117, 125, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'white';
+                  e.target.style.color = '#6c757d';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEditarArchivo}
+                style={{
+                  padding: '10px 18px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  boxShadow: '0 4px 12px rgba(255, 152, 0, 0.3)',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'linear-gradient(135deg, #f57c00 0%, #ff9800 100%)';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 16px rgba(255, 152, 0, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(255, 152, 0, 0.3)';
                 }}
               >
                 <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
@@ -17462,27 +18569,38 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
                 // Word Documents (.doc, .docx)
                 if (['doc', 'docx'].includes(extension) || tipoMime.includes('word') || tipoMime.includes('document')) {
-                  // Verificar si estamos en localhost (los visores externos no funcionan con localhost)
-                  const isLocalhost = urlArchivo.includes('localhost') || urlArchivo.includes('127.0.0.1');
+                  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                  const hasError = officeViewerError.word;
+                  
+                  // Usar el endpoint view_office.php que permite acceso desde visores externos
+                  const officeFileUrl = isLocalhost 
+                    ? `http://localhost/rcritico/api/view_office.php?id=${archivoPreview.id}`
+                    : `${API_BASE}/view_office.php?id=${archivoPreview.id}`;
+                  const officeFileUrlEncoded = encodeURIComponent(officeFileUrl);
+                  
+                  // Usar Microsoft Office Online Viewer
+                  const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${officeFileUrlEncoded}`;
                   
                   return (
-                    <div style={{ width: '100%', height: '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ width: '100%', height: previewMaximizado ? 'calc(100vh - 120px)' : '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ 
                         padding: '10px', 
-                        background: isLocalhost ? '#fff3cd' : '#e3f2fd', 
+                        background: hasError ? '#f8d7da' : '#e3f2fd', 
                         borderRadius: '5px',
                         fontSize: '14px',
-                        color: isLocalhost ? '#856404' : '#FF8C00'
+                        color: hasError ? '#721c24' : '#FF8C00'
                       }}>
                         <i className="fa fa-file-word" style={{ marginRight: '8px' }}></i>
-                        {isLocalhost 
-                          ? 'Los visores externos no funcionan con localhost. Usa "Descargar" para abrir el archivo.'
+                        {hasError
+                          ? 'Error al cargar el visor. En localhost, los visores externos no funcionan porque requieren acceso público. En producción funcionará correctamente. Usa "Descargar" para abrir el archivo.'
+                          : isLocalhost
+                          ? 'Previsualizando documento Word (en localhost puede no funcionar - en producción funcionará correctamente)'
                           : 'Previsualizando documento Word usando visor embebido'
                         }
                       </div>
-                      {!isLocalhost && (
+                      {!hasError && (
                         <iframe
-                          src={`https://view.officeapps.live.com/op/embed.aspx?src=${urlArchivoCodificada}`}
+                          src={viewerUrl}
                           style={{
                             width: '100%',
                             flex: 1,
@@ -17491,9 +18609,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             minHeight: '500px'
                           }}
                           title={archivoPreview.nombre_original}
+                          onError={() => {
+                            console.error('Error cargando visor de Word');
+                            setOfficeViewerError(prev => ({ ...prev, word: true }));
+                          }}
                         />
                       )}
-                      {isLocalhost && (
+                      {hasError && (
                         <div style={{ 
                           flex: 1, 
                           display: 'flex', 
@@ -17507,42 +18629,70 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             <div style={{ fontSize: '16px', color: '#666', marginBottom: '10px' }}>
                               {archivoPreview.nombre_original}
                             </div>
-                            <div style={{ fontSize: '14px', color: '#999' }}>
-                              Haz clic en "Descargar" para abrir el archivo
+                            <div style={{ fontSize: '14px', color: '#999', marginBottom: '20px' }}>
+                              El visor no pudo cargar el documento. Por favor, descarga el archivo para abrirlo.
                             </div>
+                            <button
+                              onClick={() => setOfficeViewerError(prev => ({ ...prev, word: false }))}
+                              style={{
+                                padding: '8px 16px',
+                                background: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                marginRight: '10px'
+                              }}
+                            >
+                              Reintentar
+                            </button>
                           </div>
                         </div>
                       )}
                       <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                        Si el documento no se muestra, haz clic en "Descargar" para abrirlo en tu aplicación
+                        {isLocalhost && !hasError && 'Nota: En localhost los visores externos no funcionan (requieren acceso público). En producción funcionará correctamente. '}
+                        {!isLocalhost && 'Si el documento no se muestra, haz clic en "Descargar" para abrirlo en tu aplicación'}
+                        {isLocalhost && 'Usa "Descargar" para abrir el archivo en localhost.'}
                       </div>
                     </div>
                   );
                 }
 
-                // PowerPoint Presentations (.ppt, .pptx)
-                if (['ppt', 'pptx'].includes(extension) || tipoMime.includes('presentation') || tipoMime.includes('powerpoint')) {
-                  // Verificar si estamos en localhost (los visores externos no funcionan con localhost)
-                  const isLocalhost = urlArchivo.includes('localhost') || urlArchivo.includes('127.0.0.1');
+                // Excel Spreadsheets (.xls, .xlsx)
+                if (['xls', 'xlsx'].includes(extension) || tipoMime.includes('excel') || tipoMime.includes('spreadsheet')) {
+                  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                  const hasError = officeViewerError.excel;
+                  
+                  // Usar el endpoint view_office.php que permite acceso desde visores externos
+                  const officeFileUrl = isLocalhost 
+                    ? `http://localhost/rcritico/api/view_office.php?id=${archivoPreview.id}`
+                    : `${API_BASE}/view_office.php?id=${archivoPreview.id}`;
+                  const officeFileUrlEncoded = encodeURIComponent(officeFileUrl);
+                  
+                  // Usar Microsoft Office Online Viewer
+                  const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${officeFileUrlEncoded}`;
                   
                   return (
-                    <div style={{ width: '100%', height: '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ width: '100%', height: previewMaximizado ? 'calc(100vh - 120px)' : '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ 
                         padding: '10px', 
-                        background: isLocalhost ? '#fff3cd' : '#fff3e0', 
+                        background: hasError ? '#f8d7da' : '#e8f5e9', 
                         borderRadius: '5px',
                         fontSize: '14px',
-                        color: isLocalhost ? '#856404' : '#e65100'
+                        color: hasError ? '#721c24' : '#1d6f42'
                       }}>
-                        <i className="fa fa-file-powerpoint" style={{ marginRight: '8px' }}></i>
-                        {isLocalhost 
-                          ? 'Los visores externos no funcionan con localhost. Usa "Descargar" para abrir el archivo.'
-                          : 'Previsualizando presentación PowerPoint usando visor embebido'
+                        <i className="fa fa-file-excel" style={{ marginRight: '8px' }}></i>
+                        {hasError
+                          ? 'Error al cargar el visor. En localhost, los visores externos no funcionan porque requieren acceso público. En producción funcionará correctamente. Usa "Descargar" para abrir el archivo.'
+                          : isLocalhost
+                          ? 'Previsualizando hoja de cálculo Excel (en localhost puede no funcionar - en producción funcionará correctamente)'
+                          : 'Previsualizando hoja de cálculo Excel usando visor embebido'
                         }
                       </div>
-                      {!isLocalhost && (
+                      {!hasError && (
                         <iframe
-                          src={`https://view.officeapps.live.com/op/embed.aspx?src=${urlArchivoCodificada}`}
+                          src={viewerUrl}
                           style={{
                             width: '100%',
                             flex: 1,
@@ -17551,9 +18701,104 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             minHeight: '500px'
                           }}
                           title={archivoPreview.nombre_original}
+                          onError={() => {
+                            console.error('Error cargando visor de Excel');
+                            setOfficeViewerError(prev => ({ ...prev, excel: true }));
+                          }}
                         />
                       )}
-                      {isLocalhost && (
+                      {hasError && (
+                        <div style={{ 
+                          flex: 1, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          background: '#f8f9fa',
+                          borderRadius: '8px'
+                        }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <i className="fa fa-file-excel" style={{ fontSize: '64px', color: '#1d6f42', marginBottom: '20px' }}></i>
+                            <div style={{ fontSize: '16px', color: '#666', marginBottom: '10px' }}>
+                              {archivoPreview.nombre_original}
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#999', marginBottom: '20px' }}>
+                              El visor no pudo cargar la hoja de cálculo. Por favor, descarga el archivo para abrirlo.
+                            </div>
+                            <button
+                              onClick={() => setOfficeViewerError(prev => ({ ...prev, excel: false }))}
+                              style={{
+                                padding: '8px 16px',
+                                background: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                marginRight: '10px'
+                              }}
+                            >
+                              Reintentar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
+                        {isLocalhost && !hasError && 'Nota: En localhost, el visor puede no funcionar si el archivo no es accesible públicamente. '}
+                        Si la hoja de cálculo no se muestra, haz clic en "Descargar" para abrirla en tu aplicación
+                      </div>
+                    </div>
+                  );
+                }
+
+                // PowerPoint Presentations (.ppt, .pptx)
+                if (['ppt', 'pptx'].includes(extension) || tipoMime.includes('presentation') || tipoMime.includes('powerpoint')) {
+                  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                  const hasError = officeViewerError.powerpoint;
+                  
+                  // Usar el endpoint view_office.php que permite acceso desde visores externos
+                  const officeFileUrl = isLocalhost 
+                    ? `http://localhost/rcritico/api/view_office.php?id=${archivoPreview.id}`
+                    : `${API_BASE}/view_office.php?id=${archivoPreview.id}`;
+                  const officeFileUrlEncoded = encodeURIComponent(officeFileUrl);
+                  
+                  // Usar Microsoft Office Online Viewer
+                  const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${officeFileUrlEncoded}`;
+                  
+                  return (
+                    <div style={{ width: '100%', height: previewMaximizado ? 'calc(100vh - 120px)' : '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ 
+                        padding: '10px', 
+                        background: hasError ? '#f8d7da' : '#fff3e0', 
+                        borderRadius: '5px',
+                        fontSize: '14px',
+                        color: hasError ? '#721c24' : '#e65100'
+                      }}>
+                        <i className="fa fa-file-powerpoint" style={{ marginRight: '8px' }}></i>
+                        {hasError
+                          ? 'Error al cargar el visor. En localhost, los visores externos no funcionan porque requieren acceso público. En producción funcionará correctamente. Usa "Descargar" para abrir el archivo.'
+                          : isLocalhost
+                          ? 'Previsualizando presentación PowerPoint (en localhost puede no funcionar - en producción funcionará correctamente)'
+                          : 'Previsualizando presentación PowerPoint usando visor embebido'
+                        }
+                      </div>
+                      {!hasError && (
+                        <iframe
+                          src={viewerUrl}
+                          style={{
+                            width: '100%',
+                            flex: 1,
+                            border: 'none',
+                            borderRadius: '8px',
+                            minHeight: '500px'
+                          }}
+                          title={archivoPreview.nombre_original}
+                          onError={() => {
+                            console.error('Error cargando visor de PowerPoint');
+                            setOfficeViewerError(prev => ({ ...prev, powerpoint: true }));
+                          }}
+                        />
+                      )}
+                      {hasError && (
                         <div style={{ 
                           flex: 1, 
                           display: 'flex', 
@@ -17567,13 +18812,29 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             <div style={{ fontSize: '16px', color: '#666', marginBottom: '10px' }}>
                               {archivoPreview.nombre_original}
                             </div>
-                            <div style={{ fontSize: '14px', color: '#999' }}>
-                              Haz clic en "Descargar" para abrir el archivo
+                            <div style={{ fontSize: '14px', color: '#999', marginBottom: '20px' }}>
+                              El visor no pudo cargar la presentación. Por favor, descarga el archivo para abrirlo.
                             </div>
+                            <button
+                              onClick={() => setOfficeViewerError(prev => ({ ...prev, powerpoint: false }))}
+                              style={{
+                                padding: '8px 16px',
+                                background: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                marginRight: '10px'
+                              }}
+                            >
+                              Reintentar
+                            </button>
                           </div>
                         </div>
                       )}
                       <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
+                        {isLocalhost && !hasError && 'Nota: En localhost, el visor puede no funcionar si el archivo no es accesible públicamente. '}
                         Si la presentación no se muestra, haz clic en "Descargar" para abrirla en tu aplicación
                       </div>
                     </div>
@@ -20650,6 +21911,162 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               >
                 <i className={`fa ${guardandoLineaBase ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
                 {guardandoLineaBase ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Código Secreto - Eliminar Carpeta Nivel 1 */}
+      {modalEliminarCarpetaNivel1 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001
+        }} onClick={() => {
+          setModalEliminarCarpetaNivel1(null);
+          setCodigoSecretoEliminarCarpeta('');
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            width: '420px',
+            maxWidth: '90vw',
+            border: '3px solid #dc3545',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem',
+              paddingBottom: '1rem',
+              borderBottom: '2px solid #f0f0f0'
+            }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                color: 'white'
+              }}>
+                <i className="fa fa-shield-alt"></i>
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#dc3545', fontWeight: 700 }}>
+                  Código de Seguridad Requerido
+                </h4>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#6c757d' }}>
+                  Solo Super Administradores
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <p style={{ fontSize: '0.95rem', color: '#495057', marginBottom: '0.75rem', lineHeight: '1.5' }}>
+                Estás intentando eliminar una carpeta del <strong>Nivel 1 (Proyecto Principal)</strong>:
+              </p>
+              <div style={{
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                marginBottom: '1rem'
+              }}>
+                <strong style={{ color: '#856404', display: 'block', marginBottom: '0.25rem' }}>
+                  <i className="fa fa-folder" style={{ marginRight: '0.5rem' }}></i>
+                  {modalEliminarCarpetaNivel1.nombre}
+                </strong>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#856404' }}>
+                  ⚠️ Esta acción eliminará en cascada todas las subcarpetas, archivos y datos asociados.
+                </p>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  fontSize: '0.85rem', 
+                  fontWeight: 600, 
+                  color: '#495057', 
+                  display: 'block', 
+                  marginBottom: '0.5rem' 
+                }}>
+                  <i className="fa fa-lock" style={{ marginRight: '0.5rem', color: '#dc3545' }}></i>
+                  Ingresa el código secreto de seguridad:
+                </label>
+                <input
+                  type="password"
+                  value={codigoSecretoEliminarCarpeta}
+                  onChange={(e) => setCodigoSecretoEliminarCarpeta(e.target.value)}
+                  placeholder="Código secreto..."
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '2px solid #dc3545',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontFamily: 'monospace',
+                    letterSpacing: '2px'
+                  }}
+                  autoFocus
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && codigoSecretoEliminarCarpeta) {
+                      confirmarEliminacionCarpetaNivel1();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setModalEliminarCarpetaNivel1(null);
+                  setCodigoSecretoEliminarCarpeta('');
+                }}
+                style={{
+                  padding: '0.7rem 1.5rem',
+                  border: '1.5px solid #e2e8f0',
+                  background: '#fff',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  color: '#64748b'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminacionCarpetaNivel1}
+                disabled={!codigoSecretoEliminarCarpeta}
+                style={{
+                  padding: '0.7rem 1.5rem',
+                  border: 'none',
+                  background: codigoSecretoEliminarCarpeta ? '#dc3545' : '#ccc',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  cursor: codigoSecretoEliminarCarpeta ? 'pointer' : 'not-allowed',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <i className="fa fa-trash" style={{ marginRight: '0.35rem' }}></i>
+                Confirmar Eliminación
               </button>
             </div>
           </div>

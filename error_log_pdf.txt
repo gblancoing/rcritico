@@ -1,0 +1,130 @@
+[22-Dec-2025 19:10:11 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 19:10:11 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 19:10:11 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 19:10:11 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 19:10:11 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:10:11 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:10:11 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:10:11 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:17:40 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 19:17:40 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 19:17:40 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 19:17:40 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 19:17:40 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:17:40 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:17:40 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:17:40 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:30:00 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 19:30:00 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 19:30:00 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 19:30:00 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 19:30:00 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:30:00 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:30:00 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:30:00 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:41:50 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 19:41:50 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 19:41:50 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 19:41:50 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 19:41:50 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:41:50 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:41:50 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 19:41:50 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 20:04:14 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:04:14 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:04:14 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:04:14 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:04:14 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 20:04:14 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 20:04:14 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 20:04:14 Europe/Berlin] Error obteniendo estadísticas RC: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'tipo_control' in 'where clause'
+[22-Dec-2025 20:11:46 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:11:46 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:11:46 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:11:46 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:19:20 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:19:20 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:19:20 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:19:20 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:25:44 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:25:44 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:25:44 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:25:44 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:26:45 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:26:45 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:26:45 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:26:45 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:34:42 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:34:42 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:34:42 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:34:42 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:40:19 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:40:19 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:40:19 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:40:19 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:42:04 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:42:04 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:42:04 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:42:04 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 20:50:22 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 20:50:22 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 20:50:22 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 20:50:22 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:00:13 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:00:13 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:00:13 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:00:13 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:10:55 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:10:55 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:10:55 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:10:55 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:17:24 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:17:24 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:17:24 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:17:24 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:24:23 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:24:23 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:24:23 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:24:23 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:26:25 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:26:25 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:26:25 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:26:25 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:30:59 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:30:59 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:30:59 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:30:59 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:35:24 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:35:24 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:35:24 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:35:24 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:37:00 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:37:00 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:37:00 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:37:00 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 21:42:01 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 21:42:01 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 21:42:01 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 21:42:01 Europe/Berlin] TCPDF creado exitosamente
+[22-Dec-2025 22:37:52 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[22-Dec-2025 22:37:52 Europe/Berlin] TCPDF disponible: SÍ
+[22-Dec-2025 22:37:52 Europe/Berlin] Creando instancia de TCPDF...
+[22-Dec-2025 22:37:52 Europe/Berlin] TCPDF creado exitosamente
+[23-Dec-2025 00:59:42 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[23-Dec-2025 00:59:42 Europe/Berlin] TCPDF disponible: SÍ
+[23-Dec-2025 00:59:42 Europe/Berlin] Creando instancia de TCPDF...
+[23-Dec-2025 00:59:42 Europe/Berlin] TCPDF creado exitosamente
+[23-Dec-2025 00:59:42 Europe/Berlin] Generando PDF con ID: 1766447982_7591
+[23-Dec-2025 00:59:42 Europe/Berlin] Número de páginas: 4
+[23-Dec-2025 01:00:37 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[23-Dec-2025 01:00:37 Europe/Berlin] TCPDF disponible: SÍ
+[23-Dec-2025 01:00:37 Europe/Berlin] Creando instancia de TCPDF...
+[23-Dec-2025 01:00:37 Europe/Berlin] TCPDF creado exitosamente
+[23-Dec-2025 01:00:37 Europe/Berlin] Generando PDF con ID: 1766448037_6670
+[23-Dec-2025 01:00:37 Europe/Berlin] Número de páginas: 2
+[23-Dec-2025 02:18:06 Europe/Berlin] === INICIANDO CREACIÓN DE PDF ===
+[23-Dec-2025 02:18:06 Europe/Berlin] TCPDF disponible: SÍ
+[23-Dec-2025 02:18:06 Europe/Berlin] Creando instancia de TCPDF...
+[23-Dec-2025 02:18:06 Europe/Berlin] TCPDF creado exitosamente
+[23-Dec-2025 02:18:06 Europe/Berlin] Generando PDF con ID: 1766452686_4918
+[23-Dec-2025 02:18:06 Europe/Berlin] Número de páginas: 4

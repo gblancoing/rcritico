@@ -98,6 +98,92 @@ function verificarTabla($pdo) {
 
 verificarTabla($pdo);
 
+/**
+ * Obtener tipo MIME de forma compatible (sin depender de fileinfo)
+ */
+function obtenerMimeType($filePath, $fileName) {
+    // Mapeo de extensiones a tipos MIME
+    $mimeTypes = [
+        // Imágenes
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'svg' => 'image/svg+xml',
+        'bmp' => 'image/bmp',
+        'ico' => 'image/x-icon',
+        // Documentos
+        'pdf' => 'application/pdf',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt' => 'application/vnd.ms-powerpoint',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        // Texto
+        'txt' => 'text/plain',
+        'csv' => 'text/csv',
+        'html' => 'text/html',
+        'htm' => 'text/html',
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'json' => 'application/json',
+        'xml' => 'application/xml',
+        // Comprimidos
+        'zip' => 'application/zip',
+        'rar' => 'application/x-rar-compressed',
+        '7z' => 'application/x-7z-compressed',
+        'tar' => 'application/x-tar',
+        'gz' => 'application/gzip',
+        // Video
+        'mp4' => 'video/mp4',
+        'mpeg' => 'video/mpeg',
+        'mpg' => 'video/mpeg',
+        'avi' => 'video/x-msvideo',
+        'mov' => 'video/quicktime',
+        'wmv' => 'video/x-ms-wmv',
+        'webm' => 'video/webm',
+        // Audio
+        'mp3' => 'audio/mpeg',
+        'wav' => 'audio/wav',
+        'ogg' => 'audio/ogg',
+        'wma' => 'audio/x-ms-wma',
+        'm4a' => 'audio/mp4'
+    ];
+    
+    // Intentar con finfo si está disponible
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $mimeType = finfo_file($finfo, $filePath);
+            finfo_close($finfo);
+            if ($mimeType && $mimeType !== 'application/octet-stream') {
+                return $mimeType;
+            }
+        }
+    }
+    
+    // Intentar con mime_content_type si está disponible
+    if (function_exists('mime_content_type')) {
+        $mimeType = @mime_content_type($filePath);
+        if ($mimeType && $mimeType !== 'application/octet-stream') {
+            return $mimeType;
+        }
+    }
+    
+    // Usar extensión del archivo como último recurso
+    $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    if (isset($mimeTypes[$extension])) {
+        return $mimeTypes[$extension];
+    }
+    
+    // Tipo genérico si no se puede determinar
+    return 'application/octet-stream';
+}
+
 // GET: Obtener archivos
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $linea_base_id = isset($_GET['linea_base_id']) ? intval($_GET['linea_base_id']) : null;
@@ -211,10 +297,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             continue;
         }
         
-        // Obtener tipo MIME
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $fileTmp);
-        finfo_close($finfo);
+        // Obtener tipo MIME (compatible con servidores sin fileinfo)
+        $mimeType = obtenerMimeType($fileTmp, $fileName);
         
         // Permitir más tipos si la extensión es conocida
         $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
@@ -278,7 +362,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode([
             'success' => false,
             'error' => 'No se pudo subir ningún archivo',
-            'errores' => $errores
+            'errores' => $errores,
+            'debug' => [
+                'uploadDir' => $uploadDir,
+                'subDir' => $subDir ?? 'no definido',
+                'uploadDir_exists' => file_exists($uploadDir),
+                'uploadDir_writable' => is_writable($uploadDir),
+                'subDir_exists' => isset($subDir) ? file_exists($subDir) : false,
+                'subDir_writable' => isset($subDir) ? is_writable($subDir) : false,
+                'php_upload_max' => ini_get('upload_max_filesize'),
+                'php_post_max' => ini_get('post_max_size'),
+                'files_received' => $fileCount
+            ]
         ], JSON_UNESCAPED_UNICODE);
     }
     exit();

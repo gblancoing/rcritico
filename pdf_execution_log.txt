@@ -1,0 +1,155 @@
+[2025-12-22 17:02:07] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 17:10:26] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 17:10:39] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:02:37] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:02:37] Iniciando proceso de generación de PDF
+[2025-12-22 19:02:54] ⚠️ TCPDF NO DISPONIBLE - Generando HTML en su lugar
+[2025-12-22 19:09:58] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:09:58] Iniciando proceso de generación de PDF
+[2025-12-22 19:10:11] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:10:11] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 19:10:11] Agregando banner al PDF...
+[2025-12-22 19:16:48] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:16:48] Iniciando proceso de generación de PDF
+[2025-12-22 19:17:01] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:17:28] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:17:28] Iniciando proceso de generación de PDF
+[2025-12-22 19:17:40] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:17:40] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 19:17:40] Agregando banner al PDF...
+[2025-12-22 19:29:22] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:29:22] Iniciando proceso de generación de PDF
+[2025-12-22 19:29:35] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:29:48] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:29:48] Iniciando proceso de generación de PDF
+[2025-12-22 19:30:00] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:30:00] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 19:30:00] Agregando banner al PDF...
+[2025-12-22 19:37:58] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:37:58] Iniciando proceso de generación de PDF
+[2025-12-22 19:38:00] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:38:00] Iniciando proceso de generación de PDF
+[2025-12-22 19:38:11] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:38:13] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:41:37] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:41:37] Iniciando proceso de generación de PDF
+[2025-12-22 19:41:50] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:41:50] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 19:41:50] Agregando banner al PDF...
+[2025-12-22 19:44:59] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:44:59] Iniciando proceso de generación de PDF
+[2025-12-22 19:45:11] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:50:06] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:50:06] Iniciando proceso de generación de PDF
+[2025-12-22 19:50:19] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 19:53:06] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 19:53:06] Iniciando proceso de generación de PDF
+[2025-12-22 19:53:18] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:04:01] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:04:01] Iniciando proceso de generación de PDF
+[2025-12-22 20:04:14] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:04:14] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:11:34] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:11:34] Iniciando proceso de generación de PDF
+[2025-12-22 20:11:46] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:11:46] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:19:07] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:19:08] Iniciando proceso de generación de PDF
+[2025-12-22 20:19:20] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:19:20] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:25:32] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:25:32] Iniciando proceso de generación de PDF
+[2025-12-22 20:25:44] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:25:44] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:26:01] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:26:01] Iniciando proceso de generación de PDF
+[2025-12-22 20:26:13] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:26:33] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:26:33] Iniciando proceso de generación de PDF
+[2025-12-22 20:26:45] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:26:45] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:34:04] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:34:04] Iniciando proceso de generación de PDF
+[2025-12-22 20:34:17] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:34:30] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:34:30] Iniciando proceso de generación de PDF
+[2025-12-22 20:34:42] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:34:42] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:40:06] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:40:06] Iniciando proceso de generación de PDF
+[2025-12-22 20:40:19] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:40:19] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:41:51] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:41:51] Iniciando proceso de generación de PDF
+[2025-12-22 20:42:04] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:42:04] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:49:23] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:49:23] Iniciando proceso de generación de PDF
+[2025-12-22 20:49:36] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:50:08] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:50:08] Iniciando proceso de generación de PDF
+[2025-12-22 20:50:22] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 20:50:22] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 20:55:39] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 20:55:39] Iniciando proceso de generación de PDF
+[2025-12-22 20:55:52] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:00:00] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:00:00] Iniciando proceso de generación de PDF
+[2025-12-22 21:00:13] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:00:13] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:06:28] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:06:28] Iniciando proceso de generación de PDF
+[2025-12-22 21:06:40] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:10:42] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:10:42] Iniciando proceso de generación de PDF
+[2025-12-22 21:10:55] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:10:55] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:17:12] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:17:12] Iniciando proceso de generación de PDF
+[2025-12-22 21:17:24] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:17:24] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:24:11] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:24:11] Iniciando proceso de generación de PDF
+[2025-12-22 21:24:23] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:24:23] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:26:12] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:26:12] Iniciando proceso de generación de PDF
+[2025-12-22 21:26:24] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:26:25] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:30:26] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:30:26] Iniciando proceso de generación de PDF
+[2025-12-22 21:30:39] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:30:47] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:30:47] Iniciando proceso de generación de PDF
+[2025-12-22 21:30:59] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:30:59] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:35:12] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:35:12] Iniciando proceso de generación de PDF
+[2025-12-22 21:35:24] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:35:24] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:36:45] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:36:45] Iniciando proceso de generación de PDF
+[2025-12-22 21:36:47] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:36:47] Iniciando proceso de generación de PDF
+[2025-12-22 21:36:57] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:37:00] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:37:00] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 21:41:49] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 21:41:49] Iniciando proceso de generación de PDF
+[2025-12-22 21:42:01] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 21:42:01] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-22 22:29:47] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 22:29:47] Iniciando proceso de generación de PDF
+[2025-12-22 22:30:00] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 22:37:39] EJECUTANDO: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php | Ruta: C:\xampp\htdocs\rcritico\api\dashboard\generar_reporte_pdf.php
+[2025-12-22 22:37:39] Iniciando proceso de generación de PDF
+[2025-12-22 22:37:52] ✓ TCPDF cargado desde Composer autoload
+[2025-12-22 22:37:52] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-23 00:59:42] ✓ TCPDF cargado desde Composer autoload
+[2025-12-23 00:59:42] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-23 01:00:37] ✓ TCPDF cargado desde Composer autoload
+[2025-12-23 01:00:37] ✓ TCPDF disponible - Continuando con generación de PDF
+[2025-12-23 01:45:54] ✓ TCPDF cargado desde Composer autoload
+[2025-12-23 02:17:47] ✓ TCPDF cargado desde: C:\xampp\htdocs\rcritico\api\dashboard/../../vendor/autoload.php
+[2025-12-23 02:18:06] ✓ TCPDF cargado desde: C:\xampp\htdocs\rcritico\api\dashboard/../../vendor/autoload.php
+[2025-12-23 02:18:06] ✓ TCPDF disponible - Continuando con generación de PDF

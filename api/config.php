@@ -1,18 +1,63 @@
 <?php
+// Función para encontrar el nombre real de la base de datos rcritico
+function findRcriticoDbName($host, $user, $pass) {
+    try {
+        $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $user, $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+        ]);
+        
+        $stmt = $pdo->query("SHOW DATABASES");
+        while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+            $db_name = $row[0];
+            // Buscar base de datos que contenga 'rcritico' pero no 'backup'
+            if (stripos($db_name, 'rcritico') !== false && 
+                stripos($db_name, 'backup') === false) {
+                // Verificar que tenga la tabla regiones
+                try {
+                    $pdo->exec("USE `" . addslashes($db_name) . "`");
+                    $stmt_check = $pdo->query("SHOW TABLES LIKE 'regiones'");
+                    if ($stmt_check->rowCount() > 0) {
+                        return $db_name;
+                    }
+                } catch (PDOException $e) {
+                    continue;
+                }
+            }
+        }
+    } catch (PDOException $e) {
+        // Si falla, retornar el nombre por defecto
+    }
+    
+    // Fallback: intentar con tab
+    return "\trcritico";
+}
+
 // Configuración de la base de datos según el entorno
 function getDbConfig() {
     // Detectar si estamos en desarrollo local o producción
-    $isLocal = in_array($_SERVER['HTTP_HOST'], ['localhost', '127.0.0.1']) || 
-               strpos($_SERVER['HTTP_HOST'], 'localhost') !== false ||
-               strpos($_SERVER['HTTP_HOST'], 'xampp') !== false;
+    // Si se ejecuta desde CLI, asumir que es local
+    $isCli = php_sapi_name() === 'cli';
     
-    if ($isLocal) {
+    // Si es HTTP, verificar el host
+    $httpHost = $_SERVER['HTTP_HOST'] ?? '';
+    $isLocalHttp = in_array($httpHost, ['localhost', '127.0.0.1']) || 
+                   strpos($httpHost, 'localhost') !== false ||
+                   strpos($httpHost, 'xampp') !== false;
+    
+    if ($isCli || $isLocalHttp) {
         // Configuración para desarrollo local (XAMPP)
+        $host = 'localhost';
+        $user = 'root';
+        $pass = '';
+        
+        // Buscar el nombre real de la base de datos automáticamente
+        $dbname = findRcriticoDbName($host, $user, $pass);
+        
         return [
-            'host' => 'localhost',
-            'user' => 'root',
-            'pass' => '',
-            'dbname' => 'rcritico'
+            'host' => $host,
+            'user' => $user,
+            'pass' => $pass,
+            'dbname' => $dbname
         ];
     } else {
         // Configuración para producción (cPanel - rcritico.carenvp.cl)

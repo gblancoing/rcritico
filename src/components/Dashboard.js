@@ -9,6 +9,8 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
   const [cargandoCarpetas, setCargandoCarpetas] = useState(true);
   const [promedioGeneral, setPromedioGeneral] = useState(null);
   const [carpetasExpandidas, setCarpetasExpandidas] = useState(new Set()); // IDs de carpetas expandidas
+  const [modalAvanceEmpresas, setModalAvanceEmpresas] = useState(false); // Modal para mostrar avance por empresa
+  const [empresasExpandidas, setEmpresasExpandidas] = useState(new Set()); // IDs de empresas expandidas para ver RCs
 
   useEffect(() => {
     if (proyectoId) {
@@ -136,7 +138,7 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
     );
   }
 
-  const tarjetaKPI = (titulo, valor, icono, color, subtitulo = null, tendencia = null) => (
+  const tarjetaKPI = (titulo, valor, icono, color, subtitulo = null, tendencia = null, onClick = null) => (
     <div style={{
       background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
       borderRadius: '10px',
@@ -146,12 +148,14 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
       borderLeft: `4px solid ${color}`,
       position: 'relative',
       overflow: 'hidden',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      cursor: onClick ? 'pointer' : 'default'
     }}
+    onClick={onClick || undefined}
     onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.boxShadow = `0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px ${color}20`;
-      e.currentTarget.style.borderLeftWidth = '5px';
+      e.currentTarget.style.transform = onClick ? 'translateY(-2px)' : 'translateY(0)';
+      e.currentTarget.style.boxShadow = onClick ? `0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px ${color}20` : '0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)';
+      e.currentTarget.style.borderLeftWidth = onClick ? '5px' : '4px';
     }}
     onMouseLeave={(e) => {
       e.currentTarget.style.transform = 'translateY(0)';
@@ -259,30 +263,36 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
         marginBottom: '1.5rem',
         paddingBottom: '1rem',
         borderBottom: '2px solid #e9ecef',
-        position: 'relative'
+        position: 'relative',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem'
       }}>
-        <div style={{
-          position: 'absolute',
-          bottom: '-2px',
-          left: 0,
-          width: '60px',
-          height: '2px',
-          background: 'linear-gradient(90deg, #0a6ebd 0%, #005288 100%)',
-          borderRadius: '2px 2px 0 0'
-        }}></div>
-        <h1 style={{
-          margin: 0,
-          fontSize: '20px',
-          fontWeight: '700',
-          color: '#0a3265',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          letterSpacing: '-0.3px',
-          flexWrap: 'wrap'
-        }}>
+        <div style={{ flex: 1, minWidth: '200px' }}>
           <div style={{
-            width: '36px',
+            position: 'absolute',
+            bottom: '-2px',
+            left: 0,
+            width: '60px',
+            height: '2px',
+            background: 'linear-gradient(90deg, #0a6ebd 0%, #005288 100%)',
+            borderRadius: '2px 2px 0 0'
+          }}></div>
+          <h1 style={{
+            margin: 0,
+            fontSize: '20px',
+            fontWeight: '700',
+            color: '#0a3265',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            letterSpacing: '-0.3px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{
+              width: '36px',
             height: '36px',
             borderRadius: '8px',
             background: 'linear-gradient(135deg, #0a6ebd15 0%, #0a6ebd08 100%)',
@@ -311,6 +321,50 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
             </>
           )}
         </h1>
+        </div>
+        {/* Botón Generar Reporte PDF */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Agregar timestamp único para evitar caché
+            const timestamp = Date.now();
+            const random = Math.floor(Math.random() * 10000);
+            const url = `${API_BASE}/dashboard/generar_reporte_pdf.php?proyecto_id=${proyectoId}&_t=${timestamp}&_r=${random}`;
+            const nuevaVentana = window.open(url, '_blank', 'noopener,noreferrer');
+            if (!nuevaVentana) {
+              alert('Por favor, permite ventanas emergentes en tu navegador para generar el reporte PDF.');
+            }
+          }}
+          style={{
+            padding: '0.5rem 1rem',
+            background: 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            boxShadow: '0 2px 6px rgba(220, 53, 69, 0.2)',
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 4px 8px rgba(220, 53, 69, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(220, 53, 69, 0.2)';
+          }}
+          title="Generar reporte PDF completo del proyecto"
+        >
+          <i className="fa fa-file-pdf" style={{ fontSize: '0.9rem' }}></i>
+          PDF
+        </button>
       </div>
 
       {/* KPIs Principales */}
@@ -361,6 +415,17 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
           'fa-users',
           '#6f42c1',
           `${kpis.total_usuarios || 0} totales`
+        )}
+        {tarjetaKPI(
+          'Avance Global por Empresa',
+          kpis.avance_global_empresas !== undefined && kpis.avance_global_empresas !== null 
+            ? `${kpis.avance_global_empresas.toFixed(1)}%` 
+            : '0.0%',
+          'fa-building',
+          '#fd7e14',
+          `${kpis.total_empresas || 0} empresas`,
+          null,
+          () => setModalAvanceEmpresas(true)
         )}
       </div>
 
@@ -688,6 +753,370 @@ const Dashboard = ({ proyectoId, proyecto, user, sidebarCollapsed, onNavigateToC
           </div>
         )}
       </div>
+
+      {/* Modal Avance por Empresa */}
+      {modalAvanceEmpresas && kpis && kpis.avance_por_empresa && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '1rem'
+        }} onClick={() => {
+          setModalAvanceEmpresas(false);
+          setEmpresasExpandidas(new Set());
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            width: '80%',
+            maxWidth: '720px',
+            maxHeight: '72vh',
+            overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            transform: 'scale(0.8)',
+            transformOrigin: 'center center'
+          }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #fd7e14 0%, #e66a00 100%)',
+              padding: '1rem 1.25rem',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <i className="fa fa-building"></i>
+                  Avance Global por Empresa
+                </h2>
+                <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.8rem', opacity: 0.95 }}>
+                  {kpis.total_empresas || 0} empresas con controles
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setModalAvanceEmpresas(false);
+                  setEmpresasExpandidas(new Set());
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  width: '40px',
+                  height: '40px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+              >
+                <i className="fa fa-times"></i>
+              </button>
+            </div>
+
+            {/* Contenido - Tabla de Empresas */}
+            <div style={{
+              padding: '1rem 1.25rem',
+              overflowY: 'auto',
+              flex: 1
+            }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse'
+              }}>
+                <thead>
+                  <tr style={{
+                    background: '#f8f9fa',
+                    borderBottom: '2px solid #dee2e6'
+                  }}>
+                    <th style={{
+                      padding: '0.75rem',
+                      textAlign: 'left',
+                      fontWeight: 700,
+                      color: '#495057',
+                      fontSize: '0.8rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Empresa
+                    </th>
+                    <th style={{
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      color: '#495057',
+                      fontSize: '0.8rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Avance
+                    </th>
+                    <th style={{
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      color: '#495057',
+                      fontSize: '0.8rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Controles
+                    </th>
+                    <th style={{
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      color: '#495057',
+                      fontSize: '0.8rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      width: '70px'
+                    }}>
+                      Detalle
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kpis.avance_por_empresa.map((empresa, index) => {
+                    const avance = parseFloat(empresa.avance_promedio || 0);
+                    const empresaKey = empresa.carpeta_id || empresa.empresa || index;
+                    const isExpanded = empresasExpandidas.has(empresaKey);
+                    const colorAvance = avance >= 80 ? '#28a745' : avance >= 50 ? '#ffc107' : '#dc3545';
+                    
+                    return (
+                      <React.Fragment key={empresa.carpeta_id || empresa.empresa || `empresa-${index}`}>
+                        <tr style={{
+                          borderBottom: '1px solid #e9ecef',
+                          background: index % 2 === 0 ? '#fff' : '#f8f9fa',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = index % 2 === 0 ? '#fff' : '#f8f9fa'}
+                        >
+                          <td style={{ padding: '0.75rem', fontWeight: 600, color: '#212529', fontSize: '0.9rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <i className="fa fa-building" style={{ color: '#fd7e14', fontSize: '0.95rem' }}></i>
+                              {empresa.empresa || empresa.nombre || 'Sin nombre'}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              padding: '0.4rem 0.8rem',
+                              borderRadius: '16px',
+                              background: `${colorAvance}15`,
+                              color: colorAvance,
+                              fontWeight: 700,
+                              fontSize: '0.85rem'
+                            }}>
+                              <i className={`fa ${avance >= 80 ? 'fa-check-circle' : avance >= 50 ? 'fa-exclamation-circle' : 'fa-times-circle'}`} style={{ fontSize: '0.8rem' }}></i>
+                              {avance.toFixed(1)}%
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', color: '#6c757d', fontSize: '0.9rem' }}>
+                            {empresa.total_controles || 0}
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                            <button
+                              onClick={() => {
+                                const empresaKey = empresa.carpeta_id || empresa.empresa || index;
+                                const newExpanded = new Set(empresasExpandidas);
+                                if (isExpanded) {
+                                  newExpanded.delete(empresaKey);
+                                } else {
+                                  newExpanded.add(empresaKey);
+                                }
+                                setEmpresasExpandidas(newExpanded);
+                              }}
+                              style={{
+                                background: isExpanded ? '#fd7e14' : 'transparent',
+                                border: `2px solid ${isExpanded ? '#fd7e14' : '#dee2e6'}`,
+                                borderRadius: '6px',
+                                width: '32px',
+                                height: '32px',
+                                color: isExpanded ? 'white' : '#6c757d',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isExpanded) {
+                                  e.currentTarget.style.background = '#f8f9fa';
+                                  e.currentTarget.style.borderColor = '#fd7e14';
+                                  e.currentTarget.style.color = '#fd7e14';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isExpanded) {
+                                  e.currentTarget.style.background = 'transparent';
+                                  e.currentTarget.style.borderColor = '#dee2e6';
+                                  e.currentTarget.style.color = '#6c757d';
+                                }
+                              }}
+                            >
+                              <i className={`fa ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                            </button>
+                          </td>
+                        </tr>
+                        {/* Submenú de RCs */}
+                        {isExpanded && empresa.rcs && empresa.rcs.length > 0 && (
+                          <tr>
+                            <td colSpan="4" style={{ padding: 0, background: '#f8f9fa' }}>
+                              <div style={{
+                                padding: '1rem 1.5rem',
+                                borderTop: '2px solid #dee2e6',
+                                background: '#fff'
+                              }}>
+                                <h4 style={{
+                                  margin: '0 0 1rem 0',
+                                  fontSize: '0.9rem',
+                                  fontWeight: 700,
+                                  color: '#495057',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem'
+                                }}>
+                                  <i className="fa fa-list" style={{ color: '#fd7e14' }}></i>
+                                  Riesgos Críticos (RC)
+                                </h4>
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                                  gap: '1rem'
+                                }}>
+                                  {empresa.rcs.map((rc, rcIndex) => {
+                                    const rcAvance = parseFloat(rc.avance_promedio || 0);
+                                    const rcColor = rcAvance >= 80 ? '#28a745' : rcAvance >= 50 ? '#ffc107' : '#dc3545';
+                                    
+                                    return (
+                                      <div
+                                        key={rc.rc_id || rcIndex}
+                                        style={{
+                                          background: 'white',
+                                          border: `2px solid ${rcColor}40`,
+                                          borderRadius: '8px',
+                                          padding: '1rem',
+                                          transition: 'all 0.2s',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.transform = 'translateY(-2px)';
+                                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                                          e.currentTarget.style.borderColor = rcColor;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.transform = 'translateY(0)';
+                                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+                                          e.currentTarget.style.borderColor = `${rcColor}40`;
+                                        }}
+                                      >
+                                        <div style={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          marginBottom: '0.5rem'
+                                        }}>
+                                          <div style={{
+                                            fontWeight: 600,
+                                            color: '#212529',
+                                            fontSize: '0.9rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem'
+                                          }}>
+                                            <i className="fa fa-shield-alt" style={{ color: '#fd7e14', fontSize: '0.85rem' }}></i>
+                                            {rc.rc_nombre}
+                                          </div>
+                                        </div>
+                                        <div style={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          marginTop: '0.75rem'
+                                        }}>
+                                          <div style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.4rem',
+                                            padding: '0.4rem 0.8rem',
+                                            borderRadius: '16px',
+                                            background: `${rcColor}15`,
+                                            color: rcColor,
+                                            fontWeight: 700,
+                                            fontSize: '0.85rem'
+                                          }}>
+                                            <i className={`fa ${rcAvance >= 80 ? 'fa-check-circle' : rcAvance >= 50 ? 'fa-exclamation-circle' : 'fa-times-circle'}`} style={{ fontSize: '0.75rem' }}></i>
+                                            {rcAvance.toFixed(1)}%
+                                          </div>
+                                          <span style={{
+                                            fontSize: '0.75rem',
+                                            color: '#6c757d'
+                                          }}>
+                                            {rc.total_controles || 0} controles
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                {empresa.rcs.length === 0 && (
+                                  <p style={{
+                                    margin: '1rem 0 0 0',
+                                    color: '#6c757d',
+                                    fontSize: '0.85rem',
+                                    fontStyle: 'italic',
+                                    textAlign: 'center',
+                                    padding: '1rem'
+                                  }}>
+                                    No hay Riesgos Críticos asociados
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {(!kpis.avance_por_empresa || kpis.avance_por_empresa.length === 0) && (
+                <div style={{
+                  padding: '3rem',
+                  textAlign: 'center',
+                  color: '#6c757d'
+                }}>
+                  <i className="fa fa-inbox" style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }}></i>
+                  <p style={{ fontSize: '1rem', margin: 0 }}>No hay empresas con controles registrados</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes fadeIn {
           from {
