@@ -174,8 +174,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     $stmt_preg->execute($dim_ids);
                     $preguntas = $stmt_preg->fetchAll(PDO::FETCH_ASSOC);
                     
-                    // Agrupar preguntas por dimension_id
+                    // Obtener evidencias individuales para cada pregunta
+                    $pregunta_ids = array_column($preguntas, 'id');
+                    $evidencias_map = [];
+                    if (!empty($pregunta_ids)) {
+                        try {
+                            $placeholders_preg = implode(',', array_fill(0, count($pregunta_ids), '?'));
+                            $stmt_evid = $pdo->prepare("SELECT * FROM bowtie_evidencias 
+                                                       WHERE pregunta_id IN ($placeholders_preg) AND activo = 1 
+                                                       ORDER BY orden ASC, id ASC");
+                            $stmt_evid->execute($pregunta_ids);
+                            $evidencias = $stmt_evid->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            // Log CRÍTICO: Verificar qué devuelve la consulta SQL directamente (PREVENTIVOS)
+                            error_log("=== CONSULTA SQL EVIDENCIAS PREVENTIVAS ===");
+                            error_log("IDs de preguntas consultadas: " . implode(',', $pregunta_ids));
+                            error_log("Total evidencias devueltas por SQL: " . count($evidencias));
+                            foreach ($evidencias as $ev) {
+                                error_log("  Evidencia SQL: ID={$ev['id']}, pregunta_id={$ev['pregunta_id']}, orden={$ev['orden']}, activo={$ev['activo']}, texto=" . substr($ev['texto'], 0, 50));
+                            }
+                            error_log("=== FIN CONSULTA SQL PREVENTIVAS ===");
+                            
+                            // Agrupar evidencias por pregunta_id
+                            foreach ($evidencias as $evid) {
+                                if (!isset($evidencias_map[$evid['pregunta_id']])) {
+                                    $evidencias_map[$evid['pregunta_id']] = [];
+                                }
+                                $evidencias_map[$evid['pregunta_id']][] = [
+                                    'id' => $evid['id'],
+                                    'texto' => $evid['texto'],
+                                    'orden' => $evid['orden']
+                                ];
+                            }
+                            
+                            // Log detallado de evidencias obtenidas (PREVENTIVOS)
+                            error_log("=== EVIDENCIAS PREVENTIVOS ===");
+                            error_log("Total evidencias obtenidas: " . count($evidencias) . " para " . count($pregunta_ids) . " preguntas");
+                            error_log("IDs de preguntas consultadas: " . implode(',', $pregunta_ids));
+                            foreach ($evidencias_map as $preg_id => $evids) {
+                                $ids_evids = array_column($evids, 'id');
+                                error_log("  Pregunta ID {$preg_id}: " . count($evids) . " evidencias (IDs: " . implode(',', $ids_evids) . ")");
+                            }
+                            error_log("=== FIN EVIDENCIAS PREVENTIVOS ===");
+                        } catch (PDOException $e) {
+                            // Si la tabla bowtie_evidencias no existe aún, continuar sin evidencias individuales
+                            error_log("Tabla bowtie_evidencias no existe aún: " . $e->getMessage());
+                        }
+                    }
+                    
+                    // Agrupar preguntas por dimension_id y agregar evidencias
                     foreach ($preguntas as $preg) {
+                        // CRÍTICO: SIEMPRE obtener evidencias directamente de BD para esta pregunta específica
+                        // Esto evita problemas donde el map inicial no obtiene todas las evidencias
+                        $evidencias_pregunta = [];
+                        try {
+                            $stmt_direct_all = $pdo->prepare("SELECT id, texto, orden FROM bowtie_evidencias WHERE pregunta_id = ? AND activo = 1 ORDER BY orden ASC, id ASC");
+                            $stmt_direct_all->execute([$preg['id']]);
+                            $todas_las_evidencias = $stmt_direct_all->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            $evidencias_pregunta = array_map(function($ev) {
+                                return [
+                                    'id' => $ev['id'],
+                                    'texto' => $ev['texto'],
+                                    'orden' => $ev['orden']
+                                ];
+                            }, $todas_las_evidencias);
+                            
+                            // Log para debugging
+                            if (count($todas_las_evidencias) > 0) {
+                                $ids_evids = array_column($todas_las_evidencias, 'id');
+                                error_log("Pregunta ID {$preg['id']}: Obtenidas " . count($todas_las_evidencias) . " evidencias directamente de BD (IDs: " . implode(',', $ids_evids) . ")");
+                            }
+                        } catch (PDOException $e) {
+                            error_log("Error obteniendo evidencias para pregunta {$preg['id']}: " . $e->getMessage());
+                            // Fallback al map si hay error
+                            $evidencias_pregunta = $evidencias_map[$preg['id']] ?? [];
+                        }
+                        
+                        $preg['evidencias'] = $evidencias_pregunta;
+                        
                         if (!isset($preguntas_map[$preg['dimension_id']])) {
                             $preguntas_map[$preg['dimension_id']] = [];
                         }
@@ -270,8 +347,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     $stmt_preg->execute($dim_ids);
                     $preguntas = $stmt_preg->fetchAll(PDO::FETCH_ASSOC);
                     
-                    // Agrupar preguntas por dimension_id
+                    // Obtener evidencias individuales para cada pregunta (mitigadores)
+                    $pregunta_ids = array_column($preguntas, 'id');
+                    $evidencias_map = [];
+                    if (!empty($pregunta_ids)) {
+                        try {
+                            $placeholders_preg = implode(',', array_fill(0, count($pregunta_ids), '?'));
+                            $stmt_evid = $pdo->prepare("SELECT * FROM bowtie_evidencias 
+                                                       WHERE pregunta_id IN ($placeholders_preg) AND activo = 1 
+                                                       ORDER BY orden ASC, id ASC");
+                            $stmt_evid->execute($pregunta_ids);
+                            $evidencias = $stmt_evid->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            // Agrupar evidencias por pregunta_id
+                            foreach ($evidencias as $evid) {
+                                if (!isset($evidencias_map[$evid['pregunta_id']])) {
+                                    $evidencias_map[$evid['pregunta_id']] = [];
+                                }
+                                $evidencias_map[$evid['pregunta_id']][] = [
+                                    'id' => $evid['id'],
+                                    'texto' => $evid['texto'],
+                                    'orden' => $evid['orden']
+                                ];
+                            }
+                        } catch (PDOException $e) {
+                            // Si la tabla bowtie_evidencias no existe aún, continuar sin evidencias individuales
+                            error_log("Tabla bowtie_evidencias no existe aún: " . $e->getMessage());
+                        }
+                    }
+                    
+                    // Agrupar preguntas por dimension_id y agregar evidencias
                     foreach ($preguntas as $preg) {
+                        // CRÍTICO: SIEMPRE obtener evidencias directamente de BD para esta pregunta específica
+                        // Esto evita problemas donde el map inicial no obtiene todas las evidencias
+                        $evidencias_pregunta = [];
+                        try {
+                            $stmt_direct_all = $pdo->prepare("SELECT id, texto, orden FROM bowtie_evidencias WHERE pregunta_id = ? AND activo = 1 ORDER BY orden ASC, id ASC");
+                            $stmt_direct_all->execute([$preg['id']]);
+                            $todas_las_evidencias = $stmt_direct_all->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            $evidencias_pregunta = array_map(function($ev) {
+                                return [
+                                    'id' => $ev['id'],
+                                    'texto' => $ev['texto'],
+                                    'orden' => $ev['orden']
+                                ];
+                            }, $todas_las_evidencias);
+                            
+                            // Log para debugging
+                            if (count($todas_las_evidencias) > 0) {
+                                $ids_evids = array_column($todas_las_evidencias, 'id');
+                                error_log("Pregunta Mitigador ID {$preg['id']}: Obtenidas " . count($todas_las_evidencias) . " evidencias directamente de BD (IDs: " . implode(',', $ids_evids) . ")");
+                            }
+                        } catch (PDOException $e) {
+                            error_log("Error obteniendo evidencias para pregunta mitigador {$preg['id']}: " . $e->getMessage());
+                            // Fallback al map si hay error
+                            $evidencias_pregunta = $evidencias_map[$preg['id']] ?? [];
+                        }
+                        
+                        $preg['evidencias'] = $evidencias_pregunta;
+                        
+                        // Log para debugging
+                        if (!empty($evidencias_pregunta)) {
+                            error_log("Pregunta Mitigador ID {$preg['id']}: Devolviendo " . count($evidencias_pregunta) . " evidencias (IDs: " . implode(',', array_column($evidencias_pregunta, 'id')) . ")");
+                        } else if (!empty($preg['evidencia'])) {
+                            error_log("Pregunta Mitigador ID {$preg['id']}: No hay evidencias en array, pero tiene evidencia (texto): " . substr($preg['evidencia'], 0, 50));
+                        }
+                        
                         if (!isset($preguntas_mitigador_map[$preg['dimension_id']])) {
                             $preguntas_mitigador_map[$preg['dimension_id']] = [];
                         }
@@ -716,10 +858,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT
                 $criticidad = isset($control['criticidad']) && !empty(trim($control['criticidad'])) ? trim($control['criticidad']) : null;
                 $jerarquia = isset($control['jerarquia']) && !empty(trim($control['jerarquia'])) ? trim($control['jerarquia']) : null;
                 
+                // CRÍTICO: Verificar si el control tiene ID para actualizarlo en lugar de insertar uno nuevo
+                $control_preventivo_id = null;
+                if (!empty($control['id']) && is_numeric($control['id'])) {
+                    // El control tiene ID, intentar actualizarlo
+                    try {
+                        // Intentar actualizar con todos los campos nuevos (si las columnas existen)
+                        $stmt_cp = $pdo->prepare("UPDATE bowtie_controles_preventivos SET bowtie_id = ?, causa_id = NULL, codigo = ?, descripcion = ?, criticidad = ?, jerarquia = ?, orden = ?, activo = 1 WHERE id = ?");
+                        $stmt_cp->execute([$bowtie_id, $codigo_cp, trim($control['descripcion']), $criticidad, $jerarquia, $index, $control['id']]);
+                        if ($stmt_cp->rowCount() > 0) {
+                            $control_preventivo_id = $control['id'];
+                            error_log("Control preventivo actualizado: ID={$control_preventivo_id}, codigo={$codigo_cp}");
+                        } else {
+                            // El ID no existe, insertar como nuevo
+                            throw new PDOException("Control ID {$control['id']} no encontrado, insertando como nuevo");
+                        }
+                    } catch (PDOException $e) {
+                        // Si alguna columna no existe o el ID no existe, intentar actualizar sin los campos nuevos
+                        if (strpos($e->getMessage(), "Unknown column") !== false || 
+                            strpos($e->getMessage(), "doesn't exist") !== false ||
+                            strpos($e->getMessage(), "no encontrado") !== false) {
+                            try {
+                                // Intentar actualizar con código pero sin campos nuevos
+                                $stmt_cp = $pdo->prepare("UPDATE bowtie_controles_preventivos SET bowtie_id = ?, causa_id = NULL, codigo = ?, descripcion = ?, orden = ?, activo = 1 WHERE id = ?");
+                                $stmt_cp->execute([$bowtie_id, $codigo_cp, trim($control['descripcion']), $index, $control['id']]);
+                                if ($stmt_cp->rowCount() > 0) {
+                                    $control_preventivo_id = $control['id'];
+                                    error_log("Control preventivo actualizado (sin campos nuevos): ID={$control_preventivo_id}, codigo={$codigo_cp}");
+                                } else {
+                                    throw new PDOException("Control ID {$control['id']} no encontrado, insertando como nuevo");
+                                }
+                            } catch (PDOException $e2) {
+                                // Si la columna codigo tampoco existe o el ID no existe, insertar como nuevo
+                                if (strpos($e2->getMessage(), "Unknown column 'codigo'") !== false || 
+                                    strpos($e2->getMessage(), "doesn't exist") !== false ||
+                                    strpos($e2->getMessage(), "no encontrado") !== false) {
+                                    // Insertar como nuevo control
+                                    $control_preventivo_id = null;
+                                } else {
+                                    throw $e2;
+                                }
+                            }
+                        } else {
+                            throw $e;
+                        }
+                    }
+                }
+                
+                // Si no se actualizó (no tenía ID o el ID no existía), insertar como nuevo
+                if (!$control_preventivo_id) {
                 try {
                     // Intentar insertar con todos los campos nuevos (si las columnas existen)
                     $stmt_cp = $pdo->prepare("INSERT INTO bowtie_controles_preventivos (bowtie_id, causa_id, codigo, descripcion, criticidad, jerarquia, orden, activo) VALUES (?, NULL, ?, ?, ?, ?, ?, 1)");
                     $stmt_cp->execute([$bowtie_id, $codigo_cp, trim($control['descripcion']), $criticidad, $jerarquia, $index]);
+                        $control_preventivo_id = $pdo->lastInsertId();
+                        error_log("Nuevo control preventivo insertado: ID={$control_preventivo_id}, codigo={$codigo_cp}");
                 } catch (PDOException $e) {
                     // Si alguna columna no existe, intentar insertar sin los campos nuevos
                     if (strpos($e->getMessage(), "Unknown column") !== false || 
@@ -728,12 +921,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT
                             // Intentar con código pero sin campos nuevos
                             $stmt_cp = $pdo->prepare("INSERT INTO bowtie_controles_preventivos (bowtie_id, causa_id, codigo, descripcion, orden, activo) VALUES (?, NULL, ?, ?, ?, 1)");
                             $stmt_cp->execute([$bowtie_id, $codigo_cp, trim($control['descripcion']), $index]);
+                                $control_preventivo_id = $pdo->lastInsertId();
+                                error_log("Nuevo control preventivo insertado (sin campos nuevos): ID={$control_preventivo_id}, codigo={$codigo_cp}");
                         } catch (PDOException $e2) {
                             // Si la columna codigo tampoco existe, insertar solo descripción
                             if (strpos($e2->getMessage(), "Unknown column 'codigo'") !== false || 
                                 strpos($e2->getMessage(), "doesn't exist") !== false) {
                                 $stmt_cp = $pdo->prepare("INSERT INTO bowtie_controles_preventivos (bowtie_id, causa_id, descripcion, orden, activo) VALUES (?, NULL, ?, ?, 1)");
                                 $stmt_cp->execute([$bowtie_id, trim($control['descripcion']), $index]);
+                                    $control_preventivo_id = $pdo->lastInsertId();
+                                    error_log("Nuevo control preventivo insertado (sin codigo): ID={$control_preventivo_id}");
                             } else {
                                 throw $e2;
                             }
@@ -742,7 +939,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT
                         throw $e;
                     }
                 }
-                $control_preventivo_id = $pdo->lastInsertId();
+                }
                 
                 // Insertar relaciones con causas (muchos a muchos) - solo si la tabla existe
                 if (isset($control['causas_asociadas']) && is_array($control['causas_asociadas'])) {
@@ -771,17 +968,169 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT
                     foreach ($control['dimensiones'] as $dim_index => $dimension) {
                         if (!empty(trim($dimension['nombre'] ?? ''))) {
                             try {
+                                // Si la dimensión tiene ID, intentar actualizar; sino insertar nueva
+                                $dimension_id = null;
+                                if (!empty($dimension['id']) && is_numeric($dimension['id'])) {
+                                    // Actualizar dimensión existente y reactivarla
+                                    $stmt_dim = $pdo->prepare("UPDATE bowtie_dimensiones SET control_preventivo_id = ?, nombre = ?, orden = ?, activo = 1 WHERE id = ?");
+                                    $stmt_dim->execute([$control_preventivo_id, trim($dimension['nombre']), $dim_index, $dimension['id']]);
+                                    // Verificar si se actualizó correctamente
+                                    if ($stmt_dim->rowCount() > 0) {
+                                        $dimension_id = $dimension['id'];
+                                        error_log("Dimensión preventivo actualizada: ID={$dimension_id}, control_preventivo_id={$control_preventivo_id}, nombre=" . substr(trim($dimension['nombre']), 0, 50));
+                                    } else {
+                                        // Si no se actualizó (no existe), insertar como nueva
                                 $stmt_dim = $pdo->prepare("INSERT INTO bowtie_dimensiones (control_preventivo_id, control_mitigador_id, nombre, orden, activo) VALUES (?, NULL, ?, ?, 1)");
                                 $stmt_dim->execute([$control_preventivo_id, trim($dimension['nombre']), $dim_index]);
                                 $dimension_id = $pdo->lastInsertId();
+                                        error_log("Dimensión preventivo insertada (ID original {$dimension['id']} no encontrado): nuevo ID={$dimension_id}, nombre=" . substr(trim($dimension['nombre']), 0, 50));
+                                    }
+                                } else {
+                                    // Insertar nueva dimensión
+                                    $stmt_dim = $pdo->prepare("INSERT INTO bowtie_dimensiones (control_preventivo_id, control_mitigador_id, nombre, orden, activo) VALUES (?, NULL, ?, ?, 1)");
+                                    $stmt_dim->execute([$control_preventivo_id, trim($dimension['nombre']), $dim_index]);
+                                    $dimension_id = $pdo->lastInsertId();
+                                    error_log("Nueva dimensión preventivo insertada: ID={$dimension_id}, nombre=" . substr(trim($dimension['nombre']), 0, 50));
+                                }
                                 
-                                // Insertar preguntas para esta dimensión
+                                // Insertar preguntas para esta dimensión (preventivos)
                                 if (isset($dimension['preguntas']) && is_array($dimension['preguntas'])) {
                                     foreach ($dimension['preguntas'] as $preg_index => $pregunta) {
                                         if (!empty(trim($pregunta['texto'] ?? ''))) {
+                                            // Mantener evidencia como texto para compatibilidad (se puede eliminar después)
                                             $evidencia = isset($pregunta['evidencia']) && !empty(trim($pregunta['evidencia'])) ? trim($pregunta['evidencia']) : null;
+                                            
+                                            // Insertar o actualizar pregunta
+                                            $pregunta_id = null;
+                                            if (!empty($pregunta['id']) && is_numeric($pregunta['id'])) {
+                                                // CRÍTICO: Actualizar también dimension_id para asociar la pregunta a la nueva dimensión activa
+                                                // Y reactivar la pregunta si estaba desactivada
+                                                $stmt_preg = $pdo->prepare("UPDATE bowtie_preguntas SET dimension_id = ?, texto = ?, evidencia = ?, orden = ?, activo = 1 WHERE id = ?");
+                                                $stmt_preg->execute([$dimension_id, trim($pregunta['texto']), $evidencia, $preg_index, $pregunta['id']]);
+                                                if ($stmt_preg->rowCount() > 0) {
+                                                    $pregunta_id = $pregunta['id'];
+                                                    error_log("Pregunta preventivo actualizada: ID={$pregunta_id}, dimension_id={$dimension_id}, texto=" . substr(trim($pregunta['texto']), 0, 50));
+                                                } else {
+                                                    // El ID no existe, insertar como nueva
                                             $stmt_preg = $pdo->prepare("INSERT INTO bowtie_preguntas (dimension_id, texto, evidencia, orden, activo) VALUES (?, ?, ?, ?, 1)");
                                             $stmt_preg->execute([$dimension_id, trim($pregunta['texto']), $evidencia, $preg_index]);
+                                                    $pregunta_id = $pdo->lastInsertId();
+                                                    error_log("Pregunta preventivo insertada (ID original {$pregunta['id']} no encontrado): nuevo ID={$pregunta_id}, texto=" . substr(trim($pregunta['texto']), 0, 50));
+                                                }
+                                            } else {
+                                                // Nueva pregunta sin ID
+                                                $stmt_preg = $pdo->prepare("INSERT INTO bowtie_preguntas (dimension_id, texto, evidencia, orden, activo) VALUES (?, ?, ?, ?, 1)");
+                                                $stmt_preg->execute([$dimension_id, trim($pregunta['texto']), $evidencia, $preg_index]);
+                                                $pregunta_id = $pdo->lastInsertId();
+                                                error_log("Nueva pregunta preventivo insertada: ID={$pregunta_id}, texto=" . substr(trim($pregunta['texto']), 0, 50));
+                                            }
+                                            
+                                            // Manejar evidencias individuales (nuevo formato)
+                                            if (isset($pregunta['evidencias']) && is_array($pregunta['evidencias'])) {
+                                                try {
+                                                    // Obtener TODAS las evidencias activas actuales de esta pregunta
+                                                    $stmt_existentes = $pdo->prepare("SELECT id FROM bowtie_evidencias WHERE pregunta_id = ? AND activo = 1");
+                                                    $stmt_existentes->execute([$pregunta_id]);
+                                                    $ids_existentes_bd = $stmt_existentes->fetchAll(PDO::FETCH_COLUMN);
+                                                    
+                                                    error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: Evidencias recibidas del frontend: " . count($pregunta['evidencias']) . " (BD tiene " . count($ids_existentes_bd) . " activas)");
+                                                    
+                                                    // IDs de evidencias que se procesan (actualizadas o insertadas)
+                                                    $ids_evidencias_procesadas = [];
+                                                    
+                                                    // Insertar o actualizar evidencias individuales
+                                                    foreach ($pregunta['evidencias'] as $evid_index => $evidencia_obj) {
+                                                        $evidencia_texto = is_array($evidencia_obj) ? ($evidencia_obj['texto'] ?? '') : (string)$evidencia_obj;
+                                                        
+                                                        // CRÍTICO: Solo procesar evidencias con texto no vacío
+                                                        if (!empty(trim($evidencia_texto))) {
+                                                            $evidencia_id = is_array($evidencia_obj) && isset($evidencia_obj['id']) ? $evidencia_obj['id'] : null;
+                                                            $evidencia_id_real = null;
+                                                            
+                                                            error_log("PREVENTIVO - Procesando evidencia: ID recibido={$evidencia_id}, texto=" . substr(trim($evidencia_texto), 0, 50));
+                                                            
+                                                            // Si el ID existe y no es temporal, intentar actualizar
+                                                            if ($evidencia_id && !preg_match('/^temp_/', (string)$evidencia_id)) {
+                                                                $evidencia_id_int = (int)$evidencia_id;
+                                                                
+                                                                // Verificar si existe en BD para esta pregunta (activa o inactiva)
+                                                                $stmt_check = $pdo->prepare("SELECT id FROM bowtie_evidencias WHERE id = ? AND pregunta_id = ?");
+                                                                $stmt_check->execute([$evidencia_id_int, $pregunta_id]);
+                                                                $existe = $stmt_check->fetch();
+                                                                
+                                                                if ($existe) {
+                                                                    // Actualizar evidencia existente (reactivar si estaba desactivada)
+                                                                    $stmt_evid = $pdo->prepare("UPDATE bowtie_evidencias SET texto = ?, orden = ?, activo = 1 WHERE id = ? AND pregunta_id = ?");
+                                                                    $stmt_evid->execute([trim($evidencia_texto), $evid_index, $evidencia_id_int, $pregunta_id]);
+                                                                    $evidencia_id_real = $evidencia_id_int;
+                                                                    error_log("PREVENTIVO - Evidencia actualizada: ID={$evidencia_id_real}");
+                                                                } else {
+                                                                    // El ID no existe para esta pregunta, insertar como nueva
+                                                                    $stmt_evid = $pdo->prepare("INSERT INTO bowtie_evidencias (pregunta_id, texto, orden, activo) VALUES (?, ?, ?, 1)");
+                                                                    $stmt_evid->execute([$pregunta_id, trim($evidencia_texto), $evid_index]);
+                                                                    $evidencia_id_real = $pdo->lastInsertId();
+                                                                    error_log("PREVENTIVO - Nueva evidencia insertada: ID={$evidencia_id_real} (ID recibido {$evidencia_id} no existía)");
+                                                                }
+                                                            } else {
+                                                                // Nueva evidencia (ID temporal o sin ID) - insertar como nueva
+                                                                $stmt_evid = $pdo->prepare("INSERT INTO bowtie_evidencias (pregunta_id, texto, orden, activo) VALUES (?, ?, ?, 1)");
+                                                                $stmt_evid->execute([$pregunta_id, trim($evidencia_texto), $evid_index]);
+                                                                $evidencia_id_real = $pdo->lastInsertId();
+                                                                error_log("PREVENTIVO - Nueva evidencia insertada: ID={$evidencia_id_real} (sin ID o temporal)");
+                                                            }
+                                                            
+                                                            // Agregar el ID real a la lista de procesadas
+                                                            if ($evidencia_id_real) {
+                                                                $ids_evidencias_procesadas[] = $evidencia_id_real;
+                                                            }
+                                                        } else {
+                                                            error_log("PREVENTIVO - Evidencia ignorada: texto vacío en índice {$evid_index}");
+                                                        }
+                                                    }
+                                                    
+                                                    error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: IDs procesadas=" . implode(',', $ids_evidencias_procesadas) . ", IDs existentes BD=" . implode(',', $ids_existentes_bd));
+                                                    
+                                                    // CRÍTICO: Desactivar evidencias que están en BD pero NO en la lista de procesadas
+                                                    // IMPORTANTE: Si el array recibido está vacío (count = 0), NO hacer nada para preservar evidencias existentes
+                                                    // Si el array tiene elementos pero ninguna fue procesada (todas vacías), desactivar todas las existentes
+                                                    if (count($pregunta['evidencias']) > 0) {
+                                                        // Hay elementos en el array: comparar IDs procesadas con existentes
+                                                        if (!empty($ids_evidencias_procesadas)) {
+                                                            // Hay evidencias procesadas: desactivar solo las que no están en la lista
+                                                            $ids_para_mantener = array_unique($ids_evidencias_procesadas);
+                                                            $ids_para_desactivar = array_diff($ids_existentes_bd, $ids_para_mantener);
+                                                            
+                                                            if (!empty($ids_para_desactivar)) {
+                                                                $placeholders = implode(',', array_fill(0, count($ids_para_desactivar), '?'));
+                                                                $stmt_deactivate = $pdo->prepare("UPDATE bowtie_evidencias SET activo = 0 WHERE pregunta_id = ? AND id IN ($placeholders)");
+                                                                $params = array_merge([$pregunta_id], $ids_para_desactivar);
+                                                                $stmt_deactivate->execute($params);
+                                                                error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: Desactivadas evidencias: " . implode(',', $ids_para_desactivar));
+                                                            } else {
+                                                                error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: No hay evidencias para desactivar (todas están en la lista de procesadas)");
+                                                            }
+                                                        } else {
+                                                            // Array con elementos pero ninguna fue procesada (todas tienen texto vacío)
+                                                            // Esto significa que el usuario eliminó todas las evidencias
+                                                            if (!empty($ids_existentes_bd)) {
+                                                                $placeholders = implode(',', array_fill(0, count($ids_existentes_bd), '?'));
+                                                                $stmt_deactivate = $pdo->prepare("UPDATE bowtie_evidencias SET activo = 0 WHERE pregunta_id = ? AND id IN ($placeholders)");
+                                                                $params = array_merge([$pregunta_id], $ids_existentes_bd);
+                                                                $stmt_deactivate->execute($params);
+                                                                error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: Todas las evidencias recibidas están vacías, desactivando todas las existentes: " . implode(',', $ids_existentes_bd));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // Array vacío: no hacer nada, mantener todas las evidencias existentes
+                                                        // Esto preserva las evidencias si el frontend no las envía en el request
+                                                        error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: Array de evidencias vacío, manteniendo todas las evidencias existentes en BD");
+                                                    }
+                                                } catch (PDOException $e) {
+                                                    error_log("Error guardando evidencias individuales (preventivos): " . $e->getMessage());
+                                                }
+                                            } else {
+                                                error_log("PREVENTIVO - Pregunta ID {$pregunta_id}: No tiene campo 'evidencias' o no es array, manteniendo evidencias existentes");
+                                            }
                                         }
                                     }
                                 }
@@ -892,17 +1241,157 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT
                     foreach ($control['dimensiones'] as $dim_index => $dimension) {
                         if (!empty(trim($dimension['nombre'] ?? ''))) {
                             try {
+                                $dimension_id = null;
+                                // Si la dimensión tiene ID, intentar actualizar; sino insertar nueva
+                                if (!empty($dimension['id'])) {
+                                    // Actualizar dimensión existente
+                                    $stmt_dim = $pdo->prepare("UPDATE bowtie_dimensiones SET nombre = ?, orden = ?, activo = 1 WHERE id = ? AND control_mitigador_id = ?");
+                                    $stmt_dim->execute([trim($dimension['nombre']), $dim_index, $dimension['id'], $control_mitigador_id]);
+                                    // Verificar si se actualizó correctamente
+                                    if ($stmt_dim->rowCount() > 0) {
+                                        $dimension_id = $dimension['id'];
+                                        error_log("Dimensión mitigador actualizada: ID={$dimension_id}, nombre=" . substr(trim($dimension['nombre']), 0, 50));
+                                    } else {
+                                        // Si no se actualizó (no existe o pertenece a otro control), insertar como nueva
                                 $stmt_dim = $pdo->prepare("INSERT INTO bowtie_dimensiones (control_preventivo_id, control_mitigador_id, nombre, orden, activo) VALUES (NULL, ?, ?, ?, 1)");
                                 $stmt_dim->execute([$control_mitigador_id, trim($dimension['nombre']), $dim_index]);
                                 $dimension_id = $pdo->lastInsertId();
+                                        error_log("Dimensión mitigador insertada (ID original {$dimension['id']} no encontrado): nuevo ID={$dimension_id}, nombre=" . substr(trim($dimension['nombre']), 0, 50));
+                                    }
+                                } else {
+                                    // Insertar nueva dimensión
+                                    $stmt_dim = $pdo->prepare("INSERT INTO bowtie_dimensiones (control_preventivo_id, control_mitigador_id, nombre, orden, activo) VALUES (NULL, ?, ?, ?, 1)");
+                                    $stmt_dim->execute([$control_mitigador_id, trim($dimension['nombre']), $dim_index]);
+                                    $dimension_id = $pdo->lastInsertId();
+                                    error_log("Nueva dimensión mitigador insertada: ID={$dimension_id}, nombre=" . substr(trim($dimension['nombre']), 0, 50));
+                                }
                                 
-                                // Insertar preguntas para esta dimensión
+                                // Insertar preguntas para esta dimensión (mitigadores)
                                 if (isset($dimension['preguntas']) && is_array($dimension['preguntas'])) {
                                     foreach ($dimension['preguntas'] as $preg_index => $pregunta) {
                                         if (!empty(trim($pregunta['texto'] ?? ''))) {
+                                            // Mantener evidencia como texto para compatibilidad (se puede eliminar después)
                                             $evidencia = isset($pregunta['evidencia']) && !empty(trim($pregunta['evidencia'])) ? trim($pregunta['evidencia']) : null;
+                                            
+                                            // Insertar o actualizar pregunta
+                                            if (!empty($pregunta['id'])) {
+                                                // CRÍTICO: Actualizar también dimension_id para asociar la pregunta a la nueva dimensión activa
+                                                $stmt_preg = $pdo->prepare("UPDATE bowtie_preguntas SET dimension_id = ?, texto = ?, evidencia = ?, orden = ? WHERE id = ?");
+                                                $stmt_preg->execute([$dimension_id, trim($pregunta['texto']), $evidencia, $preg_index, $pregunta['id']]);
+                                                $pregunta_id = $pregunta['id'];
+                                                error_log("Pregunta preventivo actualizada: ID={$pregunta_id}, dimension_id={$dimension_id} (actualizada)");
+                                            } else {
                                             $stmt_preg = $pdo->prepare("INSERT INTO bowtie_preguntas (dimension_id, texto, evidencia, orden, activo) VALUES (?, ?, ?, ?, 1)");
                                             $stmt_preg->execute([$dimension_id, trim($pregunta['texto']), $evidencia, $preg_index]);
+                                                $pregunta_id = $pdo->lastInsertId();
+                                            }
+                                            
+                                            // Manejar evidencias individuales (nuevo formato)
+                                            if (isset($pregunta['evidencias']) && is_array($pregunta['evidencias'])) {
+                                                try {
+                                                    // Obtener TODAS las evidencias activas actuales de esta pregunta
+                                                    $stmt_existentes = $pdo->prepare("SELECT id FROM bowtie_evidencias WHERE pregunta_id = ? AND activo = 1");
+                                                    $stmt_existentes->execute([$pregunta_id]);
+                                                    $ids_existentes_bd = $stmt_existentes->fetchAll(PDO::FETCH_COLUMN);
+                                                    
+                                                    error_log("MITIGADOR - Pregunta ID {$pregunta_id}: Evidencias recibidas del frontend: " . count($pregunta['evidencias']) . " (BD tiene " . count($ids_existentes_bd) . " activas)");
+                                                    
+                                                    // IDs de evidencias que se procesan (actualizadas o insertadas)
+                                                    $ids_evidencias_procesadas = [];
+                                                    
+                                                    // Insertar o actualizar evidencias individuales
+                                                    foreach ($pregunta['evidencias'] as $evid_index => $evidencia_obj) {
+                                                        $evidencia_texto = is_array($evidencia_obj) ? ($evidencia_obj['texto'] ?? '') : (string)$evidencia_obj;
+                                                        
+                                                        // CRÍTICO: Solo procesar evidencias con texto no vacío
+                                                        if (!empty(trim($evidencia_texto))) {
+                                                            $evidencia_id = is_array($evidencia_obj) && isset($evidencia_obj['id']) ? $evidencia_obj['id'] : null;
+                                                            $evidencia_id_real = null;
+                                                            
+                                                            error_log("MITIGADOR - Procesando evidencia: ID recibido={$evidencia_id}, texto=" . substr(trim($evidencia_texto), 0, 50));
+                                                            
+                                                            // Si el ID existe y no es temporal, intentar actualizar
+                                                            if ($evidencia_id && !preg_match('/^temp_/', (string)$evidencia_id)) {
+                                                                $evidencia_id_int = (int)$evidencia_id;
+                                                                
+                                                                // Verificar si existe en BD para esta pregunta (activa o inactiva)
+                                                                $stmt_check = $pdo->prepare("SELECT id FROM bowtie_evidencias WHERE id = ? AND pregunta_id = ?");
+                                                                $stmt_check->execute([$evidencia_id_int, $pregunta_id]);
+                                                                $existe = $stmt_check->fetch();
+                                                                
+                                                                if ($existe) {
+                                                                    // Actualizar evidencia existente (reactivar si estaba desactivada)
+                                                                    $stmt_evid = $pdo->prepare("UPDATE bowtie_evidencias SET texto = ?, orden = ?, activo = 1 WHERE id = ? AND pregunta_id = ?");
+                                                                    $stmt_evid->execute([trim($evidencia_texto), $evid_index, $evidencia_id_int, $pregunta_id]);
+                                                                    $evidencia_id_real = $evidencia_id_int;
+                                                                    error_log("MITIGADOR - Evidencia actualizada: ID={$evidencia_id_real}");
+                                                                } else {
+                                                                    // El ID no existe para esta pregunta, insertar como nueva
+                                                                    $stmt_evid = $pdo->prepare("INSERT INTO bowtie_evidencias (pregunta_id, texto, orden, activo) VALUES (?, ?, ?, 1)");
+                                                                    $stmt_evid->execute([$pregunta_id, trim($evidencia_texto), $evid_index]);
+                                                                    $evidencia_id_real = $pdo->lastInsertId();
+                                                                    error_log("MITIGADOR - Nueva evidencia insertada: ID={$evidencia_id_real} (ID recibido {$evidencia_id} no existía)");
+                                                                }
+                                                            } else {
+                                                                // Nueva evidencia (ID temporal o sin ID) - insertar como nueva
+                                                                $stmt_evid = $pdo->prepare("INSERT INTO bowtie_evidencias (pregunta_id, texto, orden, activo) VALUES (?, ?, ?, 1)");
+                                                                $stmt_evid->execute([$pregunta_id, trim($evidencia_texto), $evid_index]);
+                                                                $evidencia_id_real = $pdo->lastInsertId();
+                                                                error_log("MITIGADOR - Nueva evidencia insertada: ID={$evidencia_id_real} (sin ID o temporal)");
+                                                            }
+                                                            
+                                                            // Agregar el ID real a la lista de procesadas
+                                                            if ($evidencia_id_real) {
+                                                                $ids_evidencias_procesadas[] = $evidencia_id_real;
+                                                            }
+                                                        } else {
+                                                            error_log("MITIGADOR - Evidencia ignorada: texto vacío en índice {$evid_index}");
+                                                        }
+                                                    }
+                                                    
+                                                    error_log("MITIGADOR - Pregunta ID {$pregunta_id}: IDs procesadas=" . implode(',', $ids_evidencias_procesadas) . ", IDs existentes BD=" . implode(',', $ids_existentes_bd));
+                                                    
+                                                    // CRÍTICO: Desactivar evidencias que están en BD pero NO en la lista de procesadas
+                                                    // IMPORTANTE: Si el array recibido está vacío (count = 0), NO hacer nada para preservar evidencias existentes
+                                                    // Si el array tiene elementos pero ninguna fue procesada (todas vacías), desactivar todas las existentes
+                                                    if (count($pregunta['evidencias']) > 0) {
+                                                        // Hay elementos en el array: comparar IDs procesadas con existentes
+                                                        if (!empty($ids_evidencias_procesadas)) {
+                                                            // Hay evidencias procesadas: desactivar solo las que no están en la lista
+                                                            $ids_para_mantener = array_unique($ids_evidencias_procesadas);
+                                                            $ids_para_desactivar = array_diff($ids_existentes_bd, $ids_para_mantener);
+                                                            
+                                                            if (!empty($ids_para_desactivar)) {
+                                                                $placeholders = implode(',', array_fill(0, count($ids_para_desactivar), '?'));
+                                                                $stmt_deactivate = $pdo->prepare("UPDATE bowtie_evidencias SET activo = 0 WHERE pregunta_id = ? AND id IN ($placeholders)");
+                                                                $params = array_merge([$pregunta_id], $ids_para_desactivar);
+                                                                $stmt_deactivate->execute($params);
+                                                                error_log("MITIGADOR - Pregunta ID {$pregunta_id}: Desactivadas evidencias: " . implode(',', $ids_para_desactivar));
+                                                            } else {
+                                                                error_log("MITIGADOR - Pregunta ID {$pregunta_id}: No hay evidencias para desactivar (todas están en la lista de procesadas)");
+                                                            }
+                                                        } else {
+                                                            // Array con elementos pero ninguna fue procesada (todas tienen texto vacío)
+                                                            // Esto significa que el usuario eliminó todas las evidencias
+                                                            if (!empty($ids_existentes_bd)) {
+                                                                $placeholders = implode(',', array_fill(0, count($ids_existentes_bd), '?'));
+                                                                $stmt_deactivate = $pdo->prepare("UPDATE bowtie_evidencias SET activo = 0 WHERE pregunta_id = ? AND id IN ($placeholders)");
+                                                                $params = array_merge([$pregunta_id], $ids_existentes_bd);
+                                                                $stmt_deactivate->execute($params);
+                                                                error_log("MITIGADOR - Pregunta ID {$pregunta_id}: Todas las evidencias recibidas están vacías, desactivando todas las existentes: " . implode(',', $ids_existentes_bd));
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // Array vacío: no hacer nada, mantener todas las evidencias existentes
+                                                        // Esto preserva las evidencias si el frontend no las envía en el request
+                                                        error_log("MITIGADOR - Pregunta ID {$pregunta_id}: Array de evidencias vacío, manteniendo todas las evidencias existentes en BD");
+                                                    }
+                                                } catch (PDOException $e) {
+                                                    error_log("Error guardando evidencias individuales (mitigadores): " . $e->getMessage());
+                                                }
+                                            } else {
+                                                error_log("MITIGADOR - Pregunta ID {$pregunta_id}: No tiene campo 'evidencias' o no es array, manteniendo evidencias existentes");
+                                            }
                                         }
                                     }
                                 }

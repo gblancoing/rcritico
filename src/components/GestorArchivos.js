@@ -266,9 +266,51 @@ const parseEvidenciasTexto = (texto) => {
   return partes.length ? partes : [texto.trim()];
 };
 
-const pestañasGenerales = ['guia', 'riesgo', 'bowtie', 'diagrama', 'linea_base', 'archivos', 'foro', 'tareas'];
-const pestañasTerceraCascada = ['bowtie', 'linea_base', 'archivos', 'foro', 'tareas'];
-const pestañasContenedor = ['archivos']; // Nivel 3+: Solo gestor de archivos (contenedor de documentos)
+// Convertir texto de evidencias a array de objetos con ID único
+const convertirEvidenciasTextoAArray = (textoEvidencia, preguntaId) => {
+  if (!textoEvidencia || textoEvidencia.trim() === '') return [];
+  
+  // Si ya es un array, retornarlo (formato nuevo)
+  if (Array.isArray(textoEvidencia)) {
+    // Asegurar que cada evidencia tiene un ID
+    return textoEvidencia.map((ev, index) => ({
+      id: ev.id || `${preguntaId || 'preg'}_${index}_${Date.now()}`,
+      texto: ev.texto || ev || ''
+    }));
+  }
+  
+  // Si es texto, convertir a array (formato antiguo)
+  const evidencias = parseEvidenciasTexto(textoEvidencia);
+  return evidencias.map((ev, index) => ({
+    id: `${preguntaId || 'preg'}_${index}_${Date.now()}`,
+    texto: ev
+  }));
+};
+
+// Convertir array de evidencias a texto (para compatibilidad con BD actual)
+const convertirEvidenciasArrayATexto = (evidencias) => {
+  if (!evidencias || evidencias.length === 0) return '';
+  
+  // Si es texto, retornarlo (formato antiguo)
+  if (typeof evidencias === 'string') return evidencias;
+  
+  // Si es array, convertir a texto separado por saltos de línea
+  if (Array.isArray(evidencias)) {
+    return evidencias
+      .map(ev => {
+        const texto = typeof ev === 'string' ? ev : (ev.texto || '');
+        return texto.trim();
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  
+  return '';
+};
+
+const pestañasGenerales = ['guia', 'riesgo', 'diagrama', 'linea_base', 'archivos', 'foro', 'tareas']; // Nivel 1: sin BOWTIE
+const pestañasTerceraCascada = ['bowtie', 'linea_base', 'archivos', 'foro', 'tareas']; // Nivel 2: con BOWTIE
+const pestañasContenedor = ['archivos']; // Nivel 3+: Solo archivos (NO BOWTIE)
 
 // Función auxiliar para verificar si el usuario puede editar análisis Bowtie
 // admin solo puede editar en nivel 2, super_admin puede editar en todos los niveles
@@ -333,6 +375,8 @@ const DiagramaEstructura = ({ carpetaActual, carpetas, API_BASE }) => {
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const containerRef = React.useRef(null);
   const contentRef = React.useRef(null);
+  const autoGuardandoLineaBaseRef = React.useRef(false); // Bandera para evitar guardados automáticos simultáneos
+  const autoGuardandoLineaBaseMitigadoresRef = React.useRef(false); // Bandera para evitar guardados automáticos simultáneos
 
   // Cargar TODOS los datos de cada subcarpeta:
   // 1. Carpetas de Archivos (pestaña Archivos)
@@ -1097,6 +1141,7 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [formLineaBase, setFormLineaBase] = useState({});
   const [lineaBaseIdResaltar, setLineaBaseIdResaltar] = useState(null); // ID del item de línea base a resaltar (desde notificaciones)
   const [pestanaModalLineaBase, setPestanaModalLineaBase] = useState('informacion'); // 'informacion' | 'foro' | 'documentos'
+  const [modalLineaBaseMaximizado, setModalLineaBaseMaximizado] = useState(false);
   const [documentosCarpetas, setDocumentosCarpetas] = useState([]);
   const [documentosArchivos, setDocumentosArchivos] = useState([]);
   const [documentosCarpetaActual, setDocumentosCarpetaActual] = useState(null);
@@ -1302,18 +1347,110 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
 const [rutaNavegacion, setRutaNavegacion] = useState([]); // Breadcrumb
 const [modalEliminacionExito, setModalEliminacionExito] = useState(null); // { nombre, archivos, subcarpetas }
 
-// Determinar nivel actual y pestañas disponibles
-// Nivel 0-1: pestañasGenerales (todas las opciones)
-// Nivel 2: pestañasTerceraCascada (sin guia ni riesgo)
-// Nivel 3+: pestañasContenedor (solo archivos - funciona como contenedor de documentos)
-const esNivelContenedor = rutaNavegacion.length >= 3;
-const usaPestañasReducidas = rutaNavegacion.length >= 2 && !esNivelContenedor;
-const pestañasDisponibles = esNivelContenedor 
-  ? pestañasContenedor 
-  : (usaPestañasReducidas ? pestañasTerceraCascada : pestañasGenerales);
+// Determinar nivel actual y pestañas disponibles (usando useMemo para recalcular cuando cambien)
+// Nivel 0-1: pestañasGenerales (todas las opciones) - rutaNavegacion.length === 0 o 1
+// Nivel 2: pestañasTerceraCascada (con BOWTIE) - rutaNavegacion.length === 2
+// Nivel 3+: pestañasContenedor (solo archivos, SIN BOWTIE) - rutaNavegacion.length >= 3
+const nivelReal = React.useMemo(() => {
+  // Si no hay carpeta actual, nivel 0
+  if (!carpetaActual) return 0;
+  // Contar la profundidad real de la jerarquía
+  // rutaNavegacion incluye todas las carpetas padre hasta la raíz
+  // Si rutaNavegacion.length >= 3, estamos en nivel 3 o superior
+  return rutaNavegacion.length;
+}, [carpetaActual, rutaNavegacion.length]);
+
+const esNivelContenedor = React.useMemo(() => nivelReal >= 3, [nivelReal]);
+const usaPestañasReducidas = React.useMemo(() => nivelReal === 2 && !esNivelContenedor, [nivelReal, esNivelContenedor]);
+
+// Determinar pestañas disponibles basado en nivelReal
+// NIVEL 2 (rutaNavegacion.length === 1, ej: RC29): CON BOWTIE + guia, riesgo, diagrama
+// NIVEL 3+ (rutaNavegacion.length >= 2, ej: dentro de RC29): SIN BOWTIE
+const pestañasDisponibles = React.useMemo(() => {
+  // Nivel 3+: rutaNavegacion.length >= 2 → SIN bowtie
+  if (nivelReal >= 2) {
+    return pestañasTerceraCascada.filter(p => p !== 'bowtie');
+  }
+  
+  // Nivel 2: rutaNavegacion.length === 1 → CON bowtie + guia, riesgo, diagrama
+  if (nivelReal === 1) {
+    return ['guia', 'riesgo', 'diagrama', 'bowtie', 'linea_base', 'archivos', 'foro', 'tareas'];
+  }
+  
+  // Nivel 0-1: rutaNavegacion.length === 0 → pestañas generales (sin bowtie)
+  return pestañasGenerales;
+}, [nivelReal]);
 
 const aplicarAnalisisBowtie = (analisis) => {
-  setAnalisisBowtie(analisis);
+  // Convertir evidencias de texto a array de objetos con ID al cargar
+  const convertirEvidenciasEnAnalisis = (analisisData) => {
+    if (!analisisData) return analisisData;
+    
+    const convertirControles = (controles) => {
+      if (!controles || !Array.isArray(controles)) return controles;
+      return controles.map(control => {
+        const dimensiones = (control.dimensiones || []).map(dimension => {
+          const preguntas = (dimension.preguntas || []).map(pregunta => {
+            // CRÍTICO: Procesar evidencias para asegurar formato correcto
+            let evidenciasFinales = [];
+            
+            // Si ya tiene evidencias como array, procesarlas
+            if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
+              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: Procesando ${pregunta.evidencias.length} evidencias (array)`);
+              evidenciasFinales = pregunta.evidencias.map((ev, index) => {
+                // Si es un objeto con id y texto, mantenerlo
+                if (ev && typeof ev === 'object' && ev.id && ev.texto !== undefined) {
+                  return {
+                    id: ev.id,
+                    texto: ev.texto || ''
+                  };
+                }
+                // Si es un string, convertirlo a objeto
+                if (typeof ev === 'string') {
+                  return {
+                    id: `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
+                    texto: ev
+                  };
+                }
+                // Si es un objeto sin id, agregar id
+                return {
+                  id: ev?.id || `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
+                  texto: ev?.texto || ev || ''
+                };
+              });
+              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: ${evidenciasFinales.length} evidencias procesadas`);
+            }
+            // Si tiene evidencia (texto) pero no evidencias (array), convertir
+            else if (pregunta.evidencia && (!pregunta.evidencias || !Array.isArray(pregunta.evidencias) || pregunta.evidencias.length === 0)) {
+              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: Convirtiendo evidencia (texto) a array`);
+              evidenciasFinales = convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id);
+              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: ${evidenciasFinales.length} evidencias convertidas`);
+            }
+            // Si no tiene ni evidencia ni evidencias, crear array vacío
+            else {
+              evidenciasFinales = [];
+            }
+            
+            return {
+              ...pregunta,
+              evidencias: evidenciasFinales
+            };
+          });
+          return { ...dimension, preguntas };
+        });
+        return { ...control, dimensiones };
+      });
+    };
+    
+    return {
+      ...analisisData,
+      controles_preventivos: convertirControles(analisisData.controles_preventivos),
+      controles_mitigadores: convertirControles(analisisData.controles_mitigadores)
+    };
+  };
+  
+  const analisisConvertido = convertirEvidenciasEnAnalisis(analisis);
+  setAnalisisBowtie(analisisConvertido);
   setCausasEditando(new Set());
   setConsecuenciasEditando(new Set());
   setControlesPreventivosEditando(new Set());
@@ -1325,26 +1462,42 @@ const aplicarAnalisisBowtie = (analisis) => {
 useEffect(() => {
   if (!carpetaActual) return;
   
-  // En nivel 3+ (contenedor), SIEMPRE forzar a pestaña 'archivos'
-  if (esNivelContenedor) {
-    if (pestañaActiva !== 'archivos') {
-      setPestañaActiva('archivos');
-    }
-    return;
-  }
+  const nivelActual = rutaNavegacion.length;
   
-  // Para otros niveles, verificar si la pestaña actual está permitida
-  const pestañasPermitidas = usaPestañasReducidas ? pestañasTerceraCascada : pestañasGenerales;
-  if (!pestañasPermitidas.includes(pestañaActiva)) {
-    // Nivel 2: ir a bowtie, Nivel 0-1: ir a guia
-    setPestañaActiva(usaPestañasReducidas ? 'bowtie' : 'guia');
+  // CRÍTICO: Lógica corregida
+  // DEBUG: Log para verificar el nivel actual
+  console.log('[useEffect pestañaActiva] nivelActual:', nivelActual, 'rutaNavegacion.length:', rutaNavegacion.length, 'rutaNavegacion:', rutaNavegacion.map(c => (c && c.nombre) ? c.nombre : '?').join(' / '));
+  console.log('[useEffect pestañaActiva] pestañasDisponibles:', pestañasDisponibles);
+  console.log('[useEffect pestañaActiva] pestañaActiva actual:', pestañaActiva);
+  
+  // Usar pestañasDisponibles que ya tiene la lógica correcta
+  if (!pestañasDisponibles.includes(pestañaActiva)) {
+    // Si la pestaña actual no está disponible, cambiar a una válida
+    if (pestañasDisponibles.includes('bowtie')) {
+      // Si bowtie está disponible (nivel 2), ir a bowtie
+      console.log('[useEffect pestañaActiva] Cambiando a bowtie (nivel 2)');
+      setPestañaActiva('bowtie');
+    } else if (pestañasDisponibles.includes('guia')) {
+      // Si no, ir a guia (nivel 0-1)
+      console.log('[useEffect pestañaActiva] Cambiando a guia (nivel 0-1)');
+      setPestañaActiva('guia');
+    } else if (pestañasDisponibles.includes('linea_base')) {
+      // Si no hay guia, ir a linea_base (nivel 3+)
+      console.log('[useEffect pestañaActiva] Cambiando a linea_base (nivel 3+)');
+      setPestañaActiva('linea_base');
+    } else if (pestañasDisponibles.length > 0) {
+      // Si ninguna de las anteriores, usar la primera disponible
+      console.log('[useEffect pestañaActiva] Cambiando a primera pestaña disponible:', pestañasDisponibles[0]);
+      setPestañaActiva(pestañasDisponibles[0]);
+    }
   }
-}, [carpetaActual, usaPestañasReducidas, esNivelContenedor, pestañaActiva]);
+}, [carpetaActual, rutaNavegacion.length, pestañaActiva, pestañasDisponibles]);
 
   useEffect(() => {
     cargarCarpetas();
     cargarUsuarios();
   }, [proyectoId, centroCostoId, carpetaActual]);
+
 
   // Manejar navegación desde notificaciones
   useEffect(() => {
@@ -1618,9 +1771,10 @@ useEffect(() => {
       cargarAnalisisBowtie(carpetaActual.id).then(() => {
         // Cargar línea base después de que BOWTIE esté cargado
         // Usar un delay para asegurar que el estado de analisisBowtie esté actualizado
-        setTimeout(() => {
-          cargarLineaBase(carpetaActual.id);
-          cargarLineaBaseMitigadores(carpetaActual.id);
+        // CRÍTICO: Forzar recarga sin cache para obtener datos frescos del BOWTIE
+        setTimeout(async () => {
+          await cargarLineaBase(carpetaActual.id);
+          await cargarLineaBaseMitigadores(carpetaActual.id);
         }, 500);
       });
       // Resetear estados de edición al cambiar de carpeta
@@ -2289,18 +2443,23 @@ useEffect(() => {
       };
       
       // Si no hay análisis, intentar clonar del nivel superior si corresponde
+      // Nivel 2: rutaNavegacion.length === 1, debe clonar desde el nivel padre (nivel 1)
       if (!data.bowtie_id) {
         console.log('No hay bowtie_id en la respuesta, intentando clonar desde nivel superior si aplica');
-        const esNivel2 = rutaNavegacion.length === 2 && carpetaActual?.carpeta_padre_id;
+        const esNivel2 = rutaNavegacion.length === 1 && carpetaActual?.carpeta_padre_id;
         let analisisClonado = null;
         
         if (esNivel2) {
           try {
+            console.log('Nivel 2 detectado, clonando desde carpeta padre ID:', carpetaActual.carpeta_padre_id);
             const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaActual.carpeta_padre_id}`);
             if (resPadre.ok) {
               const datosPadre = await resPadre.json();
               if (datosPadre && datosPadre.bowtie_id) {
+                console.log('Datos del padre encontrados, clonando análisis Bowtie');
                 analisisClonado = construirAnalisisClonadoSinEvidencias(datosPadre);
+              } else {
+                console.log('No hay datos del padre para clonar');
               }
             }
           } catch (error) {
@@ -2309,11 +2468,76 @@ useEffect(() => {
         }
         
         if (analisisClonado) {
+          console.log('Aplicando análisis clonado');
           aplicarAnalisisBowtie(analisisClonado);
         } else {
+          console.log('Aplicando análisis vacío');
           aplicarAnalisisBowtie(analisisVacio);
         }
       } else {
+        // Función para procesar dimensiones y convertir evidencias a formato array
+        const procesarDimensiones = (dimensiones) => {
+          if (!dimensiones || !Array.isArray(dimensiones)) return [];
+          return dimensiones.map(dimension => {
+            const preguntas = (dimension.preguntas || []).map(pregunta => {
+              // CRÍTICO: Siempre procesar evidencias para asegurar formato correcto
+              let evidenciasFinales = [];
+              
+              // Si tiene evidencias como array, procesarlas
+              if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
+                console.log(`[Cargar BOWTIE] Pregunta ID ${pregunta.id}: Procesando ${pregunta.evidencias.length} evidencias del servidor`, pregunta.evidencias);
+                evidenciasFinales = pregunta.evidencias.map((ev, index) => {
+                  // Si es un objeto con id y texto, mantenerlo (formato del servidor)
+                  if (ev && typeof ev === 'object' && ev.id && ev.texto !== undefined) {
+                    console.log(`[Cargar BOWTIE] Evidencia ${index}: ID=${ev.id}, texto="${ev.texto?.substring(0, 30)}..."`);
+                    return {
+                      id: ev.id,
+                      texto: ev.texto || ''
+                    };
+                  }
+                  // Si es un objeto con id pero sin texto, usar texto vacío
+                  if (ev && typeof ev === 'object' && ev.id) {
+                    return {
+                      id: ev.id,
+                      texto: ev.texto || ev.evidencia || ''
+                    };
+                  }
+                  // Si es un string, convertirlo a objeto
+                  if (typeof ev === 'string') {
+                    return {
+                      id: `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
+                      texto: ev
+                    };
+                  }
+                  // Si es un objeto sin id, agregar id
+                  return {
+                    id: ev?.id || `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
+                    texto: ev?.texto || ev || ''
+                  };
+                });
+                console.log(`[Cargar BOWTIE] Pregunta ID ${pregunta.id}: ${evidenciasFinales.length} evidencias procesadas correctamente`);
+              }
+              // Si tiene evidencia (texto) pero no evidencias (array), convertir
+              else if (pregunta.evidencia && (!pregunta.evidencias || !Array.isArray(pregunta.evidencias) || pregunta.evidencias.length === 0)) {
+                console.log('[Cargar BOWTIE] Convirtiendo evidencia (texto) a array para pregunta ID:', pregunta.id);
+                console.log('[Cargar BOWTIE] Texto evidencia:', pregunta.evidencia?.substring(0, 100));
+                evidenciasFinales = convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id);
+                console.log('[Cargar BOWTIE] Evidencias convertidas:', evidenciasFinales.length, evidenciasFinales);
+              }
+              // Si no tiene ni evidencia ni evidencias, crear array vacío
+              else {
+                evidenciasFinales = [];
+              }
+              
+              return {
+                ...pregunta,
+                evidencias: evidenciasFinales
+              };
+            });
+            return { ...dimension, preguntas };
+          });
+        };
+
         // Estructurar los datos: agrupar controles dentro de causas y consecuencias
         const controlesPreventivosCriticos = (data.controles_preventivos || []).map((cp, index) => ({
           ...cp,
@@ -2325,7 +2549,7 @@ useEffect(() => {
             codigo: causaAsociada.codigo || `CA${causaAsociada.id || idxAsoc + 1}`,
             id: causaAsociada.id
           })),
-          dimensiones: cp.dimensiones || []
+          dimensiones: procesarDimensiones(cp.dimensiones)
         }));
         
         const controlesMitigadoresCriticos = (data.controles_mitigadores || []).map((cm, index) => ({
@@ -2338,7 +2562,7 @@ useEffect(() => {
             codigo: consecuenciaAsociada.codigo || `CO${consecuenciaAsociada.id || idxAsoc + 1}`,
             id: consecuenciaAsociada.id
           })),
-          dimensiones: cm.dimensiones || []
+          dimensiones: procesarDimensiones(cm.dimensiones)
         }));
         
         const causasEstructuradas = (data.causas || []).map((causa, index) => ({
@@ -2445,6 +2669,49 @@ useEffect(() => {
     
     try {
       setGuardandoBowtie(true);
+      
+      // Convertir evidencias de array a texto antes de enviar (para compatibilidad con BD actual)
+      const convertirEvidenciasParaEnvio = (controles) => {
+        if (!controles || !Array.isArray(controles)) return controles;
+        return controles.map(control => {
+          const dimensiones = (control.dimensiones || []).map(dimension => {
+            const preguntas = (dimension.preguntas || []).map(pregunta => {
+              // CRÍTICO: Asegurar que siempre se envíen las evidencias como array
+              // Si tiene evidencias (array), mantenerlas y también convertir a texto para compatibilidad
+              if (pregunta.evidencias && Array.isArray(pregunta.evidencias)) {
+                // Log para debugging
+                console.log(`[Guardar BOWTIE] Pregunta ID ${pregunta.id}: Enviando ${pregunta.evidencias.length} evidencias`, pregunta.evidencias);
+                
+                return {
+                  ...pregunta,
+                  evidencia: convertirEvidenciasArrayATexto(pregunta.evidencias), // Para compatibilidad
+                  evidencias: pregunta.evidencias // CRÍTICO: Mantener array con IDs para que el backend las procese
+                };
+              }
+              // Si solo tiene evidencia (texto) pero no evidencias (array), intentar convertir
+              if (pregunta.evidencia && !pregunta.evidencias) {
+                const evidenciasArray = convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id);
+                console.log(`[Guardar BOWTIE] Pregunta ID ${pregunta.id}: Convirtiendo texto a array (${evidenciasArray.length} evidencias)`);
+                return {
+                  ...pregunta,
+                  evidencias: evidenciasArray // Agregar array de evidencias
+                };
+              }
+              // Si no tiene ni evidencia ni evidencias, crear array vacío
+              if (!pregunta.evidencia && !pregunta.evidencias) {
+                return {
+                  ...pregunta,
+                  evidencias: [] // Asegurar que siempre hay un array
+                };
+              }
+              return pregunta;
+            });
+            return { ...dimension, preguntas };
+          });
+          return { ...control, dimensiones };
+        });
+      };
+      
       // Preparar datos para enviar
       const datosEnvio = {
         carpeta_id: carpetaActual.id,
@@ -2454,9 +2721,9 @@ useEffect(() => {
         energia: analisisBowtie.energia || '',
         evento_top: analisisBowtie.evento_top || '',
         causas: analisisBowtie.causas || [],
-        controles_preventivos: analisisBowtie.controles_preventivos || [],
+        controles_preventivos: convertirEvidenciasParaEnvio(analisisBowtie.controles_preventivos || []),
         consecuencias: analisisBowtie.consecuencias || [],
-        controles_mitigadores: analisisBowtie.controles_mitigadores || [],
+        controles_mitigadores: convertirEvidenciasParaEnvio(analisisBowtie.controles_mitigadores || []),
         controles_preventivos_generales: analisisBowtie.controles_preventivos_generales || [],
         controles_mitigadores_generales: analisisBowtie.controles_mitigadores_generales || []
       };
@@ -2472,6 +2739,12 @@ useEffect(() => {
         // Recargar el análisis
         if (carpetaActual && carpetaActual.id) {
           await cargarAnalisisBowtie(carpetaActual.id);
+          // CRÍTICO: Recargar línea base después de guardar BOWTIE para sincronizar con cambios
+          // Esto asegura que la línea base refleje las evidencias actuales del BOWTIE
+          // Usar await en lugar de setTimeout para asegurar que se complete antes de continuar
+          await new Promise(resolve => setTimeout(resolve, 300)); // Pequeño delay para asegurar que el BOWTIE se guardó
+          await cargarLineaBase(carpetaActual.id);
+          await cargarLineaBaseMitigadores(carpetaActual.id);
         }
         console.log('Análisis Bowtie guardado correctamente');
       } else {
@@ -2594,6 +2867,17 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
   };
 };
 
+  // Función helper para normalizar strings para comparación
+  const normalizarString = (str) => {
+    if (!str) return '';
+    return String(str).trim().replace(/\s+/g, ' ').toLowerCase();
+  };
+
+  // Función helper para comparar strings de forma tolerante
+  const stringsIguales = (str1, str2) => {
+    return normalizarString(str1) === normalizarString(str2);
+  };
+
   const cargarLineaBase = async (carpetaId) => {
     if (!carpetaId) {
       setLineaBase([]);
@@ -2606,28 +2890,52 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       let controlesPreventivos = [];
       console.log('[Línea Base] Iniciando carga, analisisBowtie existe?', !!analisisBowtie);
       
-      // Detectar si estamos en nivel 2 (tiene carpeta padre)
-      const esNivel2 = carpetaActual && carpetaActual.carpeta_padre_id;
+      // Detectar nivel actual: nivel 2 (rutaNavegacion.length === 1) o nivel 3+ (rutaNavegacion.length >= 2)
+      const esNivel2 = rutaNavegacion.length === 1;
+      const esNivel3 = rutaNavegacion.length >= 2;
       
       try {
         // Si estamos en nivel 2, usar DIRECTAMENTE los controles del BOWTIE padre (nivel 1) que tienen las evidencias
-        if (esNivel2) {
-          try {
-            const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaActual.carpeta_padre_id}`);
-            const dataPadre = await resPadre.json();
-            if (dataPadre && dataPadre.controles_preventivos && dataPadre.controles_preventivos.length > 0) {
-              // Usar los controles del padre directamente (tienen las evidencias)
-              controlesPreventivos = dataPadre.controles_preventivos;
-              console.log('[Línea Base] Nivel 2: Usando controles del BOWTIE padre con evidencias:', controlesPreventivos.length, 'controles');
+        // Si estamos en nivel 3+, usar DIRECTAMENTE los controles del BOWTIE del nivel 2 (padre) que tienen las evidencias
+        if (esNivel2 || esNivel3) {
+          const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+          if (carpetaPadreId) {
+            try {
+              console.log(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Cargando controles del BOWTIE padre (ID: ${carpetaPadreId})`);
+              // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+              const timestamp = Date.now();
+              const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaPadreId}&_t=${timestamp}`, {
+                cache: 'no-cache',
+                headers: {
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              });
+              const dataPadre = await resPadre.json();
+              if (dataPadre && dataPadre.controles_preventivos && dataPadre.controles_preventivos.length > 0) {
+                // Usar los controles del padre directamente (tienen las evidencias)
+                controlesPreventivos = dataPadre.controles_preventivos;
+                console.log(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Usando controles del BOWTIE padre con evidencias:`, controlesPreventivos.length, 'controles');
+              } else {
+                console.log(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: No se encontraron controles en el BOWTIE padre`);
+              }
+            } catch (errorPadre) {
+              console.error(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Error al cargar BOWTIE padre:`, errorPadre);
             }
-          } catch (errorPadre) {
-            console.error('[Línea Base] Error al cargar BOWTIE padre:', errorPadre);
           }
         }
         
         // Si no estamos en nivel 2 o no se pudieron cargar controles del padre, cargar del nivel actual
         if (controlesPreventivos.length === 0) {
-        const res = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaId}`);
+        // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+        const timestamp = Date.now();
+        const res = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaId}&_t=${timestamp}`, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const data = await res.json();
         console.log('[Línea Base] Respuesta API completa:', data);
         console.log('[Línea Base] data.success:', data.success, 'data.bowtie_id:', data.bowtie_id);
@@ -2667,24 +2975,86 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       // Siempre intentar cargar línea base existente desde API primero
       let lineaBaseDirecta = null;
       try {
-        const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaId}`);
+        // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+        const timestamp = Date.now();
+        const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaId}&_t=${timestamp}`, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const dataLineaBase = await resLineaBase.json();
+        
+        console.log('[Línea Base] Respuesta API línea base:', {
+          success: dataLineaBase.success,
+          tiene_linea_base: !!dataLineaBase.linea_base,
+          cantidad: dataLineaBase.linea_base ? dataLineaBase.linea_base.length : 0
+        });
         
         if (dataLineaBase.success && dataLineaBase.linea_base && dataLineaBase.linea_base.length > 0) {
           lineaBaseDirecta = dataLineaBase.linea_base;
+          console.log('[Línea Base] Datos cargados desde API:', lineaBaseDirecta.length, 'registros');
+        } else {
+          console.log('[Línea Base] No hay datos en la API o respuesta no exitosa');
         }
       } catch (error) {
         console.error('[Línea Base] Error cargando línea base desde API:', error);
       }
       
-      if (controlesPreventivos.length > 0) {
+      // CRÍTICO: Solo mostrar línea base si hay controles preventivos con evidencias/preguntas
+      // Si no hay controles o no hay evidencias/preguntas, limpiar la línea base
+      const tieneControlesConEvidencias = controlesPreventivos.some(control => {
+        const dimensiones = control.dimensiones || [];
+        return dimensiones.some(dimension => {
+          const preguntas = dimension.preguntas || [];
+          return preguntas.some(pregunta => {
+            // Verificar si tiene evidencias (array o texto)
+            const tieneEvidenciasArray = pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0;
+            const tieneEvidenciaTexto = pregunta.evidencia && pregunta.evidencia.trim() !== '';
+            return tieneEvidenciasArray || tieneEvidenciaTexto;
+          });
+        });
+      });
+      
+      console.log('[Línea Base] Tiene controles:', controlesPreventivos.length > 0);
+      console.log('[Línea Base] Tiene controles con evidencias:', tieneControlesConEvidencias);
+      
+      if (controlesPreventivos.length > 0 && tieneControlesConEvidencias) {
         // Intentar sincronizar línea base con controles preventivos
         try {
           if (lineaBaseDirecta && lineaBaseDirecta.length > 0) {
-            // Si hay línea base guardada, sincronizar con controles preventivos actuales
-            const lineaBaseExistente = lineaBaseDirecta;
+            // CRÍTICO: En nivel 3, verificar si el BOWTIE actual tiene IDs de evidencias
+            // Si el BOWTIE tiene IDs pero los registros antiguos no (o viceversa), ignorar registros antiguos
+            const esNivel3 = rutaNavegacion.length >= 2;
+            let lineaBaseExistente = lineaBaseDirecta;
+            
+            if (esNivel3) {
+              // Verificar si el BOWTIE actual tiene evidencias con IDs
+              const bowtieTieneIdsEvidencias = controlesPreventivos.some(control => {
+                return (control.dimensiones || []).some(dimension => {
+                  return (dimension.preguntas || []).some(pregunta => {
+                    return pregunta.evidencias && Array.isArray(pregunta.evidencias) && 
+                           pregunta.evidencias.some(ev => ev && ev.id);
+                  });
+                });
+              });
+              
+              // Verificar si los registros antiguos tienen IDs de evidencias
+              const registrosAntiguosTienenIds = lineaBaseDirecta.some(lb => lb.evidencia_id);
+              
+              // Si hay discrepancia en el formato (uno tiene IDs y el otro no), ignorar registros antiguos
+              if (bowtieTieneIdsEvidencias !== registrosAntiguosTienenIds) {
+                console.log('[Línea Base] Nivel 3: Discrepancia en formato de evidencias detectada. Ignorando registros antiguos y generando nuevos desde BOWTIE actual.');
+                lineaBaseExistente = []; // Ignorar registros antiguos
+              }
+            }
+            
+            console.log('[Línea Base] Total registros en BD para sincronizar:', lineaBaseExistente.length);
             // Crear una fila por cada dimensión-pregunta de cada control
             const nuevaLineaBase = [];
+            // Mapa para rastrear qué registros de BD ya fueron usados
+            const registrosUsados = new Set();
             
             controlesPreventivos.forEach((control, controlIndex) => {
               const dimensiones = control.dimensiones || [];
@@ -2693,7 +3063,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               
               // Si no hay dimensiones, crear una fila vacía
               if (dimensiones.length === 0) {
-                const existente = lineaBaseExistente.find(lb => lb.control_preventivo_id === control.id && !lb.dimension);
+                const existente = lineaBaseExistente.find(lb => 
+                  lb.control_preventivo_id === control.id && 
+                  !lb.dimension
+                );
                 nuevaLineaBase.push({
                   id: existente?.id || null,
                   control_preventivo_id: control.id,
@@ -2767,9 +3140,18 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 }
                 
                 // Crear una fila por cada EVIDENCIA de cada pregunta
+                // NUEVO: Usar array de evidencias con IDs si está disponible, sino parsear texto
                 preguntas.forEach((pregunta, pregIndex) => {
-                  const textoEvidencia = pregunta.evidencia || '';
-                  const evidenciasArray = parseEvidenciasTexto(textoEvidencia);
+                  // Obtener evidencias: si tiene array de evidencias (formato nuevo), usarlo; sino parsear texto
+                  let evidenciasArray = [];
+                  if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
+                    // Formato nuevo: array de objetos con {id, texto}
+                    evidenciasArray = pregunta.evidencias.map(ev => ev.texto || ev || '');
+                  } else {
+                    // Formato antiguo: parsear texto
+                    const textoEvidencia = pregunta.evidencia || '';
+                    evidenciasArray = parseEvidenciasTexto(textoEvidencia);
+                  }
                   
                   // Si no hay evidencias, crear al menos una fila con evidencia vacía
                   const evidenciasParaProcesar = evidenciasArray.length > 0 ? evidenciasArray : [''];
@@ -2779,13 +3161,50 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     const esPrimeraFilaDimension = pregIndex === 0 && evidenciaIndex === 0;
                     const esPrimeraFilaPregunta = evidenciaIndex === 0;
                     
+                    // Obtener ID de evidencia si está disponible (formato nuevo)
+                    const evidenciaObj = pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias[evidenciaIndex]
+                      ? pregunta.evidencias[evidenciaIndex]
+                      : null;
+                    const evidenciaId = evidenciaObj?.id || null;
+                    
                     // Buscar si existe un registro guardado para esta evidencia específica
-                  const existente = lineaBaseExistente.find(lb => 
-                    lb.control_preventivo_id === control.id && 
-                    lb.dimension === nombreDimension && 
-                      lb.pregunta === pregunta.texto &&
-                      lb.evidencia === evidenciaIndividual
-                  );
+                    // CRÍTICO: En nivel 3, solo usar registros que coincidan EXACTAMENTE con el BOWTIE actual del nivel 2
+                    // Si los IDs de evidencias no coinciden, ignorar registros antiguos
+                    const existente = lineaBaseExistente.find(lb => {
+                      const lbControlId = lb.control_preventivo_id;
+                      const lbDimension = (lb.dimension || '').trim();
+                      const lbPregunta = (lb.pregunta || '').trim();
+                      const lbEvidencia = (lb.evidencia || '').trim();
+                      
+                      const controlId = control.id;
+                      const dimension = nombreDimension.trim();
+                      const preguntaTexto = (pregunta.texto || '').trim();
+                      const evidencia = evidenciaIndividual.trim();
+                      
+                      // CRÍTICO: Priorizar matching por ID de evidencia (más preciso)
+                      // Si tenemos ID de evidencia en BD y coincide, es un match exacto
+                      if (lb.evidencia_id && evidenciaId && String(lb.evidencia_id) === String(evidenciaId)) {
+                        return true;
+                      }
+                      
+                      // Si tenemos evidenciaId en el BOWTIE pero el registro de BD no tiene evidencia_id,
+                      // o viceversa, NO hacer match (son registros antiguos)
+                      if ((evidenciaId && !lb.evidencia_id) || (!evidenciaId && lb.evidencia_id)) {
+                        return false;
+                      }
+                      
+                      // Fallback: matching por texto solo si ambos tienen el mismo formato (sin IDs)
+                      // Esto asegura que no se mezclen registros antiguos con nuevos
+                      return lbControlId === controlId && 
+                             lbDimension === dimension && 
+                             lbPregunta === preguntaTexto &&
+                             lbEvidencia === evidencia;
+                    });
+                    
+                    // Marcar este registro como usado para evitar duplicados en la preservación
+                    if (existente && existente.id) {
+                      registrosUsados.add(existente.id);
+                    }
                   
                   nuevaLineaBase.push({
                     id: existente?.id || null,
@@ -2797,6 +3216,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     dimension: nombreDimension,
                     pregunta: pregunta.texto || '',
                       evidencia: evidenciaIndividual,
+                      evidencia_id: evidenciaId, // Guardar ID de evidencia para matching futuro
                       // Flags para controlar visualización en la tabla
                       _esPrimeraFilaDimension: esPrimeraFilaDimension,
                       _esPrimeraFilaPregunta: esPrimeraFilaPregunta,
@@ -2823,48 +3243,207 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               });
             });
             });
+            
+            // PRESERVAR registros con datos completados SOLO si su evidencia todavía existe en el BOWTIE
+            // Si una evidencia fue eliminada del BOWTIE, sus datos NO se preservan (eliminación por cascada)
+            // Solo se preservan evidencias que existen en el BOWTIE pero no se emparejaron correctamente
+            
+            // PASO 1: Crear conjunto de TODAS las evidencias que existen actualmente en el BOWTIE
+            // CRÍTICO: Usar tanto el formato nuevo (array evidencias) como el antiguo (texto evidencia)
+            const evidenciasExistentesEnBOWTIE = new Set();
+            const evidenciasExistentesEnBOWTIEPorID = new Set(); // Para matching por ID de evidencia
+            controlesPreventivos.forEach((control) => {
+              const dimensiones = control.dimensiones || [];
+              dimensiones.forEach((dimension) => {
+                const preguntas = dimension.preguntas || [];
+                preguntas.forEach((pregunta) => {
+                  // Obtener evidencias: priorizar array (formato nuevo), sino parsear texto (formato antiguo)
+                  let evidenciasArray = [];
+                  if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
+                    // Formato nuevo: array de objetos con {id, texto}
+                    evidenciasArray = pregunta.evidencias.map(ev => ({
+                      id: ev.id || null,
+                      texto: ev.texto || ev || ''
+                    }));
+                  } else {
+                    // Formato antiguo: parsear texto
+                    const textoEvidencia = pregunta.evidencia || '';
+                    const evidenciasTextoArray = parseEvidenciasTexto(textoEvidencia);
+                    evidenciasArray = evidenciasTextoArray.map(ev => ({ id: null, texto: ev }));
+                  }
+                  
+                  const evidenciasParaProcesar = evidenciasArray.length > 0 ? evidenciasArray : [{ id: null, texto: '' }];
+                  evidenciasParaProcesar.forEach((evidenciaObj) => {
+                    const evidenciaTexto = evidenciaObj.texto || evidenciaObj || '';
+                    const evidenciaId = evidenciaObj.id || null;
+                    
+                    // Clave por texto (compatibilidad con formato antiguo)
+                    const claveEvidencia = `${control.id || ''}_${(dimension.nombre || '').trim()}_${(pregunta.texto || '').trim()}_${evidenciaTexto.trim()}`;
+                    evidenciasExistentesEnBOWTIE.add(claveEvidencia);
+                    
+                    // Clave por ID (formato nuevo) - solo si tiene ID
+                    if (evidenciaId) {
+                      evidenciasExistentesEnBOWTIEPorID.add(String(evidenciaId));
+                    }
+                  });
+                });
+              });
+            });
+            
+            // PASO 2: Filtrar registros para preservar solo los que:
+            // - Su evidencia todavía existe en el BOWTIE actual
+            // - No fueron usados en la sincronización
+            // - Tienen datos completados
+            // CRÍTICO: Usar el Set de registrosUsados que se fue llenando durante la sincronización
+            // para asegurar que no se dupliquen registros
+            const idsUsadosEnSincronizacion = new Set([...registrosUsados, ...nuevaLineaBase.map(item => item.id).filter(Boolean)]);
+            const evidenciasIncluidas = new Set(nuevaLineaBase.map(item => {
+              return `${item.control_preventivo_id || ''}_${(item.dimension || '').trim()}_${(item.pregunta || '').trim()}_${(item.evidencia || '').trim()}`;
+            }));
+            
+            const registrosPreservar = lineaBaseExistente.filter(lb => {
+              // Verificar si esta evidencia todavía existe en el BOWTIE actual
+              // PRIORIDAD 1: Verificar por ID de evidencia (formato nuevo - más preciso)
+              let existeEnBOWTIE = false;
+              if (lb.evidencia_id) {
+                existeEnBOWTIE = evidenciasExistentesEnBOWTIEPorID.has(String(lb.evidencia_id));
+              }
+              
+              // PRIORIDAD 2: Si no se encontró por ID, verificar por texto (formato antiguo)
+              if (!existeEnBOWTIE) {
+                const claveEvidencia = `${lb.control_preventivo_id || ''}_${(lb.dimension || '').trim()}_${(lb.pregunta || '').trim()}_${(lb.evidencia || '').trim()}`;
+                existeEnBOWTIE = evidenciasExistentesEnBOWTIE.has(claveEvidencia);
+              }
+              
+              // Verificar si esta evidencia ya está incluida en la nueva línea base
+              // Verificar por ID primero (más preciso)
+              let yaEstaIncluida = false;
+              if (lb.evidencia_id) {
+                yaEstaIncluida = nuevaLineaBase.some(item => item.evidencia_id && String(item.evidencia_id) === String(lb.evidencia_id));
+              }
+              
+              // Si no se encontró por ID, verificar por clave de texto
+              if (!yaEstaIncluida) {
+                const claveEvidencia = `${lb.control_preventivo_id || ''}_${(lb.dimension || '').trim()}_${(lb.pregunta || '').trim()}_${(lb.evidencia || '').trim()}`;
+                yaEstaIncluida = evidenciasIncluidas.has(claveEvidencia);
+              }
+              
+              // Verificar si el ID fue usado durante la sincronización
+              const fueUsadoEnSincronizacion = idsUsadosEnSincronizacion.has(lb.id);
+              
+              // CRÍTICO: Si la evidencia existe en el BOWTIE pero no está incluida en nuevaLineaBase,
+              // significa que el matching falló. DEBEMOS preservarla SIEMPRE si existe en el BOWTIE,
+              // independientemente de si tiene datos o no, para evitar pérdida de información.
+              // Incluir registros que:
+              // 1. Su evidencia todavía existe en el BOWTIE actual (CRÍTICO: no preservar evidencias eliminadas)
+              // 2. No fueron usados en la sincronización por ID (ni en el matching ni ya incluidos)
+              // 3. No tienen una evidencia duplicada ya incluida
+              
+              // CRÍTICO: Si existe en BOWTIE pero no está incluida, PRESERVAR SIEMPRE
+              // Esto asegura que no se pierdan datos cuando el matching falla
+              if (existeEnBOWTIE && !yaEstaIncluida && !fueUsadoEnSincronizacion) {
+                const claveEvidencia = `${lb.control_preventivo_id || ''}_${(lb.dimension || '').trim()}_${(lb.pregunta || '').trim()}_${(lb.evidencia || '').trim()}`;
+                console.log('[Línea Base] Registro no encontrado en matching pero existe en BOWTIE - PRESERVANDO:', claveEvidencia, 'ID:', lb.id, 'evidencia_id:', lb.evidencia_id);
+                // Preservar SIEMPRE si existe en BOWTIE, sin verificar datos (para evitar pérdida)
+                return true;
+              }
+              
+              // Si llegamos aquí, no se debe preservar
+              return false;
+            });
+            
+            // Agregar los registros preservados a la línea base
+            if (registrosPreservar.length > 0) {
+              console.log('[Línea Base] Preservando', registrosPreservar.length, 'registros que existen en BOWTIE pero no se encontraron en matching');
+              console.log('[Línea Base] IDs preservados:', registrosPreservar.map(lb => ({ id: lb.id, evidencia: lb.evidencia, tiene_datos: true })));
+              registrosPreservar.forEach(lb => {
+                nuevaLineaBase.push({
+                  id: lb.id || null,
+                  control_preventivo_id: lb.control_preventivo_id || null,
+                  codigo: lb.codigo || '',
+                  control_critico_preventivo: lb.control_critico_preventivo || '',
+                  dimension: lb.dimension || '',
+                  pregunta: lb.pregunta || '',
+                  evidencia: lb.evidencia || '',
+                  evidencia_id: lb.evidencia_id || null, // CRÍTICO: Preservar ID de evidencia
+                  verificador_responsable: lb.verificador_responsable || '',
+                  fecha_verificacion: lb.fecha_verificacion || '',
+                  implementado_estandar_desempeno: lb.implementado_estandar || '',
+                  accion_a_ejecutar: lb.accion_ejecutar || '',
+                  responsable_cierre_accion: lb.responsable_cierre || '',
+                  fecha_cierre: lb.fecha_cierre || '',
+                  criticidad: lb.criticidad || '',
+                  porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
+                  nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
+                  comentario_trabajador: lb.comentario_trabajador || '',
+                  archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
+                  conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
+                  ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
+                  estado_validacion: lb.estado_validacion || null,
+                  comentario_validacion: lb.comentario_validacion || '',
+                  usuario_validacion: lb.usuario_validacion || '',
+                  fecha_validacion: lb.fecha_validacion || '',
+                  ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
+                });
+              });
+              console.log('[Línea Base] Total registros después de preservar:', nuevaLineaBase.length);
+            } else {
+              console.log('[Línea Base] No se encontraron registros para preservar');
+            }
+            
             console.log('[Línea Base] Línea base sincronizada con existente (por evidencia):', nuevaLineaBase.length, 'elementos');
             console.log('[Línea Base] Estableciendo estado con', nuevaLineaBase.length, 'elementos');
-            setLineaBase(nuevaLineaBase);
+            // Asegurar que siempre sea un array
+            if (!Array.isArray(nuevaLineaBase)) {
+              console.error('[Línea Base] Error: nuevaLineaBase no es un array, convirtiendo...');
+              setLineaBase([]);
+            } else {
+              console.log('[Línea Base] Total registros a mostrar:', nuevaLineaBase.length);
+              setLineaBase(nuevaLineaBase);
+              
+              // CRÍTICO: Guardar automáticamente para preservar todos los registros que existen en el BOWTIE
+              // Esto asegura que los registros preservados se persistan en la BD inmediatamente
+              // y no se pierdan si el usuario navega o recarga la página
+              // Usar ref para evitar múltiples guardados automáticos simultáneos
+              if (nuevaLineaBase.length > 0 && !autoGuardandoLineaBaseRef.current && !guardandoLineaBase) {
+                autoGuardandoLineaBaseRef.current = true;
+                console.log('[Línea Base] Guardando automáticamente para preservar registros...');
+                // Usar setTimeout para asegurar que el estado se haya actualizado antes de guardar
+                setTimeout(async () => {
+                  try {
+                    // evitarRecarga=true para evitar que se recargue y cause un bucle infinito
+                    await guardarLineaBase(nuevaLineaBase, true);
+                    console.log('[Línea Base] Guardado automático completado');
+                    
+                    // CRÍTICO: Después del guardado automático, recargar UNA VEZ para mostrar nuevas evidencias
+                    // pero solo si hay registros nuevos (sin ID) que necesitan mostrarse
+                    const tieneRegistrosNuevos = nuevaLineaBase.some(item => !item.id);
+                    if (tieneRegistrosNuevos) {
+                      console.log('[Línea Base] Recargando para mostrar nuevas evidencias...');
+                      // Pequeño delay para asegurar que el guardado se completó
+                      await new Promise(resolve => setTimeout(resolve, 200));
+                      await cargarLineaBase(carpetaActual.id);
+                    }
+                  } catch (error) {
+                    console.error('[Línea Base] Error en guardado automático:', error);
+                  } finally {
+                    autoGuardandoLineaBaseRef.current = false;
+                  }
+                }, 100);
+              }
+            }
             // Verificar inmediatamente después (en el siguiente tick)
             setTimeout(() => {
               console.log('[Línea Base] Estado verificado después de setLineaBase:', nuevaLineaBase.length);
             }, 0);
-          } else if (lineaBaseDirecta && lineaBaseDirecta.length > 0) {
-            // Si hay datos de línea base pero no se pudieron sincronizar con controles preventivos,
-            // usar directamente los datos de la API
-            console.log('[Línea Base] No se pudo sincronizar con controles preventivos, usando datos directos de API');
-            const nuevaLineaBase = lineaBaseDirecta.map(lb => ({
-              id: lb.id || null,
-              control_preventivo_id: lb.control_preventivo_id || null,
-              codigo: lb.codigo || '',
-              control_critico_preventivo: lb.control_critico_preventivo || '',
-              dimension: lb.dimension || '',
-              pregunta: lb.pregunta || '',
-              evidencia: lb.evidencia || '',
-              verificador_responsable: lb.verificador_responsable || '',
-              fecha_verificacion: lb.fecha_verificacion || '',
-              implementado_estandar_desempeno: (lb.implementado_estandar || lb.implementado_estandar_desempeno) || '',
-              accion_a_ejecutar: lb.accion_ejecutar || '',
-              responsable_cierre_accion: lb.responsable_cierre || '',
-              fecha_cierre: lb.fecha_cierre || '',
-              criticidad: lb.criticidad || '',
-              porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
-              nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
-              comentario_trabajador: lb.comentario_trabajador || '',
-              archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
-              conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
-              ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
-              estado_validacion: lb.estado_validacion || null,
-              comentario_validacion: lb.comentario_validacion || '',
-              usuario_validacion: lb.usuario_validacion || '',
-              fecha_validacion: lb.fecha_validacion || '',
-              ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
-            }));
-            console.log('[Línea Base] Línea base cargada directamente desde API:', nuevaLineaBase.length, 'elementos');
-            setLineaBase(nuevaLineaBase);
           } else {
-            // Si no hay línea base guardada, crear desde controles preventivos
+            // CRÍTICO: NUNCA usar directamente lineaBaseDirecta sin verificar que corresponda al BOWTIE actual
+            // Si no se pudo sincronizar, significa que los datos en BD no corresponden al BOWTIE actual
+            // Por lo tanto, construir línea base SOLO desde el BOWTIE actual (sin datos antiguos)
+            console.log('[Línea Base] Construyendo línea base SOLO desde BOWTIE actual (ignorando registros antiguos que no coinciden)');
+            console.log('[Línea Base] Total controles preventivos:', controlesPreventivos.length);
+            
+            // Si no hay línea base guardada o no se pudo sincronizar, crear desde controles preventivos
             // Crear una fila por cada dimensión-pregunta de cada control
             const nuevaLineaBase = [];
             
@@ -2971,13 +3550,29 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
             });
             console.log('[Línea Base] Línea base creada desde controles preventivos (por evidencia):', nuevaLineaBase.length, 'elementos');
             console.log('[Línea Base] Estableciendo estado con', nuevaLineaBase.length, 'elementos');
-            setLineaBase(nuevaLineaBase);
+            // Asegurar que siempre sea un array
+            if (!Array.isArray(nuevaLineaBase)) {
+              console.error('[Línea Base] Error: nuevaLineaBase no es un array, convirtiendo...');
+              setLineaBase([]);
+            } else {
+              setLineaBase(nuevaLineaBase);
+            }
             // Verificar inmediatamente después (en el siguiente tick)
             setTimeout(() => {
               console.log('[Línea Base] Estado verificado después de setLineaBase:', nuevaLineaBase.length);
             }, 0);
           }
         } catch (error) {
+          console.error('[Línea Base] Error en sincronización:', error);
+          console.error('[Línea Base] Detalles del error:', error.message, error.stack);
+          
+          // CRÍTICO: NUNCA usar datos antiguos de BD si hay error. Siempre construir desde BOWTIE actual
+          // Si hay error en sincronización, significa que los datos en BD no corresponden al BOWTIE actual
+          console.log('[Línea Base] Error en sincronización, construyendo desde BOWTIE actual (ignorando datos antiguos en BD)');
+          
+          // Si no hay datos directos pero hay controles preventivos, intentar crear desde controles
+          console.log('[Línea Base] No hay datos en BD, intentando crear desde controles preventivos');
+          
           console.log('[Línea Base] No hay API de línea base aún, creando desde controles preventivos');
           // Si no existe la API, crear desde controles preventivos
           // Crear una fila por cada dimensión-pregunta de cada control
@@ -3090,45 +3685,110 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           }, 0);
         }
       } else {
-        // Si no hay controles preventivos, intentar cargar línea base directamente desde API
-        console.log('[Línea Base] No hay controles preventivos, intentando cargar línea base directamente desde API');
+        // CRÍTICO: Si no hay controles preventivos O no hay evidencias/preguntas en el BOWTIE,
+        // NO mostrar datos antiguos de la BD. La línea base debe estar vacía o solo mostrar controles sin evidencias.
+        console.log('[Línea Base] No hay controles con evidencias en el BOWTIE. Limpiando línea base.');
+        console.log('[Línea Base] Motivo:', controlesPreventivos.length === 0 ? 'No hay controles preventivos' : 'No hay evidencias/preguntas en los controles');
+        
+        // Si hay controles pero no hay evidencias, crear solo filas básicas de controles (sin evidencias)
+        if (controlesPreventivos.length > 0) {
+          const nuevaLineaBase = [];
+          controlesPreventivos.forEach((control, controlIndex) => {
+            const codigo = control.codigo || `CCP${controlIndex + 1}`;
+            const nombreControl = control.descripcion || '';
+            // Solo crear una fila básica del control, sin dimensiones/preguntas/evidencias
+            nuevaLineaBase.push({
+              id: null,
+              control_preventivo_id: control.id,
+              codigo: codigo,
+              control_critico_preventivo: nombreControl,
+              dimension: '',
+              pregunta: '',
+              evidencia: '',
+              verificador_responsable: '',
+              fecha_verificacion: '',
+              implementado_estandar_desempeno: '',
+              accion_a_ejecutar: '',
+              responsable_cierre_accion: '',
+              fecha_cierre: '',
+              criticidad: control.criticidad || '',
+              porcentaje_avance_implementacion_accion: '',
+              nombre_dueno_control_critico_tecnico: '',
+              comentario_trabajador: '',
+              archivos_respaldo: [],
+              conversacion_seguimiento: [],
+              ultimo_usuario_edito: '',
+              estado_validacion: null,
+              comentario_validacion: '',
+              usuario_validacion: '',
+              fecha_validacion: '',
+              ponderacion: 0
+            });
+          });
+          console.log('[Línea Base] Creando solo filas básicas de controles (sin evidencias):', nuevaLineaBase.length);
+          setLineaBase(nuevaLineaBase);
+          setCargandoLineaBase(false);
+          return;
+        }
+        
+        // Si no hay controles preventivos, limpiar completamente la línea base
+        console.log('[Línea Base] Limpiando línea base completamente (no hay controles preventivos)');
+        setLineaBase([]);
+        setCargandoLineaBase(false);
+        return;
+        
+        /* CÓDIGO COMENTADO: NO mostrar datos antiguos si no hay controles en el BOWTIE
+        // IMPORTANTE: Si hay datos en la BD, NO mostrarlos si no hay controles del BOWTIE
+        // Este código fue comentado para evitar mostrar datos antiguos cuando no hay evidencias
+        if (false && lineaBaseDirecta && lineaBaseDirecta.length > 0) {
+          console.log('[Línea Base] Encontrados datos en BD sin controles BOWTIE, usando datos directos:', lineaBaseDirecta.length);
+          const nuevaLineaBase = lineaBaseDirecta.map(lb => ({
+            id: lb.id || null,
+            control_preventivo_id: lb.control_preventivo_id || null,
+            codigo: lb.codigo || '',
+            control_critico_preventivo: lb.control_critico_preventivo || '',
+            dimension: lb.dimension || '',
+            pregunta: lb.pregunta || '',
+            evidencia: lb.evidencia || '',
+            verificador_responsable: lb.verificador_responsable || '',
+            fecha_verificacion: lb.fecha_verificacion || '',
+            implementado_estandar_desempeno: (lb.implementado_estandar || lb.implementado_estandar_desempeno) || '',
+            accion_a_ejecutar: lb.accion_ejecutar || '',
+            responsable_cierre_accion: lb.responsable_cierre || '',
+            fecha_cierre: lb.fecha_cierre || '',
+            criticidad: lb.criticidad || '',
+            porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
+            nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
+            comentario_trabajador: lb.comentario_trabajador || '',
+            archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
+            conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
+            ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
+            estado_validacion: lb.estado_validacion || null,
+            comentario_validacion: lb.comentario_validacion || '',
+            usuario_validacion: lb.usuario_validacion || '',
+            fecha_validacion: lb.fecha_validacion || '',
+            ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
+          }));
+          
+          console.log('[Línea Base] Datos cargados directamente desde BD (sin BOWTIE):', nuevaLineaBase.length, 'registros');
+          if (!Array.isArray(nuevaLineaBase)) {
+            console.error('[Línea Base] Error: nuevaLineaBase no es un array');
+            setLineaBase([]);
+          } else {
+            setLineaBase(nuevaLineaBase);
+          }
+          setCargandoLineaBase(false);
+          return; // Salir temprano si ya cargamos los datos
+        }
         try {
           const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaId}`);
           const dataLineaBase = await resLineaBase.json();
           
-          if (dataLineaBase.success && dataLineaBase.linea_base && dataLineaBase.linea_base.length > 0) {
-            // Usar directamente los datos de la API sin sincronizar con controles preventivos
-            const nuevaLineaBase = dataLineaBase.linea_base.map(lb => ({
-              id: lb.id || null,
-              control_preventivo_id: lb.control_preventivo_id || null,
-              codigo: lb.codigo || '',
-              control_critico_preventivo: lb.control_critico_preventivo || '',
-              dimension: lb.dimension || '',
-              pregunta: lb.pregunta || '',
-              evidencia: lb.evidencia || '',
-              verificador_responsable: lb.verificador_responsable || '',
-              fecha_verificacion: lb.fecha_verificacion || '',
-              implementado_estandar_desempeno: (lb.implementado_estandar || lb.implementado_estandar_desempeno) || '',
-              accion_a_ejecutar: lb.accion_ejecutar || '',
-              responsable_cierre_accion: lb.responsable_cierre || '',
-              fecha_cierre: lb.fecha_cierre || '',
-              criticidad: lb.criticidad || '',
-              porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
-              nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
-              comentario_trabajador: lb.comentario_trabajador || '',
-              archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
-              conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
-              ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
-              estado_validacion: lb.estado_validacion || null,
-              comentario_validacion: lb.comentario_validacion || '',
-              usuario_validacion: lb.usuario_validacion || '',
-              fecha_validacion: lb.fecha_validacion || '',
-              ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
-            }));
-            
-            console.log('[Línea Base] Línea base cargada directamente desde API (sin controles preventivos):', nuevaLineaBase.length, 'elementos');
-            setLineaBase(nuevaLineaBase);
-          } else {
+          // CRÍTICO: NUNCA usar directamente datos de la API sin verificar que correspondan al BOWTIE actual
+          // Este bloque fue eliminado porque causaba que se mostraran datos antiguos que no existen en el BOWTIE actual
+          // La línea base SIEMPRE debe construirse desde el BOWTIE actual, sincronizando solo los datos adicionales (verificador, etc.)
+          // Si llegamos aquí, significa que no se pudo sincronizar, por lo tanto construir desde BOWTIE actual
+          console.log('[Línea Base] No se pudo sincronizar, construyendo desde BOWTIE actual (ignorando datos antiguos en BD)'); else {
             console.log('[Línea Base] No hay línea base en la API, limpiando');
             setLineaBase([]);
           }
@@ -3136,6 +3796,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           console.error('[Línea Base] Error cargando línea base directamente:', error);
           setLineaBase([]);
         }
+        */
       }
     } catch (error) {
       console.error('[Línea Base] Error cargando línea base:', error);
@@ -3156,7 +3817,29 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       setCargandoDocumentos(true);
       const carpetaParam = carpetaId === null ? 'null' : carpetaId;
       const res = await fetch(`${API_BASE}/archivos/linea_base_carpetas.php?linea_base_id=${lineaBaseId}&carpeta_padre_id=${carpetaParam}`);
-      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const text = await res.text();
+      if (!text || text.trim() === '') {
+        console.warn('Respuesta vacía del servidor');
+        setDocumentosCarpetas([]);
+        setDocumentosArchivos([]);
+        setDocumentosBreadcrumbs([]);
+        setDocumentosCarpetaActual(carpetaId);
+        return;
+      }
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('Error parseando JSON:', parseError);
+        console.error('Respuesta del servidor:', text.substring(0, 500));
+        throw new Error('Respuesta no válida del servidor');
+      }
       
       if (data.success) {
         setDocumentosCarpetas(data.carpetas || []);
@@ -3166,6 +3849,9 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       }
     } catch (error) {
       console.error('Error cargando documentos:', error);
+      setDocumentosCarpetas([]);
+      setDocumentosArchivos([]);
+      setDocumentosBreadcrumbs([]);
     } finally {
       setCargandoDocumentos(false);
     }
@@ -3336,7 +4022,25 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           usuario_nombre: user?.nombre || user?.email
         })
       });
-      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
+      const text = await res.text();
+      if (!text || text.trim() === '') {
+        throw new Error('Respuesta vacía del servidor');
+      }
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('[Crear Carpeta] Error parseando JSON:', parseError);
+        console.error('[Crear Carpeta] Respuesta del servidor:', text.substring(0, 500));
+        throw new Error('Respuesta no válida del servidor: ' + text.substring(0, 100));
+      }
+      
       console.log('[Crear Carpeta] Respuesta crear carpeta:', data);
       
       if (data.success) {
@@ -3388,8 +4092,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     
     // Verificar clave secreta (misma que para eliminar usuarios)
     const CLAVE_SECRETA = 'eliminar2024';
-    if (claveEliminarDocumento !== CLAVE_SECRETA) {
-      mostrarNotificacion('✗ Clave incorrecta', 'error');
+    const claveIngresada = claveEliminarDocumento.trim().toLowerCase();
+    if (claveIngresada !== CLAVE_SECRETA.toLowerCase()) {
+      mostrarNotificacion('✗ Clave incorrecta. La clave es: eliminar2024', 'error');
+      console.log('Clave ingresada:', claveIngresada, '| Clave esperada:', CLAVE_SECRETA);
       return;
     }
     
@@ -3398,12 +4104,39 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         ? `${API_BASE}/archivos/linea_base_carpetas.php`
         : `${API_BASE}/archivos/linea_base_archivos.php`;
         
+      console.log('[Eliminar Documento] Enviando DELETE a:', endpoint, 'con id:', modalEliminarDocumento.id);
+      
       const res = await fetch(endpoint, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: modalEliminarDocumento.id })
       });
-      const data = await res.json();
+
+      // Verificar respuesta antes de parsear JSON
+      const contentType = res.headers.get('content-type');
+      let data;
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[Eliminar Documento] Error HTTP:', res.status, errorText);
+        throw new Error(`Error ${res.status}: ${errorText.substring(0, 200)}`);
+      }
+      
+      if (contentType && contentType.includes('application/json')) {
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+          console.log('[Eliminar Documento] Respuesta exitosa:', data);
+        } catch (e) {
+          console.error('[Eliminar Documento] Error parseando JSON:', e);
+          console.error('[Eliminar Documento] Texto recibido:', text.substring(0, 500));
+          throw new Error('El servidor devolvió una respuesta que no es JSON válido: ' + text.substring(0, 200));
+        }
+      } else {
+        const text = await res.text();
+        console.error('[Eliminar Documento] Respuesta no JSON:', text.substring(0, 500));
+        throw new Error('El servidor devolvió una respuesta no válida: ' + text.substring(0, 200));
+      }
       
       if (data.success) {
         mostrarNotificacion(`✓ ${modalEliminarDocumento.tipo === 'carpeta' ? 'Carpeta' : 'Archivo'} eliminado`, 'success');
@@ -3610,16 +4343,148 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     return iconos[extension?.toLowerCase()] || 'fa-file-o';
   };
 
-  const guardarLineaBase = async (lineaBaseActualizada = null) => {
-    const datosAGuardar = lineaBaseActualizada || lineaBase;
-    if (!carpetaActual || !datosAGuardar || datosAGuardar.length === 0) return;
+  const guardarLineaBase = async (lineaBaseActualizada = null, evitarRecarga = false) => {
+    // Validar carpeta actual primero
+    if (!carpetaActual) {
+      console.error('[Guardar Línea Base] Error: No hay carpeta actual seleccionada');
+      mostrarNotificacion('✗ Error: No hay carpeta seleccionada', 'error');
+      return;
+    }
+    
+    // Obtener datos a guardar
+    let datosAGuardar = lineaBaseActualizada || lineaBase;
+    
+    // Asegurar que sea un array - si no lo es, intentar convertirlo o usar array vacío
+    if (!Array.isArray(datosAGuardar)) {
+      console.error('[Guardar Línea Base] Error: datosAGuardar no es un array:', typeof datosAGuardar, datosAGuardar);
+      
+      // Intentar convertir si es un objeto con propiedades de array
+      if (datosAGuardar && typeof datosAGuardar === 'object') {
+        // Si tiene una propiedad que parece ser un array, intentar usarla
+        if (datosAGuardar.linea_base && Array.isArray(datosAGuardar.linea_base)) {
+          datosAGuardar = datosAGuardar.linea_base;
+          console.log('[Guardar Línea Base] Corregido: usando propiedad linea_base del objeto');
+        } else {
+          // Si es un objeto único, convertirlo a array
+          datosAGuardar = [datosAGuardar];
+          console.log('[Guardar Línea Base] Corregido: convirtiendo objeto único a array');
+        }
+      } else {
+        // Si es null, undefined, o cualquier otro tipo, usar array vacío
+        console.warn('[Guardar Línea Base] datosAGuardar es null/undefined, usando array vacío');
+        datosAGuardar = [];
+      }
+    }
+    
+    console.log('[Guardar Línea Base] Validación exitosa:', {
+      carpeta_id: carpetaActual.id,
+      total_items: datosAGuardar.length,
+      es_array: Array.isArray(datosAGuardar)
+    });
 
     try {
       setGuardandoLineaBase(true);
+      
+      // CRÍTICO: Cargar TODOS los registros existentes de la BD para evitar pérdida de datos
+      // Esto asegura que aunque el estado local no esté sincronizado, siempre preservamos todos los datos
+      console.log('[Guardar Línea Base] Cargando registros existentes de BD para preservar datos...');
+      let registrosExistentesBD = [];
+      try {
+        const resExistente = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php?carpeta_id=${carpetaActual.id}`);
+        const dataExistente = await resExistente.json();
+        if (dataExistente.success && dataExistente.linea_base && Array.isArray(dataExistente.linea_base)) {
+          registrosExistentesBD = dataExistente.linea_base.filter(r => r.activo !== 0);
+          console.log('[Guardar Línea Base] Registros existentes en BD:', registrosExistentesBD.length);
+        }
+      } catch (errorExistente) {
+        console.warn('[Guardar Línea Base] Error cargando registros existentes (continuando):', errorExistente);
+      }
+      
+      // Crear mapa de registros a guardar por clave única (control_preventivo_id + dimension + pregunta + evidencia)
+      const mapaRegistrosAGuardar = new Map();
+      datosAGuardar.forEach(item => {
+        const clave = `${item.control_preventivo_id || ''}_${(item.dimension || '').trim()}_${(item.pregunta || '').trim()}_${(item.evidencia || '').trim()}`;
+        mapaRegistrosAGuardar.set(clave, item);
+      });
+      
+      // Obtener evidencias actuales del BOWTIE para verificar cuáles existen
+      const evidenciasExistentesEnBOWTIE = new Set();
+      if (analisisBowtie && analisisBowtie.controles_preventivos) {
+        analisisBowtie.controles_preventivos.forEach((control) => {
+          const dimensiones = control.dimensiones || [];
+          dimensiones.forEach((dimension) => {
+            const preguntas = dimension.preguntas || [];
+            preguntas.forEach((pregunta) => {
+              const textoEvidencia = pregunta.evidencia || '';
+              const evidenciasArray = parseEvidenciasTexto(textoEvidencia);
+              const evidenciasParaProcesar = evidenciasArray.length > 0 ? evidenciasArray : [''];
+              evidenciasParaProcesar.forEach((evidenciaIndividual) => {
+                const claveEvidencia = `${control.id || ''}_${(dimension.nombre || '').trim()}_${(pregunta.texto || '').trim()}_${evidenciaIndividual.trim()}`;
+                evidenciasExistentesEnBOWTIE.add(claveEvidencia);
+              });
+            });
+          });
+        });
+      }
+      
+      // Combinar registros: usar los nuevos/modificados, pero preservar los existentes que no están en la lista nueva
+      // SOLO si su evidencia todavía existe en el BOWTIE y tienen datos completados
+      const registrosFinales = [...datosAGuardar];
+      const idsYaIncluidos = new Set(datosAGuardar.map(item => item.id).filter(Boolean));
+      const clavesYaIncluidas = new Set(datosAGuardar.map(item => 
+        `${item.control_preventivo_id || ''}_${(item.dimension || '').trim()}_${(item.pregunta || '').trim()}_${(item.evidencia || '').trim()}`
+      ));
+      
+      registrosExistentesBD.forEach(registroBD => {
+        const claveRegistroBD = `${registroBD.control_preventivo_id || ''}_${(registroBD.dimension || '').trim()}_${(registroBD.pregunta || '').trim()}_${(registroBD.evidencia || '').trim()}`;
+        const existeEnBOWTIE = evidenciasExistentesEnBOWTIE.has(claveRegistroBD);
+        const yaIncluidoPorID = idsYaIncluidos.has(registroBD.id);
+        const yaIncluidoPorClave = clavesYaIncluidas.has(claveRegistroBD) || mapaRegistrosAGuardar.has(claveRegistroBD);
+        const yaIncluido = yaIncluidoPorID || yaIncluidoPorClave;
+        
+        // CRÍTICO: Incluir registro de BD SIEMPRE si:
+        // 1. No está ya incluido en los datos a guardar (ni por ID ni por clave única)
+        // 2. Su evidencia todavía existe en el BOWTIE (eliminación por cascada solo si la evidencia fue eliminada)
+        // NO verificamos si tiene datos porque queremos preservar TODOS los registros que existen en el BOWTIE
+        // para evitar pérdida de información cuando el matching falla
+        if (!yaIncluido && existeEnBOWTIE) {
+          console.log('[Guardar Línea Base] Preservando registro de BD no incluido (existe en BOWTIE):', claveRegistroBD, 'ID:', registroBD.id);
+          registrosFinales.push({
+            id: registroBD.id,
+            control_preventivo_id: registroBD.control_preventivo_id,
+            codigo: registroBD.codigo || '',
+            control_critico_preventivo: registroBD.control_critico_preventivo || '',
+            dimension: registroBD.dimension || '',
+            pregunta: registroBD.pregunta || '',
+            evidencia: registroBD.evidencia || '',
+            verificador_responsable: registroBD.verificador_responsable || '',
+            fecha_verificacion: registroBD.fecha_verificacion || '',
+            implementado_estandar_desempeno: registroBD.implementado_estandar || '',
+            accion_a_ejecutar: registroBD.accion_ejecutar || '',
+            responsable_cierre_accion: registroBD.responsable_cierre || '',
+            fecha_cierre: registroBD.fecha_cierre || '',
+            criticidad: registroBD.criticidad || '',
+            porcentaje_avance_implementacion_accion: registroBD.porcentaje_avance || '',
+            nombre_dueno_control_critico_tecnico: registroBD.nombre_dueno_control || '',
+            comentario_trabajador: registroBD.comentario_trabajador || '',
+            archivos_respaldo: typeof registroBD.archivos_respaldo === 'string' ? (JSON.parse(registroBD.archivos_respaldo) || []) : (registroBD.archivos_respaldo || []),
+            conversacion_seguimiento: typeof registroBD.conversacion_seguimiento === 'string' ? (JSON.parse(registroBD.conversacion_seguimiento) || []) : (registroBD.conversacion_seguimiento || []),
+            ultimo_usuario_edito: registroBD.ultimo_usuario_edito || '',
+            estado_validacion: registroBD.estado_validacion || null,
+            comentario_validacion: registroBD.comentario_validacion || '',
+            usuario_validacion: registroBD.usuario_validacion || '',
+            fecha_validacion: registroBD.fecha_validacion || '',
+            ponderacion: registroBD.ponderacion !== undefined ? registroBD.ponderacion : (registroBD.estado_validacion === 'validado' ? 100 : 0)
+          });
+        }
+      });
+      
+      console.log('[Guardar Línea Base] Total registros a enviar (incluyendo preservados):', registrosFinales.length, '(originales:', datosAGuardar.length, ', preservados:', registrosFinales.length - datosAGuardar.length, ')');
+      
       const datosEnvio = {
         carpeta_id: carpetaActual.id,
         usuario_id: user.id,
-        linea_base: datosAGuardar.map(item => ({
+        linea_base: registrosFinales.map(item => ({
           id: item.id,
           control_preventivo_id: item.control_preventivo_id,
           codigo: item.codigo || '',
@@ -3648,15 +4513,48 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         }))
       };
 
+      console.log('[Guardar Línea Base] Enviando datos:', { 
+        carpeta_id: carpetaActual.id, 
+        total_items: datosEnvio.linea_base.length,
+        usuario_id: user.id
+      });
+
       const res = await fetch(`${API_BASE}/archivos/carpeta_linea_base.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(datosEnvio)
       });
 
-      const data = await res.json();
+      // Verificar respuesta antes de parsear JSON
+      const contentType = res.headers.get('content-type');
+      let data;
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Error HTTP al guardar línea base:', res.status, errorText);
+        throw new Error(`Error ${res.status}: ${errorText.substring(0, 200)}`);
+      }
+      
+      if (contentType && contentType.includes('application/json')) {
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+          console.log('[Guardar Línea Base] Respuesta exitosa:', data);
+        } catch (e) {
+          console.error('[Guardar Línea Base] Error parseando JSON:', e);
+          console.error('[Guardar Línea Base] Texto recibido:', text.substring(0, 500));
+          throw new Error('El servidor devolvió una respuesta que no es JSON válido: ' + text.substring(0, 200));
+        }
+      } else {
+        const text = await res.text();
+        console.error('Respuesta no JSON del servidor:', text.substring(0, 500));
+        throw new Error('El servidor devolvió una respuesta no válida');
+      }
       if (data.success) {
+        // Solo recargar si no se está evitando la recarga (para evitar bucles infinitos en guardados automáticos)
+        if (!evitarRecarga) {
         await cargarLineaBase(carpetaActual.id);
+        }
         // Recargar promedio de ponderación
         try {
           const resPromedio = await fetch(`${API_BASE}/archivos/promedio_ponderacion.php?carpeta_id=${carpetaActual.id}`);
@@ -3693,28 +4591,52 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       let controlesMitigadores = [];
       console.log('[Línea Base Mitigadores] Iniciando carga, analisisBowtie existe?', !!analisisBowtie);
       
-      // Detectar si estamos en nivel 2 (tiene carpeta padre)
-      const esNivel2 = carpetaActual && carpetaActual.carpeta_padre_id;
+      // Detectar nivel actual: nivel 2 (rutaNavegacion.length === 1) o nivel 3+ (rutaNavegacion.length >= 2)
+      const esNivel2 = rutaNavegacion.length === 1;
+      const esNivel3 = rutaNavegacion.length >= 2;
       
       try {
         // Si estamos en nivel 2, usar DIRECTAMENTE los controles del BOWTIE padre (nivel 1) que tienen las evidencias
-        if (esNivel2) {
-          try {
-            const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaActual.carpeta_padre_id}`);
-            const dataPadre = await resPadre.json();
-            if (dataPadre && dataPadre.controles_mitigadores && dataPadre.controles_mitigadores.length > 0) {
-              // Usar los controles del padre directamente (tienen las evidencias)
-              controlesMitigadores = dataPadre.controles_mitigadores;
-              console.log('[Línea Base Mitigadores] Nivel 2: Usando controles del BOWTIE padre con evidencias:', controlesMitigadores.length, 'controles');
+        // Si estamos en nivel 3+, usar DIRECTAMENTE los controles del BOWTIE del nivel 2 (padre) que tienen las evidencias
+        if (esNivel2 || esNivel3) {
+          const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+          if (carpetaPadreId) {
+            try {
+              console.log(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Cargando controles del BOWTIE padre (ID: ${carpetaPadreId})`);
+              // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+              const timestamp = Date.now();
+              const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaPadreId}&_t=${timestamp}`, {
+                cache: 'no-cache',
+                headers: {
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              });
+              const dataPadre = await resPadre.json();
+              if (dataPadre && dataPadre.controles_mitigadores && dataPadre.controles_mitigadores.length > 0) {
+                // Usar los controles del padre directamente (tienen las evidencias)
+                controlesMitigadores = dataPadre.controles_mitigadores;
+                console.log(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Usando controles del BOWTIE padre con evidencias:`, controlesMitigadores.length, 'controles');
+              } else {
+                console.log(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: No se encontraron controles en el BOWTIE padre`);
+              }
+            } catch (errorPadre) {
+              console.error(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Error al cargar BOWTIE padre:`, errorPadre);
             }
-          } catch (errorPadre) {
-            console.error('[Línea Base Mitigadores] Error al cargar BOWTIE padre:', errorPadre);
           }
         }
         
         // Si no estamos en nivel 2 o no se pudieron cargar controles del padre, cargar del nivel actual
         if (controlesMitigadores.length === 0) {
-        const res = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaId}`);
+        // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+        const timestamp = Date.now();
+        const res = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaId}&_t=${timestamp}`, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const data = await res.json();
         console.log('[Línea Base Mitigadores] Respuesta API completa:', data);
         console.log('[Línea Base Mitigadores] data.success:', data.success, 'data.bowtie_id:', data.bowtie_id);
@@ -3751,17 +4673,70 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       
       console.log('[Línea Base Mitigadores] Total controles encontrados:', controlesMitigadores.length);
       
-      if (controlesMitigadores.length > 0) {
+      // CRÍTICO: Solo mostrar línea base si hay controles mitigadores con evidencias/preguntas
+      // Si no hay controles o no hay evidencias/preguntas, limpiar la línea base
+      const tieneControlesConEvidencias = controlesMitigadores.some(control => {
+        const dimensiones = control.dimensiones || [];
+        return dimensiones.some(dimension => {
+          const preguntas = dimension.preguntas || [];
+          return preguntas.some(pregunta => {
+            // Verificar si tiene evidencias (array o texto)
+            const tieneEvidenciasArray = pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0;
+            const tieneEvidenciaTexto = pregunta.evidencia && pregunta.evidencia.trim() !== '';
+            return tieneEvidenciasArray || tieneEvidenciaTexto;
+          });
+        });
+      });
+      
+      console.log('[Línea Base Mitigadores] Tiene controles:', controlesMitigadores.length > 0);
+      console.log('[Línea Base Mitigadores] Tiene controles con evidencias:', tieneControlesConEvidencias);
+      
+      if (controlesMitigadores.length > 0 && tieneControlesConEvidencias) {
         // Intentar cargar línea base existente desde API (si existe)
         try {
-          const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base_mitigadores.php?carpeta_id=${carpetaId}`);
+          // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+          const timestamp = Date.now();
+          const resLineaBase = await fetch(`${API_BASE}/archivos/carpeta_linea_base_mitigadores.php?carpeta_id=${carpetaId}&_t=${timestamp}`, {
+            cache: 'no-cache',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
           const dataLineaBase = await resLineaBase.json();
           
           if (dataLineaBase.success && dataLineaBase.linea_base && dataLineaBase.linea_base.length > 0) {
+            // CRÍTICO: En nivel 3, verificar si el BOWTIE actual tiene IDs de evidencias
+            // Si el BOWTIE tiene IDs pero los registros antiguos no (o viceversa), ignorar registros antiguos
+            const esNivel3 = rutaNavegacion.length >= 2;
+            let lineaBaseExistente = dataLineaBase.linea_base;
+            
+            if (esNivel3) {
+              // Verificar si el BOWTIE actual tiene evidencias con IDs
+              const bowtieTieneIdsEvidencias = controlesMitigadores.some(control => {
+                return (control.dimensiones || []).some(dimension => {
+                  return (dimension.preguntas || []).some(pregunta => {
+                    return pregunta.evidencias && Array.isArray(pregunta.evidencias) && 
+                           pregunta.evidencias.some(ev => ev && ev.id);
+                  });
+                });
+              });
+              
+              // Verificar si los registros antiguos tienen IDs de evidencias
+              const registrosAntiguosTienenIds = dataLineaBase.linea_base.some(lb => lb.evidencia_id);
+              
+              // Si hay discrepancia en el formato (uno tiene IDs y el otro no), ignorar registros antiguos
+              if (bowtieTieneIdsEvidencias !== registrosAntiguosTienenIds) {
+                console.log('[Línea Base Mitigadores] Nivel 3: Discrepancia en formato de evidencias detectada. Ignorando registros antiguos y generando nuevos desde BOWTIE actual.');
+                lineaBaseExistente = []; // Ignorar registros antiguos
+              }
+            }
+            
             // Si hay línea base guardada, sincronizar con controles mitigadores actuales
-            const lineaBaseExistente = dataLineaBase.linea_base;
             // Crear una fila por cada dimensión-pregunta de cada control
             const nuevaLineaBase = [];
+            // Mapa para rastrear qué registros de BD ya fueron usados
+            const registrosUsados = new Set();
             
             controlesMitigadores.forEach((control, controlIndex) => {
               const dimensiones = control.dimensiones || [];
@@ -3845,8 +4820,18 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 
                 // Crear una fila por cada EVIDENCIA de cada pregunta
                 preguntas.forEach((pregunta, pregIndex) => {
-                  const textoEvidencia = pregunta.evidencia || '';
-                  const evidenciasArray = parseEvidenciasTexto(textoEvidencia);
+                  // Obtener evidencias: si tiene array de evidencias (formato nuevo), usarlo; sino parsear texto
+                  let evidenciasArray = [];
+                  if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
+                    // Formato nuevo: array de objetos con {id, texto}
+                    evidenciasArray = pregunta.evidencias.map(ev => ev.texto || ev || '');
+                  } else {
+                    // Formato antiguo: parsear texto
+                    const textoEvidencia = pregunta.evidencia || '';
+                    evidenciasArray = parseEvidenciasTexto(textoEvidencia);
+                  }
+                  
+                  // Si no hay evidencias, crear al menos una fila con evidencia vacía
                   const evidenciasParaProcesar = evidenciasArray.length > 0 ? evidenciasArray : [''];
                   
                   evidenciasParaProcesar.forEach((evidenciaIndividual, evidenciaIndex) => {
@@ -3854,21 +4839,62 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     const esPrimeraFilaDimension = pregIndex === 0 && evidenciaIndex === 0;
                     const esPrimeraFilaPregunta = evidenciaIndex === 0;
                     
-                  const existente = lineaBaseExistente.find(lb => 
-                    lb.control_mitigador_id === control.id && 
-                    lb.dimension === nombreDimension && 
-                      lb.pregunta === pregunta.texto &&
-                      lb.evidencia === evidenciaIndividual
-                  );
+                    // Obtener ID de evidencia si está disponible (formato nuevo)
+                    const evidenciaObj = pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias[evidenciaIndex]
+                      ? pregunta.evidencias[evidenciaIndex]
+                      : null;
+                    const evidenciaId = evidenciaObj?.id || null;
+                    
+                    // Buscar si existe un registro guardado para esta evidencia específica
+                    // IMPORTANTE: Usar ID de evidencia si está disponible para matching más preciso
+                    const existente = lineaBaseExistente.find(lb => {
+                      const lbControlId = lb.control_mitigador_id;
+                      const lbDimension = (lb.dimension || '').trim();
+                      const lbPregunta = (lb.pregunta || '').trim();
+                      const lbEvidencia = (lb.evidencia || '').trim();
+                      
+                      const controlId = control.id;
+                      const dimension = nombreDimension.trim();
+                      const preguntaTexto = (pregunta.texto || '').trim();
+                      const evidencia = evidenciaIndividual.trim();
+                      
+                      // CRÍTICO: Priorizar matching por ID de evidencia (más preciso)
+                      // Si tenemos ID de evidencia en BD y coincide, es un match exacto
+                      if (lb.evidencia_id && evidenciaId && String(lb.evidencia_id) === String(evidenciaId)) {
+                        return true;
+                      }
+                      
+                      // Si tenemos evidenciaId en el BOWTIE pero el registro de BD no tiene evidencia_id,
+                      // o viceversa, NO hacer match (son registros antiguos)
+                      if ((evidenciaId && !lb.evidencia_id) || (!evidenciaId && lb.evidencia_id)) {
+                        return false;
+                      }
+                      
+                      // Fallback: matching por texto solo si ambos tienen el mismo formato (sin IDs)
+                      // Esto asegura que no se mezclen registros antiguos con nuevos
+                      return lbControlId === controlId && 
+                             lbDimension === dimension && 
+                             lbPregunta === preguntaTexto &&
+                             lbEvidencia === evidencia;
+                    });
+                  
+                    // Marcar este registro como usado para evitar duplicados en la preservación
+                    if (existente && existente.id) {
+                      registrosUsados.add(existente.id);
+                    }
                   
                   nuevaLineaBase.push({
                     id: existente?.id || null,
                     control_mitigador_id: control.id,
                     codigo: codigo,
                       control_critico_mitigador: esPrimeraFilaControl ? nombreControl : '',
+                      // IMPORTANTE: Siempre guardar dimension, pregunta y evidencia con valores completos
+                      // para que el match funcione correctamente al recargar
                     dimension: nombreDimension,
                     pregunta: pregunta.texto || '',
                       evidencia: evidenciaIndividual,
+                      evidencia_id: evidenciaId, // Guardar ID de evidencia para matching futuro
+                      // Flags para controlar visualización en la tabla
                       _esPrimeraFilaDimension: esPrimeraFilaDimension,
                       _esPrimeraFilaPregunta: esPrimeraFilaPregunta,
                     verificador_responsable: existente ? (existente.verificador_responsable ?? '') : '',
@@ -3894,9 +4920,185 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 });
               });
             });
+            
+            // PRESERVAR registros con datos completados SOLO si su evidencia todavía existe en el BOWTIE
+            // Si una evidencia fue eliminada del BOWTIE, sus datos NO se preservan (eliminación por cascada)
+            // Solo se preservan evidencias que existen en el BOWTIE pero no se emparejaron correctamente
+            
+            // PASO 1: Crear conjunto de TODAS las evidencias que existen actualmente en el BOWTIE
+            // CRÍTICO: Usar tanto el formato nuevo (array evidencias) como el antiguo (texto evidencia)
+            const evidenciasExistentesEnBOWTIE = new Set();
+            const evidenciasExistentesEnBOWTIEPorID = new Set(); // Para matching por ID de evidencia
+            controlesMitigadores.forEach((control) => {
+              const dimensiones = control.dimensiones || [];
+              dimensiones.forEach((dimension) => {
+                const preguntas = dimension.preguntas || [];
+                preguntas.forEach((pregunta) => {
+                  // Obtener evidencias: priorizar array (formato nuevo), sino parsear texto (formato antiguo)
+                  let evidenciasArray = [];
+                  if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
+                    // Formato nuevo: array de objetos con {id, texto}
+                    evidenciasArray = pregunta.evidencias.map(ev => ({
+                      id: ev.id || null,
+                      texto: ev.texto || ev || ''
+                    }));
+                  } else {
+                    // Formato antiguo: parsear texto
+                    const textoEvidencia = pregunta.evidencia || '';
+                    const evidenciasTextoArray = parseEvidenciasTexto(textoEvidencia);
+                    evidenciasArray = evidenciasTextoArray.map(ev => ({ id: null, texto: ev }));
+                  }
+                  
+                  const evidenciasParaProcesar = evidenciasArray.length > 0 ? evidenciasArray : [{ id: null, texto: '' }];
+                  evidenciasParaProcesar.forEach((evidenciaObj) => {
+                    const evidenciaTexto = evidenciaObj.texto || evidenciaObj || '';
+                    const evidenciaId = evidenciaObj.id || null;
+                    
+                    // Clave por texto (compatibilidad con formato antiguo)
+                    const claveEvidencia = `${control.id || ''}_${(dimension.nombre || '').trim()}_${(pregunta.texto || '').trim()}_${evidenciaTexto.trim()}`;
+                    evidenciasExistentesEnBOWTIE.add(claveEvidencia);
+                    
+                    // Clave por ID (formato nuevo) - solo si tiene ID
+                    if (evidenciaId) {
+                      evidenciasExistentesEnBOWTIEPorID.add(String(evidenciaId));
+                    }
+                  });
+                });
+              });
+            });
+            
+            // PASO 2: Filtrar registros para preservar solo los que:
+            // - Su evidencia todavía existe en el BOWTIE actual
+            // - No fueron usados en la sincronización
+            // - Tienen datos completados
+            // CRÍTICO: Usar el Set de registrosUsados que se fue llenando durante la sincronización
+            // para asegurar que no se dupliquen registros
+            const idsUsadosEnSincronizacion = new Set([...registrosUsados, ...nuevaLineaBase.map(item => item.id).filter(Boolean)]);
+            const evidenciasIncluidas = new Set(nuevaLineaBase.map(item => {
+              return `${item.control_mitigador_id || ''}_${(item.dimension || '').trim()}_${(item.pregunta || '').trim()}_${(item.evidencia || '').trim()}`;
+            }));
+            
+            const registrosPreservar = lineaBaseExistente.filter(lb => {
+              // Verificar si esta evidencia todavía existe en el BOWTIE actual
+              // PRIORIDAD 1: Verificar por ID de evidencia (formato nuevo - más preciso)
+              let existeEnBOWTIE = false;
+              if (lb.evidencia_id) {
+                existeEnBOWTIE = evidenciasExistentesEnBOWTIEPorID.has(String(lb.evidencia_id));
+              }
+              
+              // PRIORIDAD 2: Si no se encontró por ID, verificar por texto (formato antiguo)
+              if (!existeEnBOWTIE) {
+                const claveEvidencia = `${lb.control_mitigador_id || ''}_${(lb.dimension || '').trim()}_${(lb.pregunta || '').trim()}_${(lb.evidencia || '').trim()}`;
+                existeEnBOWTIE = evidenciasExistentesEnBOWTIE.has(claveEvidencia);
+              }
+              
+              // Verificar si esta evidencia ya está incluida en la nueva línea base
+              // Verificar por ID primero (más preciso)
+              let yaEstaIncluida = false;
+              if (lb.evidencia_id) {
+                yaEstaIncluida = nuevaLineaBase.some(item => item.evidencia_id && String(item.evidencia_id) === String(lb.evidencia_id));
+              }
+              
+              // Si no se encontró por ID, verificar por clave de texto
+              if (!yaEstaIncluida) {
+                const claveEvidencia = `${lb.control_mitigador_id || ''}_${(lb.dimension || '').trim()}_${(lb.pregunta || '').trim()}_${(lb.evidencia || '').trim()}`;
+                yaEstaIncluida = evidenciasIncluidas.has(claveEvidencia);
+              }
+              
+              // Verificar si el ID fue usado durante la sincronización
+              const fueUsadoEnSincronizacion = idsUsadosEnSincronizacion.has(lb.id);
+              
+              // CRÍTICO: Si la evidencia existe en el BOWTIE pero no está incluida en nuevaLineaBase,
+              // significa que el matching falló. DEBEMOS preservarla SIEMPRE si existe en el BOWTIE,
+              // independientemente de si tiene datos o no, para evitar pérdida de información.
+              // Incluir registros que:
+              // 1. Su evidencia todavía existe en el BOWTIE actual (CRÍTICO: no preservar evidencias eliminadas)
+              // 2. No fueron usados en la sincronización por ID (ni en el matching ni ya incluidos)
+              // 3. No tienen una evidencia duplicada ya incluida
+              
+              // CRÍTICO: Si existe en BOWTIE pero no está incluida, PRESERVAR SIEMPRE
+              // Esto asegura que no se pierdan datos cuando el matching falla
+              if (existeEnBOWTIE && !yaEstaIncluida && !fueUsadoEnSincronizacion) {
+                const claveEvidencia = `${lb.control_mitigador_id || ''}_${(lb.dimension || '').trim()}_${(lb.pregunta || '').trim()}_${(lb.evidencia || '').trim()}`;
+                console.log('[Línea Base Mitigadores] Registro no encontrado en matching pero existe en BOWTIE - PRESERVANDO:', claveEvidencia, 'ID:', lb.id, 'evidencia_id:', lb.evidencia_id);
+                // Preservar SIEMPRE si existe en BOWTIE, sin verificar datos (para evitar pérdida)
+                return true;
+              }
+              
+              // Si llegamos aquí, no se debe preservar
+              return false;
+            });
+            
+            // Agregar los registros preservados a la línea base
+            if (registrosPreservar.length > 0) {
+              console.log('[Línea Base Mitigadores] Preservando', registrosPreservar.length, 'registros que existen en BOWTIE pero no se encontraron en matching');
+              console.log('[Línea Base Mitigadores] IDs preservados:', registrosPreservar.map(lb => ({ id: lb.id, evidencia: lb.evidencia, tiene_datos: true })));
+              registrosPreservar.forEach(lb => {
+                nuevaLineaBase.push({
+                  id: lb.id || null,
+                  control_mitigador_id: lb.control_mitigador_id || null,
+                  codigo: lb.codigo || '',
+                  control_critico_mitigador: lb.control_critico_mitigador || '',
+                  dimension: lb.dimension || '',
+                  pregunta: lb.pregunta || '',
+                  evidencia: lb.evidencia || '',
+                  evidencia_id: lb.evidencia_id || null, // CRÍTICO: Preservar ID de evidencia
+                  verificador_responsable: lb.verificador_responsable || '',
+                  fecha_verificacion: lb.fecha_verificacion || '',
+                  implementado_estandar_desempeno: lb.implementado_estandar || '',
+                  accion_a_ejecutar: lb.accion_ejecutar || '',
+                  responsable_cierre_accion: lb.responsable_cierre || '',
+                  fecha_cierre: lb.fecha_cierre || '',
+                  criticidad: lb.criticidad || '',
+                  porcentaje_avance_implementacion_accion: lb.porcentaje_avance || '',
+                  nombre_dueno_control_critico_tecnico: lb.nombre_dueno_control || '',
+                  comentario_trabajador: lb.comentario_trabajador || '',
+                  archivos_respaldo: typeof lb.archivos_respaldo === 'string' ? (JSON.parse(lb.archivos_respaldo) || []) : (lb.archivos_respaldo || []),
+                  conversacion_seguimiento: typeof lb.conversacion_seguimiento === 'string' ? (JSON.parse(lb.conversacion_seguimiento) || []) : (lb.conversacion_seguimiento || []),
+                  ultimo_usuario_edito: lb.ultimo_usuario_edito || '',
+                  estado_validacion: lb.estado_validacion || null,
+                  comentario_validacion: lb.comentario_validacion || '',
+                  usuario_validacion: lb.usuario_validacion || '',
+                  fecha_validacion: lb.fecha_validacion || '',
+                  ponderacion: lb.ponderacion !== undefined ? lb.ponderacion : (lb.estado_validacion === 'validado' ? 100 : 0)
+                });
+              });
+              console.log('[Línea Base Mitigadores] Total registros después de preservar:', nuevaLineaBase.length);
+            } else {
+              console.log('[Línea Base Mitigadores] No se encontraron registros para preservar');
+            }
+            
             setLineaBaseMitigadores(nuevaLineaBase);
+            
+            // CRÍTICO: Guardar automáticamente para preservar todos los registros que existen en el BOWTIE
+            // Esto asegura que los registros preservados se persistan en la BD inmediatamente
+            // Usar ref para evitar múltiples guardados automáticos simultáneos
+            if (nuevaLineaBase.length > 0 && !autoGuardandoLineaBaseMitigadoresRef.current && !guardandoLineaBaseMitigadores) {
+              autoGuardandoLineaBaseMitigadoresRef.current = true;
+              console.log('[Línea Base Mitigadores] Guardando automáticamente para preservar registros...');
+              setTimeout(async () => {
+                try {
+                  await guardarLineaBaseMitigadores(nuevaLineaBase, true);
+                  console.log('[Línea Base Mitigadores] Guardado automático completado');
+                  
+                  // CRÍTICO: Después del guardado automático, recargar UNA VEZ para mostrar nuevas evidencias
+                  // pero solo si hay registros nuevos (sin ID) que necesitan mostrarse
+                  const tieneRegistrosNuevos = nuevaLineaBase.some(item => !item.id);
+                  if (tieneRegistrosNuevos) {
+                    console.log('[Línea Base Mitigadores] Recargando para mostrar nuevas evidencias...');
+                    // Pequeño delay para asegurar que el guardado se completó
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    await cargarLineaBaseMitigadores(carpetaActual.id);
+                  }
+                } catch (error) {
+                  console.error('[Línea Base Mitigadores] Error en guardado automático:', error);
+                } finally {
+                  autoGuardandoLineaBaseMitigadoresRef.current = false;
+                }
+              }, 100);
+            }
           } else {
-            // Si no hay línea base guardada, crear desde controles mitigadores
+            // Si no hay línea base guardada pero hay controles con evidencias, crear desde controles mitigadores
             // Crear una fila por cada dimensión-pregunta de cada control
             const nuevaLineaBase = [];
             
@@ -4108,6 +5310,54 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           setLineaBaseMitigadores(nuevaLineaBase);
         }
       } else {
+        // CRÍTICO: Si no hay controles mitigadores O no hay evidencias/preguntas en el BOWTIE,
+        // NO mostrar datos antiguos de la BD. La línea base debe estar vacía o solo mostrar controles sin evidencias.
+        console.log('[Línea Base Mitigadores] No hay controles con evidencias en el BOWTIE. Limpiando línea base.');
+        console.log('[Línea Base Mitigadores] Motivo:', controlesMitigadores.length === 0 ? 'No hay controles mitigadores' : 'No hay evidencias/preguntas en los controles');
+        
+        // Si hay controles pero no hay evidencias, crear solo filas básicas de controles (sin evidencias)
+        if (controlesMitigadores.length > 0) {
+          const nuevaLineaBase = [];
+          controlesMitigadores.forEach((control, controlIndex) => {
+            const codigo = control.codigo || `CCM${controlIndex + 1}`;
+            const nombreControl = control.descripcion || '';
+            // Solo crear una fila básica del control, sin dimensiones/preguntas/evidencias
+            nuevaLineaBase.push({
+              id: null,
+              control_mitigador_id: control.id,
+              codigo: codigo,
+              control_critico_mitigador: nombreControl,
+              dimension: '',
+              pregunta: '',
+              evidencia: '',
+              verificador_responsable: '',
+              fecha_verificacion: '',
+              implementado_estandar_desempeno: '',
+              accion_a_ejecutar: '',
+              responsable_cierre_accion: '',
+              fecha_cierre: '',
+              criticidad: control.criticidad || '',
+              porcentaje_avance_implementacion_accion: '',
+              nombre_dueno_control_critico_tecnico: '',
+              comentario_trabajador: '',
+              archivos_respaldo: [],
+              conversacion_seguimiento: [],
+              ultimo_usuario_edito: '',
+              estado_validacion: null,
+              comentario_validacion: '',
+              usuario_validacion: '',
+              fecha_validacion: '',
+              ponderacion: 0
+            });
+          });
+          console.log('[Línea Base Mitigadores] Creando solo filas básicas de controles (sin evidencias):', nuevaLineaBase.length);
+          setLineaBaseMitigadores(nuevaLineaBase);
+          setCargandoLineaBaseMitigadores(false);
+          return;
+        }
+        
+        // Si no hay controles mitigadores, limpiar completamente la línea base
+        console.log('[Línea Base Mitigadores] Limpiando línea base completamente (no hay controles mitigadores)');
         setLineaBaseMitigadores([]);
       }
     } catch (error) {
@@ -4118,16 +5368,132 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
   };
 
-  const guardarLineaBaseMitigadores = async (lineaBaseMitigadoresActualizada = null) => {
+  const guardarLineaBaseMitigadores = async (lineaBaseMitigadoresActualizada = null, evitarRecarga = false) => {
     const datosAGuardar = lineaBaseMitigadoresActualizada || lineaBaseMitigadores;
-    if (!carpetaActual || !datosAGuardar || datosAGuardar.length === 0) return;
+    if (!carpetaActual) {
+      console.error('[Guardar Línea Base Mitigadores] Error: No hay carpeta actual seleccionada');
+      mostrarNotificacion('✗ Error: No hay carpeta seleccionada', 'error');
+      return;
+    }
+    
+    // Asegurar que sea un array
+    let datosAGuardarArray = Array.isArray(datosAGuardar) ? datosAGuardar : [];
+    
+    if (datosAGuardarArray.length === 0) {
+      console.log('[Guardar Línea Base Mitigadores] No hay datos para guardar (array vacío)');
+      mostrarNotificacion('✗ No hay datos para guardar', 'warning');
+      return;
+    }
 
     try {
       setGuardandoLineaBaseMitigadores(true);
+      
+      // CRÍTICO: Cargar TODOS los registros existentes de la BD para evitar pérdida de datos
+      console.log('[Guardar Línea Base Mitigadores] Cargando registros existentes de BD para preservar datos...');
+      let registrosExistentesBD = [];
+      try {
+        // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
+        const timestamp = Date.now();
+        const resExistente = await fetch(`${API_BASE}/archivos/carpeta_linea_base_mitigadores.php?carpeta_id=${carpetaActual.id}&_t=${timestamp}`, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        const dataExistente = await resExistente.json();
+        if (dataExistente.success && dataExistente.linea_base && Array.isArray(dataExistente.linea_base)) {
+          registrosExistentesBD = dataExistente.linea_base.filter(r => r.activo !== 0);
+          console.log('[Guardar Línea Base Mitigadores] Registros existentes en BD:', registrosExistentesBD.length);
+        }
+      } catch (errorExistente) {
+        console.warn('[Guardar Línea Base Mitigadores] Error cargando registros existentes (continuando):', errorExistente);
+      }
+      
+      // Crear mapa de registros a guardar por clave única
+      const mapaRegistrosAGuardar = new Map();
+      datosAGuardarArray.forEach(item => {
+        const clave = `${item.control_mitigador_id || ''}_${(item.dimension || '').trim()}_${(item.pregunta || '').trim()}_${(item.evidencia || '').trim()}`;
+        mapaRegistrosAGuardar.set(clave, item);
+      });
+      
+      // Obtener evidencias actuales del BOWTIE para verificar cuáles existen
+      const evidenciasExistentesEnBOWTIE = new Set();
+      if (analisisBowtie && analisisBowtie.controles_mitigadores) {
+        analisisBowtie.controles_mitigadores.forEach((control) => {
+          const dimensiones = control.dimensiones || [];
+          dimensiones.forEach((dimension) => {
+            const preguntas = dimension.preguntas || [];
+            preguntas.forEach((pregunta) => {
+              const textoEvidencia = pregunta.evidencia || '';
+              const evidenciasArray = parseEvidenciasTexto(textoEvidencia);
+              const evidenciasParaProcesar = evidenciasArray.length > 0 ? evidenciasArray : [''];
+              evidenciasParaProcesar.forEach((evidenciaIndividual) => {
+                const claveEvidencia = `${control.id || ''}_${(dimension.nombre || '').trim()}_${(pregunta.texto || '').trim()}_${evidenciaIndividual.trim()}`;
+                evidenciasExistentesEnBOWTIE.add(claveEvidencia);
+              });
+            });
+          });
+        });
+      }
+      
+      // Combinar registros: usar los nuevos/modificados, pero preservar los existentes que no están en la lista nueva
+      const registrosFinales = [...datosAGuardarArray];
+      const idsYaIncluidos = new Set(datosAGuardarArray.map(item => item.id).filter(Boolean));
+      const clavesYaIncluidas = new Set(datosAGuardarArray.map(item => 
+        `${item.control_mitigador_id || ''}_${(item.dimension || '').trim()}_${(item.pregunta || '').trim()}_${(item.evidencia || '').trim()}`
+      ));
+      
+      registrosExistentesBD.forEach(registroBD => {
+        const claveRegistroBD = `${registroBD.control_mitigador_id || ''}_${(registroBD.dimension || '').trim()}_${(registroBD.pregunta || '').trim()}_${(registroBD.evidencia || '').trim()}`;
+        const existeEnBOWTIE = evidenciasExistentesEnBOWTIE.has(claveRegistroBD);
+        const yaIncluidoPorID = idsYaIncluidos.has(registroBD.id);
+        const yaIncluidoPorClave = clavesYaIncluidas.has(claveRegistroBD) || mapaRegistrosAGuardar.has(claveRegistroBD);
+        const yaIncluido = yaIncluidoPorID || yaIncluidoPorClave;
+        
+        // CRÍTICO: Incluir registro de BD SIEMPRE si:
+        // 1. No está ya incluido en los datos a guardar (ni por ID ni por clave única)
+        // 2. Su evidencia todavía existe en el BOWTIE (eliminación por cascada solo si la evidencia fue eliminada)
+        // NO verificamos si tiene datos porque queremos preservar TODOS los registros que existen en el BOWTIE
+        // para evitar pérdida de información cuando el matching falla
+        if (!yaIncluido && existeEnBOWTIE) {
+          console.log('[Guardar Línea Base Mitigadores] Preservando registro de BD no incluido (existe en BOWTIE):', claveRegistroBD, 'ID:', registroBD.id);
+            registrosFinales.push({
+              id: registroBD.id,
+              control_mitigador_id: registroBD.control_mitigador_id,
+              codigo: registroBD.codigo || '',
+              control_critico_mitigador: registroBD.control_critico_mitigador || '',
+              dimension: registroBD.dimension || '',
+              pregunta: registroBD.pregunta || '',
+              evidencia: registroBD.evidencia || '',
+              verificador_responsable: registroBD.verificador_responsable || '',
+              fecha_verificacion: registroBD.fecha_verificacion || '',
+              implementado_estandar_desempeno: registroBD.implementado_estandar || '',
+              accion_a_ejecutar: registroBD.accion_ejecutar || '',
+              responsable_cierre_accion: registroBD.responsable_cierre || '',
+              fecha_cierre: registroBD.fecha_cierre || '',
+              criticidad: registroBD.criticidad || '',
+              porcentaje_avance_implementacion_accion: registroBD.porcentaje_avance || '',
+              nombre_dueno_control_critico_tecnico: registroBD.nombre_dueno_control || '',
+              comentario_trabajador: registroBD.comentario_trabajador || '',
+              archivos_respaldo: typeof registroBD.archivos_respaldo === 'string' ? (JSON.parse(registroBD.archivos_respaldo) || []) : (registroBD.archivos_respaldo || []),
+              conversacion_seguimiento: typeof registroBD.conversacion_seguimiento === 'string' ? (JSON.parse(registroBD.conversacion_seguimiento) || []) : (registroBD.conversacion_seguimiento || []),
+              ultimo_usuario_edito: registroBD.ultimo_usuario_edito || '',
+              estado_validacion: registroBD.estado_validacion || null,
+              comentario_validacion: registroBD.comentario_validacion || '',
+              usuario_validacion: registroBD.usuario_validacion || '',
+              fecha_validacion: registroBD.fecha_validacion || '',
+              ponderacion: registroBD.ponderacion !== undefined ? registroBD.ponderacion : (registroBD.estado_validacion === 'validado' ? 100 : 0)
+            });
+        }
+      });
+      
+      console.log('[Guardar Línea Base Mitigadores] Total registros a enviar (incluyendo preservados):', registrosFinales.length, '(originales:', datosAGuardarArray.length, ', preservados:', registrosFinales.length - datosAGuardarArray.length, ')');
+      
       const datosEnvio = {
         carpeta_id: carpetaActual.id,
         usuario_id: user.id,
-        linea_base: datosAGuardar.map(item => ({
+        linea_base: registrosFinales.map(item => ({
           id: item.id,
           control_mitigador_id: item.control_mitigador_id,
           codigo: item.codigo || '',
@@ -4164,7 +5530,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
       const data = await res.json();
       if (data.success) {
+        // Solo recargar si no se está evitando la recarga (para evitar bucles infinitos en guardados automáticos)
+        if (!evitarRecarga) {
         await cargarLineaBaseMitigadores(carpetaActual.id);
+        }
         // Recargar promedio de ponderación
         try {
           const resPromedio = await fetch(`${API_BASE}/archivos/promedio_ponderacion.php?carpeta_id=${carpetaActual.id}`);
@@ -4360,13 +5729,54 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               if (typeof ca === 'string') return { codigo: ca };
               return { codigo: ca.codigo || ca };
             });
+            
+            // Procesar dimensiones y sus preguntas con evidencias
+            const dimensionesProcesadas = (item.dimensiones || []).map(dimension => ({
+              ...dimension,
+              preguntas: (dimension.preguntas || []).map(pregunta => {
+                // CRÍTICO: Asegurar que siempre se envíen las evidencias como array
+                if (pregunta.evidencias && Array.isArray(pregunta.evidencias)) {
+                  // Filtrar evidencias vacías antes de enviar (solo las que no tienen texto)
+                  const evidenciasValidas = pregunta.evidencias.filter(ev => {
+                    const texto = ev?.texto || ev || '';
+                    return texto.trim() !== '';
+                  });
+                  
+                  console.log(`[Guardar Sección Preventivos] Pregunta ID ${pregunta.id}: Procesando ${evidenciasValidas.length} evidencias válidas de ${pregunta.evidencias.length} totales`);
+                  console.log(`[Guardar Sección Preventivos] IDs de evidencias a enviar:`, evidenciasValidas.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                  
+                  return {
+                    ...pregunta,
+                    evidencia: convertirEvidenciasArrayATexto(evidenciasValidas), // Para compatibilidad
+                    evidencias: evidenciasValidas // CRÍTICO: Mantener array con IDs para que el backend las procese
+                  };
+                }
+                // Si solo tiene evidencia (texto) pero no evidencias (array), intentar convertir
+                if (pregunta.evidencia && !pregunta.evidencias) {
+                  const evidenciasArray = convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id);
+                  return {
+                    ...pregunta,
+                    evidencias: evidenciasArray // Agregar array de evidencias
+                  };
+                }
+                // Si no tiene ni evidencia ni evidencias, crear array vacío
+                if (!pregunta.evidencia && !pregunta.evidencias) {
+                  return {
+                    ...pregunta,
+                    evidencias: [] // Asegurar que siempre hay un array
+                  };
+                }
+                return pregunta;
+              })
+            }));
+            
             return {
               codigo: item.codigo || `CCP${idx + 1}`,
               descripcion: item.descripcion || '',
               criticidad: item.criticidad || null,
               jerarquia: item.jerarquia || null,
               causas_asociadas: causasAsoc,
-              dimensiones: item.dimensiones || []
+              dimensiones: dimensionesProcesadas
             };
           }
           // Para controles mitigadores
@@ -4375,13 +5785,55 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               if (typeof co === 'string') return { codigo: co };
               return { codigo: co.codigo || co };
             });
+            
+            // Procesar dimensiones y sus preguntas con evidencias
+            const dimensionesProcesadas = (item.dimensiones || []).map(dimension => ({
+              ...dimension,
+              preguntas: (dimension.preguntas || []).map(pregunta => {
+                // CRÍTICO: Asegurar que siempre se envíen las evidencias como array
+                if (pregunta.evidencias && Array.isArray(pregunta.evidencias)) {
+                  // Filtrar evidencias vacías antes de enviar
+                  const evidenciasValidas = pregunta.evidencias.filter(ev => {
+                    const texto = ev.texto || ev || '';
+                    return texto.trim() !== '';
+                  });
+                  
+                  console.log(`[Guardar Sección Mitigadores] Pregunta ID ${pregunta.id}: Procesando ${evidenciasValidas.length} evidencias válidas de ${pregunta.evidencias.length} totales`);
+                  
+                  return {
+                    ...pregunta,
+                    evidencia: convertirEvidenciasArrayATexto(evidenciasValidas), // Para compatibilidad
+                    evidencias: evidenciasValidas // CRÍTICO: Mantener array con IDs para que el backend las procese
+                  };
+                }
+                // Si solo tiene evidencia (texto) pero no evidencias (array), intentar convertir
+                if (pregunta.evidencia && !pregunta.evidencias) {
+                  const evidenciasArray = convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id);
+                  console.log(`[Guardar Sección Mitigadores] Pregunta ID ${pregunta.id}: Convirtiendo texto a array (${evidenciasArray.length} evidencias)`);
+                  return {
+                    ...pregunta,
+                    evidencias: evidenciasArray // Agregar array de evidencias
+                  };
+                }
+                // Si no tiene ni evidencia ni evidencias, crear array vacío
+                if (!pregunta.evidencia && !pregunta.evidencias) {
+                  console.log(`[Guardar Sección Mitigadores] Pregunta ID ${pregunta.id}: Sin evidencias, creando array vacío`);
+                  return {
+                    ...pregunta,
+                    evidencias: [] // Asegurar que siempre hay un array
+                  };
+                }
+                return pregunta;
+              })
+            }));
+            
             return {
               codigo: item.codigo || `CCM${idx + 1}`,
               descripcion: item.descripcion || '',
               criticidad: item.criticidad || null,
               jerarquia: item.jerarquia || null,
               consecuencias_asociadas: consecuenciasAsoc,
-              dimensiones: item.dimensiones || []
+              dimensiones: dimensionesProcesadas
             };
           }
       if (tipoSeccion === 'controles_preventivos_generales') {
@@ -4429,6 +5881,20 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       console.log(`Datos completos a enviar:`, datosEnvio);
       console.log(`Array de ${seccion} que se enviará (${datosEnvio[seccion].length} elementos):`, datosEnvio[seccion]);
       
+      // Log detallado de evidencias para debugging
+      if (seccion === 'controles_preventivos' || seccion === 'controles_mitigadores') {
+        datosEnvio[seccion].forEach((control, idx) => {
+          console.log(`Control ${idx + 1} (${control.codigo}):`, control.dimensiones?.length || 0, 'dimensiones');
+          (control.dimensiones || []).forEach((dim, dimIdx) => {
+            console.log(`  Dimensión ${dimIdx + 1} (${dim.nombre}):`, dim.preguntas?.length || 0, 'preguntas');
+            (dim.preguntas || []).forEach((preg, pregIdx) => {
+              const evidenciasCount = preg.evidencias?.length || 0;
+              console.log(`    Pregunta ${pregIdx + 1}:`, evidenciasCount, 'evidencias', preg.evidencias);
+            });
+          });
+        });
+      }
+      
       // Log detallado de cada elemento
       datosEnvio[seccion].forEach((item, idx) => {
         console.log(`  ${seccion}[${idx}]:`, {
@@ -4458,6 +5924,78 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       console.log('Respuesta del servidor:', data);
       
       if (data.success) {
+        // CRÍTICO: Recargar análisis BOWTIE y línea base después de guardar
+        // Esto asegura que las evidencias y preguntas guardadas se reflejen en la línea base
+        if (carpetaActual && carpetaActual.id) {
+          const esNivel2 = rutaNavegacion.length === 1;
+          
+          await cargarAnalisisBowtie(carpetaActual.id);
+          // Pequeño delay para asegurar que el BOWTIE se guardó completamente
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Recargar línea base del nivel actual
+          if (seccion === 'controles_preventivos') {
+            await cargarLineaBase(carpetaActual.id);
+          } else if (seccion === 'controles_mitigadores') {
+            await cargarLineaBaseMitigadores(carpetaActual.id);
+          } else {
+            // Si se guardaron ambos tipos, recargar ambos
+            await cargarLineaBase(carpetaActual.id);
+            await cargarLineaBaseMitigadores(carpetaActual.id);
+          }
+          
+          // CRÍTICO: Si estamos en nivel 1 (proyecto principal) y guardamos el BOWTIE, recargar línea base de carpetas del nivel 2
+          // Si estamos en nivel 2 y guardamos el BOWTIE, también recargar línea base de carpetas del nivel 3
+          // Esto asegura que las carpetas hijas se actualicen con los nuevos datos del BOWTIE
+          const esNivel1 = rutaNavegacion.length === 0;
+          
+          if (esNivel1) {
+            console.log('[Guardar BOWTIE] Nivel 1 detectado, recargando línea base de carpetas del nivel 2...');
+            // Buscar carpetas hijas (nivel 2) y recargar su línea base si están en la lista de carpetas
+            const carpetasHijasNivel2 = carpetas.filter(c => c.carpeta_padre_id === carpetaActual.id);
+            console.log(`[Guardar BOWTIE] Encontradas ${carpetasHijasNivel2.length} carpetas hijas (nivel 2)`);
+            
+            // Recargar línea base de cada carpeta hija nivel 2
+            for (const carpetaHija of carpetasHijasNivel2) {
+              try {
+                console.log(`[Guardar BOWTIE] Recargando línea base de carpeta hija nivel 2: ${carpetaHija.nombre} (ID: ${carpetaHija.id})`);
+                await cargarLineaBase(carpetaHija.id);
+                await cargarLineaBaseMitigadores(carpetaHija.id);
+                
+                // También recargar línea base de las carpetas hijas del nivel 3 (nietas)
+                const carpetasNietas = carpetas.filter(c => c.carpeta_padre_id === carpetaHija.id);
+                console.log(`[Guardar BOWTIE] Encontradas ${carpetasNietas.length} carpetas nietas (nivel 3) para ${carpetaHija.nombre}`);
+                for (const carpetaNieta of carpetasNietas) {
+                  try {
+                    console.log(`[Guardar BOWTIE] Recargando línea base de carpeta nieta nivel 3: ${carpetaNieta.nombre} (ID: ${carpetaNieta.id})`);
+                    await cargarLineaBase(carpetaNieta.id);
+                    await cargarLineaBaseMitigadores(carpetaNieta.id);
+                  } catch (error) {
+                    console.error(`[Guardar BOWTIE] Error al recargar línea base de carpeta nieta ${carpetaNieta.id}:`, error);
+                  }
+                }
+              } catch (error) {
+                console.error(`[Guardar BOWTIE] Error al recargar línea base de carpeta hija nivel 2 ${carpetaHija.id}:`, error);
+              }
+            }
+          } else if (esNivel2) {
+            console.log('[Guardar BOWTIE] Nivel 2 detectado, recargando línea base de carpetas del nivel 3...');
+            // Buscar carpetas hijas (nivel 3) y recargar su línea base si están en la lista de carpetas
+            const carpetasHijas = carpetas.filter(c => c.carpeta_padre_id === carpetaActual.id);
+            console.log(`[Guardar BOWTIE] Encontradas ${carpetasHijas.length} carpetas hijas (nivel 3)`);
+            
+            // Recargar línea base de cada carpeta hija
+            for (const carpetaHija of carpetasHijas) {
+              try {
+                console.log(`[Guardar BOWTIE] Recargando línea base de carpeta hija: ${carpetaHija.nombre} (ID: ${carpetaHija.id})`);
+                await cargarLineaBase(carpetaHija.id);
+                await cargarLineaBaseMitigadores(carpetaHija.id);
+              } catch (error) {
+                console.error(`[Guardar BOWTIE] Error al recargar línea base de carpeta hija ${carpetaHija.id}:`, error);
+              }
+            }
+          }
+        }
         // Esperar un momento para asegurar que el servidor haya procesado los cambios
         await new Promise(resolve => setTimeout(resolve, 500));
         
@@ -4569,17 +6107,44 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
   const guardarControlesPreventivos = async () => {
     if (!carpetaActual || !analisisBowtie) {
       console.error('No se puede guardar: carpetaActual o analisisBowtie es null');
-      return;
+      return false;
     }
     
-    const controlesValidos = (analisisBowtie.controles_preventivos || []).filter(c => c.descripcion && c.descripcion.trim() !== '');
+    // CRÍTICO: Usar una función que obtenga el estado más reciente
+    // Esto asegura que tenemos los datos actualizados incluso si React no ha procesado todas las actualizaciones
+    const obtenerEstadoActual = () => {
+      return analisisBowtie;
+    };
+    
+    const estadoActual = obtenerEstadoActual();
+    const controlesValidos = (estadoActual.controles_preventivos || []).filter(c => c.descripcion && c.descripcion.trim() !== '');
 
     if (controlesValidos.length === 0) {
       alert('Debe agregar al menos un control preventivo con descripción antes de guardar.');
-      return;
+      return false;
     }
 
-    console.log('Estado actual de controles preventivos antes de guardar:', analisisBowtie.controles_preventivos);
+    console.log('[GUARDAR PREVENTIVOS] Estado actual de controles preventivos antes de guardar:', estadoActual.controles_preventivos);
+    
+    // CRÍTICO: Log detallado de evidencias en cada pregunta antes de guardar
+    console.log('[GUARDAR PREVENTIVOS] ===== INICIANDO ANÁLISIS DE EVIDENCIAS =====');
+    controlesValidos.forEach((control, idx) => {
+      console.log(`[GUARDAR PREVENTIVOS] Control ${idx} (${control.codigo}, ID: ${control.id}):`, control.dimensiones?.length || 0, 'dimensiones');
+      (control.dimensiones || []).forEach((dim, dimIdx) => {
+        console.log(`  [GUARDAR PREVENTIVOS] Dimensión ${dimIdx} (${dim.nombre}):`, dim.preguntas?.length || 0, 'preguntas');
+        (dim.preguntas || []).forEach((preg, pregIdx) => {
+          const evidenciasCount = preg.evidencias?.length || 0;
+          console.log(`    [GUARDAR PREVENTIVOS] Pregunta ${pregIdx} (ID: ${preg.id}, "${preg.texto?.substring(0, 30)}"): ${evidenciasCount} evidencias`);
+          if (evidenciasCount > 0) {
+            console.log(`      [GUARDAR PREVENTIVOS] Evidencias a enviar:`, preg.evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+          } else {
+            console.warn(`      [GUARDAR PREVENTIVOS] ⚠️⚠️⚠️ Pregunta sin evidencias!`);
+          }
+        });
+      });
+    });
+    console.log('[GUARDAR PREVENTIVOS] ===== FIN ANÁLISIS DE EVIDENCIAS =====');
+    
     setGuardandoControlesPreventivos(true);
     try {
       const resultado = await guardarSeccionBowtie('controles_preventivos', controlesValidos);
@@ -4589,13 +6154,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         setControlesPreventivosEditando(new Set());
         // Mostrar mensaje de éxito
         alert('Controles preventivos guardados correctamente.');
+        return true; // CRÍTICO: Retornar true para indicar éxito
       } else {
         console.error('Error al guardar controles preventivos');
         alert('Error al guardar los controles preventivos. Por favor, intente nuevamente.');
+        return false; // Retornar false para indicar error
       }
     } catch (error) {
       console.error('Error en guardarControlesPreventivos:', error);
       alert('Error al guardar los controles preventivos. Por favor, intente nuevamente.');
+      return false; // Retornar false para indicar error
     } finally {
       setGuardandoControlesPreventivos(false);
     }
@@ -4604,17 +6172,42 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
   const guardarControlesMitigadores = async () => {
     if (!carpetaActual || !analisisBowtie) {
       console.error('No se puede guardar: carpetaActual o analisisBowtie es null');
-      return;
+      return false;
     }
     
-    const controlesValidos = (analisisBowtie.controles_mitigadores || []).filter(c => c.descripcion && c.descripcion.trim() !== '');
+    // CRÍTICO: Usar una función que obtenga el estado más reciente
+    const obtenerEstadoActual = () => {
+      return analisisBowtie;
+    };
+    
+    const estadoActual = obtenerEstadoActual();
+    const controlesValidos = (estadoActual.controles_mitigadores || []).filter(c => c.descripcion && c.descripcion.trim() !== '');
 
     if (controlesValidos.length === 0) {
       alert('Debe agregar al menos un control mitigador con descripción antes de guardar.');
-      return;
+      return false;
     }
 
-    console.log('Estado actual de controles mitigadores antes de guardar:', analisisBowtie.controles_mitigadores);
+    console.log('[GUARDAR MITIGADORES] Estado actual de controles mitigadores antes de guardar:', estadoActual.controles_mitigadores);
+    
+    // CRÍTICO: Log detallado de evidencias en cada pregunta antes de guardar
+    console.log('[GUARDAR MITIGADORES] ===== INICIANDO ANÁLISIS DE EVIDENCIAS =====');
+    controlesValidos.forEach((control, idx) => {
+      console.log(`[GUARDAR MITIGADORES] Control ${idx} (${control.codigo}, ID: ${control.id}):`, control.dimensiones?.length || 0, 'dimensiones');
+      (control.dimensiones || []).forEach((dim, dimIdx) => {
+        console.log(`  [GUARDAR MITIGADORES] Dimensión ${dimIdx} (${dim.nombre}):`, dim.preguntas?.length || 0, 'preguntas');
+        (dim.preguntas || []).forEach((preg, pregIdx) => {
+          const evidenciasCount = preg.evidencias?.length || 0;
+          console.log(`    [GUARDAR MITIGADORES] Pregunta ${pregIdx} (ID: ${preg.id}, "${preg.texto?.substring(0, 30)}"): ${evidenciasCount} evidencias`);
+          if (evidenciasCount > 0) {
+            console.log(`      [GUARDAR MITIGADORES] Evidencias a enviar:`, preg.evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+          } else {
+            console.warn(`      [GUARDAR MITIGADORES] ⚠️⚠️⚠️ Pregunta sin evidencias!`);
+          }
+        });
+      });
+    });
+    console.log('[GUARDAR MITIGADORES] ===== FIN ANÁLISIS DE EVIDENCIAS =====');
     setGuardandoControlesMitigadores(true);
     try {
       const resultado = await guardarSeccionBowtie('controles_mitigadores', controlesValidos);
@@ -4624,13 +6217,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         setControlesMitigadoresEditando(new Set());
         // Mostrar mensaje de éxito
         alert('Controles mitigadores guardados correctamente.');
+        return true; // CRÍTICO: Retornar true para indicar éxito
       } else {
         console.error('Error al guardar controles mitigadores');
         alert('Error al guardar los controles mitigadores. Por favor, intente nuevamente.');
+        return false; // Retornar false para indicar error
       }
     } catch (error) {
       console.error('Error en guardarControlesMitigadores:', error);
       alert('Error al guardar los controles mitigadores. Por favor, intente nuevamente.');
+      return false; // Retornar false para indicar error
     } finally {
       setGuardandoControlesMitigadores(false);
     }
@@ -5702,7 +7298,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          throw new Error('Respuesta no válida del servidor (HTTP ' + res.status + '): ' + text.substring(0, 200));
+          throw new Error(`Respuesta no válida del servidor (HTTP ${res.status}): ${text.substring(0, 200)}`);
         }
       }
 
@@ -5737,8 +7333,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     
     // Verificar código secreto (mismo que para eliminar documentos)
     const CODIGO_SECRETO = 'eliminar2024';
-    if (codigoSecretoEliminarCarpeta !== CODIGO_SECRETO) {
-      alert('❌ Código secreto incorrecto. No se puede eliminar la carpeta.');
+    const codigoIngresado = codigoSecretoEliminarCarpeta.trim().toLowerCase();
+    if (codigoIngresado !== CODIGO_SECRETO.toLowerCase()) {
+      alert('❌ Código secreto incorrecto. La clave es: eliminar2024');
+      console.log('[Eliminar Carpeta Nivel 1] Código ingresado:', codigoIngresado, '| Código esperado:', CODIGO_SECRETO);
       setCodigoSecretoEliminarCarpeta('');
       return;
     }
@@ -5871,10 +7469,30 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
   };
 
-  const entrarCarpeta = (carpeta) => {
+  const entrarCarpeta = async (carpeta) => {
     setNavegacionDesdeNotificacion(false);
     setCarpetaActual(carpeta);
-    setRutaNavegacion([...rutaNavegacion, carpeta]);
+    
+    // Construir ruta completa desde la carpeta hasta la raíz (igual que cuando se carga desde URL)
+    const construirRuta = async (c) => {
+      const ruta = [c];
+      let padreId = c.carpeta_padre_id;
+      while (padreId) {
+        try {
+          const resPadre = await fetch(`${API_BASE}/archivos/carpetas.php?id=${padreId}${user && user.id ? `&usuario_id=${user.id}` : ''}`);
+          if (resPadre.ok) {
+            const dataPadre = await resPadre.json();
+            const padre = Array.isArray(dataPadre) ? dataPadre[0] : dataPadre;
+            if (padre && padre.id) {
+              ruta.unshift(padre);
+              padreId = padre.carpeta_padre_id;
+            } else break;
+          } else break;
+        } catch { break; }
+      }
+      setRutaNavegacion(ruta);
+    };
+    await construirRuta(carpeta);
   };
 
   const volverAtras = () => {
@@ -6706,10 +8324,19 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
             borderBottom: '2px solid #e9ecef',
             background: '#f8f9fa'
           }}>
-            {pestañasDisponibles.map((pestaña) => (
+            {pestañasDisponibles
+              .map((pestaña) => {
+                const nivelActual = rutaNavegacion.length;
+                
+                return (
               <button
                 key={pestaña}
                 onClick={() => {
+                  // Si intentan activar 'bowtie' en nivel 3+, forzar 'linea_base'
+                  if (pestaña === 'bowtie' && nivelActual >= 3) {
+                    setPestañaActiva('linea_base');
+                    return;
+                  }
                   setPestañaActiva(pestaña);
                   // Si se activa la pestaña de línea base, recargar los datos
                   if (pestaña === 'linea_base' && carpetaActual && carpetaActual.id) {
@@ -6762,13 +8389,14 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   </span>
                 )}
               </button>
-            ))}
+              );
+              })}
           </div>
 
           {/* Contenido de las pestañas */}
           <div style={{ padding: '1.5rem' }}>
-            {/* Pestaña Análisis BOWTIE - NO mostrar en nivel contenedor (3+) */}
-            {pestañaActiva === 'bowtie' && !esNivelContenedor && (
+            {/* Pestaña Análisis BOWTIE - Solo en nivel 2 (rutaNavegacion.length === 1), NUNCA en nivel 3+ */}
+            {pestañaActiva === 'bowtie' && nivelReal === 1 && (
               <div>
                 {!carpetaActual ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#999' }}>
@@ -7105,19 +8733,19 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               lineHeight: '1.8'
                             }}>
                               <div style={{ marginBottom: '0.75rem' }}>
-                                <strong style={{ color: '#dc3545' }}>Evento Central:</strong> &quot;Contacto con energía eléctrica durante trabajos en equipos energizados&quot;
+                                <strong style={{ color: '#dc3545' }}>Evento Central:</strong> "Contacto con energía eléctrica durante trabajos en equipos energizados"
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                  <strong style={{ color: '#17a2b8' }}>Causa:</strong> &quot;Equipo energizado sin señalización adecuada&quot;
+                                  <strong style={{ color: '#17a2b8' }}>Causa:</strong> "Equipo energizado sin señalización adecuada"
                                   <div style={{ marginLeft: '1rem', marginTop: '0.25rem', fontSize: '12px' }}>
-                                    <strong>Control Preventivo:</strong> &quot;Verificar señalización de área restringida antes de iniciar trabajo&quot;
+                                    <strong>Control Preventivo:</strong> "Verificar señalización de área restringida antes de iniciar trabajo"
                                   </div>
                                 </div>
                                 <div>
-                                  <strong style={{ color: '#FF8C00' }}>Consecuencia:</strong> &quot;Lesión grave o fatal por electrocución&quot;
+                                  <strong style={{ color: '#FF8C00' }}>Consecuencia:</strong> "Lesión grave o fatal por electrocución"
                                   <div style={{ marginLeft: '1rem', marginTop: '0.25rem', fontSize: '12px' }}>
-                                    <strong>Control Mitigador:</strong> &quot;Equipo de respuesta a emergencias disponible y entrenado&quot;
+                                    <strong>Control Mitigador:</strong> "Equipo de respuesta a emergencias disponible y entrenado"
                                   </div>
                                 </div>
                               </div>
@@ -7308,13 +8936,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                   const causasParaMostrar = analisisBowtie?.causas || [];
                                   return causasParaMostrar.length > 0 ? (
                                     causasParaMostrar.map((causa, index) => {
-                                    const codigo = causa.codigo || `CA${index + 1}`;
-                                    const estaGuardada = !!causa.id; // Si tiene ID, está guardada en BD
-                                    const estaEditando = causasEditando.has(causa.id) || (!estaGuardada); // Nueva causa siempre editable
-                                    const puedeEditar = puedeEditarBowtie(user, rutaNavegacion) && analisisBowtie;
-                                    
-                                    return (
-                                      <tr key={`causa-${causa.id || `temp-${index}`}-${index}`} style={{ borderBottom: '1px solid #dee2e6', lineHeight: '1.3' }}>
+                                      const codigo = causa.codigo || `CA${index + 1}`;
+                                      const estaGuardada = !!causa.id; // Si tiene ID, está guardada en BD
+                                      const estaEditando = causasEditando.has(causa.id) || (!estaGuardada); // Nueva causa siempre editable
+                                      const puedeEditar = puedeEditarBowtie(user, rutaNavegacion) && analisisBowtie;
+                                      
+                                      return (
+                                        <tr key={`causa-${causa.id || `temp-${index}`}-${index}`} style={{ borderBottom: '1px solid #dee2e6', lineHeight: '1.3' }}>
                                         <td style={{ padding: '0.35rem 0.5rem', background: '#f8f9fa', fontWeight: '600', color: '#495057', verticalAlign: 'top' }}>
                                           {puedeEditar && estaEditando ? (
                                             <input
@@ -8146,11 +9774,22 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                   <i className="fa fa-search"></i>
                                                 </button>
                                                 <button
-                                                  onClick={() => {
+                                                  onClick={async () => {
+                                                    // CRÍTICO: Recargar datos antes de abrir el modal para asegurar que tenemos los datos más recientes
+                                                    if (carpetaActual && carpetaActual.id) {
+                                                      await cargarAnalisisBowtie(carpetaActual.id);
+                                                      // Pequeño delay para asegurar que el estado se actualice
+                                                      await new Promise(resolve => setTimeout(resolve, 100));
+                                                    }
+                                                    
+                                                    // Buscar el control actualizado usando su ID en lugar del índice
+                                                    const controlActualizado = analisisBowtie?.controles_preventivos?.find(c => c.id === control.id) || control;
+                                                    const controlIndexActualizado = analisisBowtie?.controles_preventivos?.findIndex(c => c.id === control.id) ?? index;
+                                                    
                                                     setModalDimensionesPreventivo({
                                                       controlId: control.id,
-                                                      controlIndex: index,
-                                                      control: control,
+                                                      controlIndex: controlIndexActualizado,
+                                                      control: controlActualizado,
                                                       tipo: 'preventivo'
                                                     });
                                                   }}
@@ -10022,7 +11661,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 </div>
                     );
                   })}
-            </div>
+                </div>
               )}
             </>
           )}
@@ -10070,7 +11709,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             gap: '8px'
                           }}>
                             <i className="fa fa-chart-line"></i>
-                            Línea Base - {carpetaActual.nombre}
+                            Línea Base - Controles Críticos Preventivos
                           </h3>
                           {rutaNavegacion.length === 2 && promedioPonderacionActual !== null && promedioPonderacionActual !== undefined && (
                             <div style={{
@@ -10114,26 +11753,6 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                           >
                             <i className="fa fa-file-excel"></i> Exportar Excel
                           </button>
-                          {canEditFiles(user) && (
-                            <button
-                              onClick={guardarLineaBase}
-                              disabled={guardandoLineaBase}
-                              style={{
-                                background: guardandoLineaBase ? '#6c757d' : '#28a745',
-                                color: 'white',
-                                border: 'none',
-                                padding: '0.5rem 1.5rem',
-                                borderRadius: '6px',
-                                cursor: guardandoLineaBase ? 'not-allowed' : 'pointer',
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                opacity: guardandoLineaBase ? 0.7 : 1
-                              }}
-                              title='Guardar línea base'
-                            >
-                              <i className={`fa ${guardandoLineaBase ? 'fa-spinner fa-spin' : 'fa-save'}`}></i> {guardandoLineaBase ? 'Guardando...' : 'Guardar Línea Base'}
-                            </button>
-                          )}
                         </div>
                       </div>
 
@@ -10572,7 +12191,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         {puedeEditarLineaBase(user, rutaNavegacion) ? (
                                           <button
                                             onClick={() => {
-                                              setModalValidacionObservacion({ itemIndex: index, tipo: 'preventivo', item });
+                                              // Obtener el item actualizado del estado para asegurar que tiene los datos más recientes
+                                              const itemActualizado = lineaBase[index];
+                                              setModalValidacionObservacion({ 
+                                                itemIndex: index, 
+                                                tipo: 'preventivo', 
+                                                item: itemActualizado || item 
+                                              });
                                             }}
                                             style={{
                                               background: item.estado_validacion === 'validado' ? '#28a745' : item.estado_validacion === 'con_observaciones' ? '#ffc107' : '#6c757d',
@@ -10887,26 +12512,6 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                           >
                             <i className="fa fa-file-excel"></i> Exportar Excel
                           </button>
-                          {canEditFiles(user) && (
-                            <button
-                              onClick={guardarLineaBaseMitigadores}
-                              disabled={guardandoLineaBaseMitigadores}
-                              style={{
-                                background: guardandoLineaBaseMitigadores ? '#6c757d' : '#28a745',
-                                color: 'white',
-                                border: 'none',
-                                padding: '0.5rem 1.5rem',
-                                borderRadius: '6px',
-                                cursor: guardandoLineaBaseMitigadores ? 'not-allowed' : 'pointer',
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                opacity: guardandoLineaBaseMitigadores ? 0.7 : 1
-                              }}
-                              title="Guardar línea base mitigadores"
-                            >
-                              <i className={`fa ${guardandoLineaBaseMitigadores ? 'fa-spinner fa-spin' : 'fa-save'}`}></i> {guardandoLineaBaseMitigadores ? 'Guardando...' : 'Guardar Línea Base Mitigadores'}
-                            </button>
-                          )}
                         </div>
                       </div>
 
@@ -11340,7 +12945,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                             {puedeEditarLineaBase(user, rutaNavegacion) ? (
                                               <button
                                                 onClick={() => {
-                                                  setModalValidacionObservacion({ itemIndex: index, tipo: 'mitigador', item });
+                                                  // Obtener el item actualizado del estado para asegurar que tiene los datos más recientes
+                                                  const itemActualizado = lineaBaseMitigadores[index];
+                                                  setModalValidacionObservacion({ 
+                                                    itemIndex: index, 
+                                                    tipo: 'mitigador', 
+                                                    item: itemActualizado || item 
+                                                  });
                                                 }}
                                                 style={{
                                                   background: item.estado_validacion === 'validado' ? '#28a745' : item.estado_validacion === 'con_observaciones' ? '#ffc107' : '#6c757d',
@@ -11772,10 +13383,84 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
             {/* Modal para gestionar Dimensiones, Preguntas y Evidencias */}
             {(modalDimensionesPreventivo || modalDimensionesMitigador) && (() => {
               const modal = modalDimensionesPreventivo || modalDimensionesMitigador;
-              const controlActual = modal.tipo === 'preventivo' 
-                ? analisisBowtie?.controles_preventivos?.[modal.controlIndex]
-                : analisisBowtie?.controles_mitigadores?.[modal.controlIndex];
-              const dimensiones = controlActual?.dimensiones || [];
+              
+              // CRÍTICO: Función auxiliar para obtener siempre el control correcto por ID
+              const obtenerControlYIndice = () => {
+                if (modal.controlId) {
+                  const control = modal.tipo === 'preventivo'
+                    ? analisisBowtie?.controles_preventivos?.find(c => c.id === modal.controlId)
+                    : analisisBowtie?.controles_mitigadores?.find(c => c.id === modal.controlId);
+                  
+                  if (control) {
+                    // Actualizar el controlIndex si cambió
+                    const indexActualizado = modal.tipo === 'preventivo'
+                      ? analisisBowtie?.controles_preventivos?.findIndex(c => c.id === modal.controlId)
+                      : analisisBowtie?.controles_mitigadores?.findIndex(c => c.id === modal.controlId);
+                    if (indexActualizado !== -1) {
+                      modal.controlIndex = indexActualizado;
+                    }
+                    return { control, index: indexActualizado !== -1 ? indexActualizado : modal.controlIndex };
+                  }
+                }
+                // Fallback al índice
+                const control = modal.tipo === 'preventivo'
+                  ? analisisBowtie?.controles_preventivos?.[modal.controlIndex]
+                  : analisisBowtie?.controles_mitigadores?.[modal.controlIndex];
+                return { control, index: modal.controlIndex };
+              };
+              
+              const { control: controlActual, index: controlIndexActual } = obtenerControlYIndice();
+              
+              // Si aún no hay control, usar el que se guardó en el modal
+              const controlFinal = controlActual || modal.control;
+              const controlIndexFinal = controlIndexActual !== undefined ? controlIndexActual : modal.controlIndex;
+              
+              console.log('[Modal Dimensiones] Control actual:', controlFinal?.codigo, 'ID:', controlFinal?.id, 'Índice:', controlIndexFinal, 'Dimensiones:', controlFinal?.dimensiones?.length || 0);
+              
+              // Procesar dimensiones para asegurar que las evidencias estén en formato correcto
+              const dimensionesProcesadas = (controlFinal?.dimensiones || []).map(dimension => {
+                const preguntas = (dimension.preguntas || []).map(pregunta => {
+                  // Si tiene evidencia (texto) pero no evidencias (array), convertir
+                  if (pregunta.evidencia && (!pregunta.evidencias || !Array.isArray(pregunta.evidencias) || pregunta.evidencias.length === 0)) {
+                    return {
+                      ...pregunta,
+                      evidencias: convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id)
+                    };
+                  }
+                  // Si ya tiene evidencias, asegurar formato correcto
+                  if (pregunta.evidencias && Array.isArray(pregunta.evidencias)) {
+                    return {
+                      ...pregunta,
+                      evidencias: pregunta.evidencias.map((ev, index) => {
+                        if (ev && typeof ev === 'object' && ev.id && ev.texto !== undefined) {
+                          return ev;
+                        }
+                        if (typeof ev === 'string') {
+                          return {
+                            id: ev.id || `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
+                            texto: ev
+                          };
+                        }
+                        return {
+                          id: ev.id || `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
+                          texto: ev.texto || ev || ''
+                        };
+                      })
+                    };
+                  }
+                  // Si no tiene ni evidencia ni evidencias, crear array vacío
+                  if (!pregunta.evidencia && !pregunta.evidencias) {
+                    return {
+                      ...pregunta,
+                      evidencias: []
+                    };
+                  }
+                  return pregunta;
+                });
+                return { ...dimension, preguntas };
+              });
+              
+              const dimensiones = dimensionesProcesadas;
               const normalizarTipoDimension = (valor) => {
                 if (!valor) return '';
                 const texto = valor.toString().trim().toUpperCase();
@@ -11808,8 +13493,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 const nuevosControles = modal.tipo === 'preventivo'
                   ? [...analisisBowtie.controles_preventivos]
                   : [...analisisBowtie.controles_mitigadores];
-                nuevosControles[modal.controlIndex] = {
-                  ...controlActual,
+                nuevosControles[controlIndexFinal] = {
+                  ...controlFinal,
                   dimensiones: [...dimensiones, nuevaDimension]
                 };
                 if (modal.tipo === 'preventivo') {
@@ -11845,13 +13530,14 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     <select
                       value={normalizarTipoDimension(dimension.nombre) || ''}
                       onChange={(e) => {
+                        const { control: controlActualizado, index: controlIndexActualizado } = obtenerControlYIndice();
                         const nuevosControles = modal.tipo === 'preventivo'
                           ? [...analisisBowtie.controles_preventivos]
                           : [...analisisBowtie.controles_mitigadores];
                         const nuevasDimensiones = [...dimensiones];
                         nuevasDimensiones[dimIndex] = {...dimension, nombre: normalizarTipoDimension(e.target.value)};
-                        nuevosControles[modal.controlIndex] = {
-                          ...controlActual,
+                        nuevosControles[controlIndexActualizado] = {
+                          ...(controlActualizado || controlFinal),
                           dimensiones: nuevasDimensiones
                         };
                         if (modal.tipo === 'preventivo') {
@@ -11879,12 +13565,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     </select>
                     <button
                       onClick={() => {
+                        const { control: controlActualizado, index: controlIndexActualizado } = obtenerControlYIndice();
                         const nuevosControles = modal.tipo === 'preventivo'
                           ? [...analisisBowtie.controles_preventivos]
                           : [...analisisBowtie.controles_mitigadores];
                         const nuevasDimensiones = dimensiones.filter((_, i) => i !== dimIndex);
-                        nuevosControles[modal.controlIndex] = {
-                          ...controlActual,
+                        nuevosControles[controlIndexActualizado] = {
+                          ...(controlActualizado || controlFinal),
                           dimensiones: nuevasDimensiones
                         };
                         if (modal.tipo === 'preventivo') {
@@ -11913,18 +13600,19 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         const nuevaPregunta = {
                           id: null,
                           texto: '',
-                          evidencia: ''
+                          evidencias: [] // Cambiar de evidencia (string) a evidencias (array de objetos con id)
                         };
                         const nuevosControles = modal.tipo === 'preventivo'
                           ? [...analisisBowtie.controles_preventivos]
                           : [...analisisBowtie.controles_mitigadores];
+                        const { control: controlActualizado, index: controlIndexActualizado } = obtenerControlYIndice();
                         const nuevasDimensiones = [...dimensiones];
                         nuevasDimensiones[dimIndex] = {
                           ...dimension,
                           preguntas: [...(dimension.preguntas || []), nuevaPregunta]
                         };
-                        nuevosControles[modal.controlIndex] = {
-                          ...controlActual,
+                        nuevosControles[controlIndexActualizado] = {
+                          ...(controlActualizado || controlFinal),
                           dimensiones: nuevasDimensiones
                         };
                         if (modal.tipo === 'preventivo') {
@@ -11948,34 +13636,76 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {(dimension.preguntas || []).map((pregunta, pregIndex) => (
-                      <div key={`pregunta-${dimIndex}-${pregIndex}`} style={{
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px',
-                        padding: '1rem',
-                        background: 'white'
-                      }}>
-                        <div style={{ marginBottom: '0.75rem' }}>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#495057' }}>
-                            Pregunta:
-                          </label>
-                          <textarea
-                            value={pregunta.texto || ''}
+                    {(() => {
+                      // CRÍTICO: Obtener preguntas del estado actual, no de dimensiones procesadas al inicio
+                      // CRÍTICO: Buscar el control por ID para asegurar que usamos el control correcto
+                      const controlActualEstado = modal.tipo === 'preventivo'
+                        ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                        : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                      
+                      const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                      const dimensionActual = dimensionesActuales[dimIndex];
+                      const preguntasActuales = dimensionActual?.preguntas || [];
+                      
+                      return preguntasActuales.map((pregunta, pregIndex) => (
+                        <div key={`pregunta-${dimIndex}-${pregIndex}`} style={{
+                          border: '1px solid #dee2e6',
+                          borderRadius: '6px',
+                          padding: '1rem',
+                          background: 'white'
+                        }}>
+                          <div style={{ marginBottom: '0.75rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#495057' }}>
+                              Pregunta:
+                            </label>
+                            <textarea
+                              value={pregunta.texto || ''}
                             onChange={(e) => {
+                              // CRÍTICO: Buscar el control por ID para asegurar que usamos el control correcto
+                              const controlActualEstado = modal.tipo === 'preventivo'
+                                ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                                : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                              
+                              // Actualizar el controlIndex si encontramos el control por ID
+                              let controlIndexActual = modal.controlIndex;
+                              if (modal.controlId) {
+                                const indexEncontrado = modal.tipo === 'preventivo'
+                                  ? analisisBowtie.controles_preventivos?.findIndex(c => c.id === modal.controlId)
+                                  : analisisBowtie.controles_mitigadores?.findIndex(c => c.id === modal.controlId);
+                                if (indexEncontrado !== -1) {
+                                  controlIndexActual = indexEncontrado;
+                                }
+                              }
+                              
                               const nuevosControles = modal.tipo === 'preventivo'
                                 ? [...analisisBowtie.controles_preventivos]
                                 : [...analisisBowtie.controles_mitigadores];
-                              const nuevasDimensiones = [...dimensiones];
-                              const nuevasPreguntas = [...(dimension.preguntas || [])];
-                              nuevasPreguntas[pregIndex] = {...pregunta, texto: e.target.value};
+                              
+                              // Obtener dimensiones del estado actual, no del procesamiento inicial
+                              const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                              const dimensionActual = dimensionesActuales[dimIndex];
+                              const preguntaActual = dimensionActual?.preguntas?.[pregIndex];
+                              
+                              const nuevasDimensiones = [...dimensionesActuales];
+                              const nuevasPreguntas = [...(dimensionActual.preguntas || [])];
+                              
+                              // Preservar evidencias existentes al editar el texto de la pregunta
+                              nuevasPreguntas[pregIndex] = {
+                                ...preguntaActual,
+                                texto: e.target.value,
+                                evidencias: preguntaActual?.evidencias || []
+                              };
+                              
                               nuevasDimensiones[dimIndex] = {
-                                ...dimension,
+                                ...dimensionActual,
                                 preguntas: nuevasPreguntas
                               };
-                              nuevosControles[modal.controlIndex] = {
-                                ...controlActual,
+                              
+                              nuevosControles[controlIndexActual] = {
+                                ...controlActualEstado,
                                 dimensiones: nuevasDimensiones
                               };
+                              
                               if (modal.tipo === 'preventivo') {
                                 setAnalisisBowtie({...analisisBowtie, controles_preventivos: nuevosControles});
                               } else {
@@ -11995,60 +13725,357 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                           />
                         </div>
                         <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#495057' }}>
-                            Evidencia:
-                          </label>
-                          <textarea
-                            value={pregunta.evidencia || ''}
-                            onChange={(e) => {
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <label style={{ display: 'block', fontWeight: '600', color: '#495057' }}>
+                              Evidencias:
+                            </label>
+                            <button
+                              onClick={() => {
+                              // CRÍTICO: Buscar el control por ID para asegurar que usamos el control correcto
+                              const controlActualEstado = modal.tipo === 'preventivo'
+                                ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                                : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                              
+                              // Actualizar el controlIndex si encontramos el control por ID
+                              let controlIndexActual = modal.controlIndex;
+                              if (modal.controlId) {
+                                const indexEncontrado = modal.tipo === 'preventivo'
+                                  ? analisisBowtie.controles_preventivos?.findIndex(c => c.id === modal.controlId)
+                                  : analisisBowtie.controles_mitigadores?.findIndex(c => c.id === modal.controlId);
+                                if (indexEncontrado !== -1) {
+                                  controlIndexActual = indexEncontrado;
+                                }
+                              }
+                              
                               const nuevosControles = modal.tipo === 'preventivo'
                                 ? [...analisisBowtie.controles_preventivos]
                                 : [...analisisBowtie.controles_mitigadores];
-                              const nuevasDimensiones = [...dimensiones];
-                              const nuevasPreguntas = [...(dimension.preguntas || [])];
-                              nuevasPreguntas[pregIndex] = {...pregunta, evidencia: e.target.value};
+                              
+                              // Obtener dimensiones del estado actual, no del procesamiento inicial
+                              const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                              const dimensionActual = dimensionesActuales[dimIndex];
+                              const preguntaActual = dimensionActual?.preguntas?.[pregIndex];
+                              
+                              const nuevasDimensiones = [...dimensionesActuales];
+                              const nuevasPreguntas = [...(dimensionActual.preguntas || [])];
+                              
+                              // Preservar evidencias existentes con sus IDs
+                              const evidencias = preguntaActual?.evidencias || [];
+                              console.log('[Agregar Evidencia] Evidencias existentes antes de agregar:', evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                              
+                              // Generar ID temporal único para la nueva evidencia
+                              const nuevoId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                              const nuevaEvidencia = {
+                                id: nuevoId,
+                                texto: ''
+                              };
+                              
+                              const evidenciasConNueva = [...evidencias, nuevaEvidencia];
+                              console.log('[Agregar Evidencia] Evidencias después de agregar:', evidenciasConNueva.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                              
+                              // Agregar nueva evidencia preservando las existentes
+                              nuevasPreguntas[pregIndex] = {
+                                ...preguntaActual,
+                                evidencias: evidenciasConNueva
+                              };
+                              
                               nuevasDimensiones[dimIndex] = {
-                                ...dimension,
+                                ...dimensionActual,
                                 preguntas: nuevasPreguntas
                               };
-                              nuevosControles[modal.controlIndex] = {
-                                ...controlActual,
+                              
+                              nuevosControles[controlIndexActual] = {
+                                ...controlActualEstado,
                                 dimensiones: nuevasDimensiones
                               };
+                              
                               if (modal.tipo === 'preventivo') {
                                 setAnalisisBowtie({...analisisBowtie, controles_preventivos: nuevosControles});
                               } else {
                                 setAnalisisBowtie({...analisisBowtie, controles_mitigadores: nuevosControles});
                               }
                             }}
-                            placeholder="Detalle la evidencia asociada..."
                             style={{
-                              width: '100%',
-                              minHeight: '60px',
+                                background: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                padding: '0.3rem 0.6rem',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '11px'
+                              }}
+                            >
+                              <i className="fa fa-plus"></i> Agregar Evidencia
+                            </button>
+                          </div>
+                          {/* Lista de evidencias individuales */}
+                          <div style={{
+                            border: '1px solid #ced4da',
+                            borderRadius: '4px',
                               padding: '0.5rem',
-                              borderRadius: '4px',
-                              border: '1px solid #ced4da',
-                              fontSize: '13px',
-                              resize: 'vertical'
-                            }}
-                          />
+                            background: '#f8f9fa',
+                            minHeight: '60px',
+                            maxHeight: '200px',
+                            overflowY: 'auto'
+                          }}>
+                            {(() => {
+                              // CRÍTICO: Obtener evidencias del estado actual, no de pregunta procesada
+                              // Buscar el control por ID para asegurar que usamos el control correcto
+                              const controlActualEstado = modal.tipo === 'preventivo'
+                                ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                                : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                              
+                              const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                              const dimensionActual = dimensionesActuales[dimIndex];
+                              const preguntaActual = dimensionActual?.preguntas?.[pregIndex];
+                              
+                              // DEBUG: Verificar qué tiene la pregunta actual
+                              let evidenciasPregunta = preguntaActual?.evidencias || [];
+                              console.log('[Modal Dimensiones] Pregunta:', preguntaActual?.texto?.substring(0, 50), 'Evidencias RAW:', evidenciasPregunta);
+                              
+                              // CRÍTICO: Si no tiene evidencias como array pero tiene evidencia como texto, convertir
+                              if ((!evidenciasPregunta || evidenciasPregunta.length === 0) && preguntaActual?.evidencia) {
+                                console.log('[Modal Dimensiones] Convirtiendo evidencia (texto) a array para pregunta:', preguntaActual?.texto?.substring(0, 50));
+                                evidenciasPregunta = convertirEvidenciasTextoAArray(preguntaActual.evidencia, preguntaActual.id);
+                                console.log('[Modal Dimensiones] Evidencias convertidas:', evidenciasPregunta);
+                              }
+                              
+                              // Asegurar que las evidencias están en formato array de objetos con id y texto
+                              if (Array.isArray(evidenciasPregunta) && evidenciasPregunta.length > 0) {
+                                evidenciasPregunta = evidenciasPregunta.map((ev, index) => {
+                                  if (ev && typeof ev === 'object' && ev.id && ev.texto !== undefined) {
+                                    return ev;
+                                  }
+                                  if (typeof ev === 'string') {
+                                    return {
+                                      id: `${preguntaActual?.id || 'preg'}_${index}_${Date.now()}`,
+                                      texto: ev
+                                    };
+                                  }
+                                  return {
+                                    id: ev?.id || `${preguntaActual?.id || 'preg'}_${index}_${Date.now()}`,
+                                    texto: ev?.texto || ev || ''
+                                  };
+                                });
+                              }
+                              
+                              console.log('[Modal Dimensiones] Evidencias finales para renderizar:', evidenciasPregunta);
+                              
+                              // Si tiene evidencias como array, usarlas
+                              if (Array.isArray(evidenciasPregunta) && evidenciasPregunta.length > 0) {
+                                return evidenciasPregunta.map((evidencia, evIndex) => {
+                                  // CRÍTICO: Asegurar que el valor es siempre un string
+                                  let valorEvidencia = '';
+                                  if (evidencia && typeof evidencia === 'object') {
+                                    valorEvidencia = evidencia.texto || evidencia.evidencia || '';
+                                  } else if (typeof evidencia === 'string') {
+                                    valorEvidencia = evidencia;
+                                  }
+                                  
+                                  return (
+                                  <div key={evidencia?.id || evIndex} style={{
+                                    display: 'flex',
+                                    gap: '0.5rem',
+                                    marginBottom: '0.5rem',
+                                    alignItems: 'flex-start'
+                                  }}>
+                                    <input
+                                      type="text"
+                                      value={valorEvidencia}
+                                      onChange={(e) => {
+                                        // CRÍTICO: Buscar el control por ID para asegurar que usamos el control correcto
+                                        const controlActualEstado = modal.tipo === 'preventivo'
+                                          ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                                          : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                                        
+                                        // Actualizar el controlIndex si encontramos el control por ID
+                                        let controlIndexActual = modal.controlIndex;
+                                        if (modal.controlId) {
+                                          const indexEncontrado = modal.tipo === 'preventivo'
+                                            ? analisisBowtie.controles_preventivos?.findIndex(c => c.id === modal.controlId)
+                                            : analisisBowtie.controles_mitigadores?.findIndex(c => c.id === modal.controlId);
+                                          if (indexEncontrado !== -1) {
+                                            controlIndexActual = indexEncontrado;
+                                          }
+                                        }
+                                        
+                                        const nuevosControles = modal.tipo === 'preventivo'
+                                          ? [...analisisBowtie.controles_preventivos]
+                                          : [...analisisBowtie.controles_mitigadores];
+                                        
+                                        // Obtener dimensiones del estado actual, no del procesamiento inicial
+                                        const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                                        const dimensionActual = dimensionesActuales[dimIndex];
+                                        const preguntaActual = dimensionActual?.preguntas?.[pregIndex];
+                                        
+                                        const nuevasDimensiones = [...dimensionesActuales];
+                                        const nuevasPreguntas = [...(dimensionActual.preguntas || [])];
+                                        
+                                        // Preservar evidencias existentes con sus IDs
+                                        const evidencias = [...(preguntaActual?.evidencias || [])];
+                                        
+                                        // Actualizar solo la evidencia editada, preservando su ID
+                                        const evidenciaActual = evidencias[evIndex];
+                                        evidencias[evIndex] = {
+                                          ...evidenciaActual,
+                                          id: evidenciaActual?.id || evidencia?.id || null,
+                                          texto: e.target.value
+                                        };
+                                        
+                                        console.log(`[Modal onChange Evidencia] Actualizando evidencia ${evIndex}:`, { id: evidencias[evIndex].id, texto: evidencias[evIndex].texto?.substring(0, 30) });
+                                        
+                                        nuevasPreguntas[pregIndex] = {
+                                          ...preguntaActual,
+                                          evidencias
+                                        };
+                                        
+                                        nuevasDimensiones[dimIndex] = {
+                                          ...dimensionActual,
+                                          preguntas: nuevasPreguntas
+                                        };
+                                        
+                                        nuevosControles[controlIndexActual] = {
+                                          ...controlActualEstado,
+                                          dimensiones: nuevasDimensiones
+                                        };
+                                        
+                                        if (modal.tipo === 'preventivo') {
+                                          setAnalisisBowtie({...analisisBowtie, controles_preventivos: nuevosControles});
+                                        } else {
+                                          setAnalisisBowtie({...analisisBowtie, controles_mitigadores: nuevosControles});
+                                        }
+                                      }}
+                                      placeholder={`Evidencia ${evIndex + 1}...`}
+                                      style={{
+                                        flex: 1,
+                                        padding: '0.4rem',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ced4da',
+                                        fontSize: '12px'
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        // CRÍTICO: Buscar el control por ID para asegurar que usamos el control correcto
+                                        const controlActualEstado = modal.tipo === 'preventivo'
+                                          ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                                          : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                                        
+                                        // Actualizar el controlIndex si encontramos el control por ID
+                                        let controlIndexActual = modal.controlIndex;
+                                        if (modal.controlId) {
+                                          const indexEncontrado = modal.tipo === 'preventivo'
+                                            ? analisisBowtie.controles_preventivos?.findIndex(c => c.id === modal.controlId)
+                                            : analisisBowtie.controles_mitigadores?.findIndex(c => c.id === modal.controlId);
+                                          if (indexEncontrado !== -1) {
+                                            controlIndexActual = indexEncontrado;
+                                          }
+                                        }
+                                        
+                                        const nuevosControles = modal.tipo === 'preventivo'
+                                          ? [...analisisBowtie.controles_preventivos]
+                                          : [...analisisBowtie.controles_mitigadores];
+                                        
+                                        // Obtener dimensiones del estado actual, no del procesamiento inicial
+                                        const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                                        const dimensionActual = dimensionesActuales[dimIndex];
+                                        const preguntaActual = dimensionActual?.preguntas?.[pregIndex];
+                                        
+                                        const nuevasDimensiones = [...dimensionesActuales];
+                                        const nuevasPreguntas = [...(dimensionActual.preguntas || [])];
+                                        
+                                        // Preservar evidencias existentes, eliminando solo la seleccionada
+                                        const evidencias = (preguntaActual?.evidencias || []).filter((_, i) => i !== evIndex);
+                                        console.log(`[Eliminar Evidencia] Evidencias después de eliminar índice ${evIndex}:`, evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                                        
+                                        nuevasPreguntas[pregIndex] = {
+                                          ...preguntaActual,
+                                          evidencias
+                                        };
+                                        
+                                        nuevasDimensiones[dimIndex] = {
+                                          ...dimensionActual,
+                                          preguntas: nuevasPreguntas
+                                        };
+                                        
+                                        nuevosControles[controlIndexActual] = {
+                                          ...controlActualEstado,
+                                          dimensiones: nuevasDimensiones
+                                        };
+                                        
+                                        if (modal.tipo === 'preventivo') {
+                                          setAnalisisBowtie({...analisisBowtie, controles_preventivos: nuevosControles});
+                                        } else {
+                                          setAnalisisBowtie({...analisisBowtie, controles_mitigadores: nuevosControles});
+                                        }
+                                      }}
+                                      style={{
+                                        background: '#dc3545',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '11px'
+                                      }}
+                                      title="Eliminar evidencia"
+                                    >
+                                      <i className="fa fa-trash"></i>
+                                    </button>
+                                  </div>
+                                  );
+                                });
+                              }
+                              
+                              // Si no hay evidencias, mostrar mensaje
+                              return (
+                                <div style={{ color: '#6c757d', fontSize: '12px', fontStyle: 'italic', padding: '0.5rem' }}>
+                                  No hay evidencias agregadas. Haz clic en "Agregar Evidencia" para agregar una.
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </div>
                         <div style={{ textAlign: 'right', marginTop: '0.75rem' }}>
                           <button
                             onClick={() => {
+                              // CRÍTICO: Buscar el control por ID para asegurar que usamos el control correcto
+                              const controlActualEstado = modal.tipo === 'preventivo'
+                                ? (analisisBowtie.controles_preventivos?.find(c => c.id === modal.controlId) || analisisBowtie.controles_preventivos[modal.controlIndex])
+                                : (analisisBowtie.controles_mitigadores?.find(c => c.id === modal.controlId) || analisisBowtie.controles_mitigadores[modal.controlIndex]);
+                              
+                              // Actualizar el controlIndex si encontramos el control por ID
+                              let controlIndexActual = modal.controlIndex;
+                              if (modal.controlId) {
+                                const indexEncontrado = modal.tipo === 'preventivo'
+                                  ? analisisBowtie.controles_preventivos?.findIndex(c => c.id === modal.controlId)
+                                  : analisisBowtie.controles_mitigadores?.findIndex(c => c.id === modal.controlId);
+                                if (indexEncontrado !== -1) {
+                                  controlIndexActual = indexEncontrado;
+                                }
+                              }
+                              
                               const nuevosControles = modal.tipo === 'preventivo'
                                 ? [...analisisBowtie.controles_preventivos]
                                 : [...analisisBowtie.controles_mitigadores];
-                              const nuevasDimensiones = [...dimensiones];
-                              const nuevasPreguntas = (dimension.preguntas || []).filter((_, i) => i !== pregIndex);
+                              
+                              // Obtener dimensiones del estado actual, no del procesamiento inicial
+                              const dimensionesActuales = controlActualEstado?.dimensiones || [];
+                              const dimensionActual = dimensionesActuales[dimIndex];
+                              
+                              const nuevasDimensiones = [...dimensionesActuales];
+                              const nuevasPreguntas = (dimensionActual.preguntas || []).filter((_, i) => i !== pregIndex);
+                              
                               nuevasDimensiones[dimIndex] = {
-                                ...dimension,
+                                ...dimensionActual,
                                 preguntas: nuevasPreguntas
                               };
-                              nuevosControles[modal.controlIndex] = {
-                                ...controlActual,
+                              
+                              nuevosControles[controlIndexActual] = {
+                                ...controlActualEstado,
                                 dimensiones: nuevasDimensiones
                               };
+                              
                               if (modal.tipo === 'preventivo') {
                                 setAnalisisBowtie({...analisisBowtie, controles_preventivos: nuevosControles});
                               } else {
@@ -12069,7 +14096,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                           </button>
                         </div>
                       </div>
-                    ))}
+                    ));
+                    })()}
                   </div>
                 </div>
               );
@@ -12126,7 +14154,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         gap: '10px'
                       }}>
                         <i className="fa fa-list-ul"></i>
-                        Gestionar Dimensiones, Preguntas y Evidencias - {controlActual?.codigo || 'Control'}
+                        Gestionar Dimensiones, Preguntas y Evidencias - {controlFinal?.codigo || 'Control'}
                       </h3>
                       <button
                         onClick={() => {
@@ -12265,14 +14293,115 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       </button>
                       <button
                         onClick={async () => {
-                          // Guardar los cambios en el control
-                          if (modal.tipo === 'preventivo') {
-                            await guardarControlesPreventivos();
-                          } else {
-                            await guardarControlesMitigadores();
+                          try {
+                            // CRÍTICO: Antes de guardar, verificar que el estado tenga las evidencias actualizadas
+                            console.log('[Modal Guardar] ===== INICIANDO GUARDADO =====');
+                            console.log('[Modal Guardar] Control ID:', modal.controlId, 'Tipo:', modal.tipo);
+                            
+                            // Buscar el control actualizado por ID
+                            const controlAntes = modal.tipo === 'preventivo'
+                              ? analisisBowtie?.controles_preventivos?.find(c => c.id === modal.controlId)
+                              : analisisBowtie?.controles_mitigadores?.find(c => c.id === modal.controlId);
+                            
+                            if (controlAntes) {
+                              console.log('[Modal Guardar] Control encontrado:', controlAntes.codigo, 'Dimensiones:', controlAntes.dimensiones?.length || 0);
+                              (controlAntes.dimensiones || []).forEach((dim, dimIdx) => {
+                                console.log(`  [Modal Guardar] Dimensión ${dimIdx} (${dim.nombre}):`, dim.preguntas?.length || 0, 'preguntas');
+                                (dim.preguntas || []).forEach((preg, pregIdx) => {
+                                  const evidenciasCount = preg.evidencias?.length || 0;
+                                  console.log(`    [Modal Guardar] Pregunta ${pregIdx} (ID: ${preg.id}, "${preg.texto?.substring(0, 30)}"): ${evidenciasCount} evidencias`);
+                                  if (evidenciasCount > 0) {
+                                    console.log(`      [Modal Guardar] Evidencias a enviar:`, preg.evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                                  } else {
+                                    console.warn(`      [Modal Guardar] ⚠️ Pregunta sin evidencias!`);
+                                  }
+                                });
+                              });
+                            } else {
+                              console.error('[Modal Guardar] ⚠️ Control no encontrado por ID:', modal.controlId);
+                              console.log('[Modal Guardar] Controles disponibles:', modal.tipo === 'preventivo' 
+                                ? analisisBowtie?.controles_preventivos?.map(c => ({ id: c.id, codigo: c.codigo }))
+                                : analisisBowtie?.controles_mitigadores?.map(c => ({ id: c.id, codigo: c.codigo })));
+                            }
+                            
+                            // CRÍTICO: Forzar una actualización del estado antes de guardar
+                            // Esto asegura que todas las actualizaciones del modal estén en analisisBowtie
+                            console.log('[Modal Guardar] Forzando sincronización de estado antes de guardar...');
+                            
+                            // Pequeño delay para asegurar que React haya procesado todas las actualizaciones de estado
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                            
+                            // Verificar nuevamente el estado después del delay
+                            const controlVerificacion = modal.tipo === 'preventivo'
+                              ? analisisBowtie?.controles_preventivos?.find(c => c.id === modal.controlId)
+                              : analisisBowtie?.controles_mitigadores?.find(c => c.id === modal.controlId);
+                            
+                            if (controlVerificacion) {
+                              console.log('[Modal Guardar] Estado verificado después del delay:');
+                              (controlVerificacion.dimensiones || []).forEach((dim, dimIdx) => {
+                                (dim.preguntas || []).forEach((preg, pregIdx) => {
+                                  const evidenciasCount = preg.evidencias?.length || 0;
+                                  console.log(`  [Modal Guardar] Pregunta ${pregIdx} después del delay: ${evidenciasCount} evidencias`);
+                                  if (evidenciasCount > 0) {
+                                    console.log(`    [Modal Guardar] Evidencias:`, preg.evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                                  }
+                                });
+                              });
+                            }
+                            
+                            let resultado = false;
+                            // Guardar los cambios en el control
+                            if (modal.tipo === 'preventivo') {
+                              resultado = await guardarControlesPreventivos();
+                            } else {
+                              resultado = await guardarControlesMitigadores();
+                            }
+                            
+                            // CRÍTICO: Solo cerrar el modal si el guardado fue exitoso
+                            // Y asegurar que los datos se recargaron antes de cerrar
+                            if (resultado) {
+                              console.log('[Modal Guardar] Guardado exitoso, recargando datos antes de cerrar...');
+                              // Recargar datos una vez más para asegurar sincronización
+                              if (carpetaActual && carpetaActual.id) {
+                                await cargarAnalisisBowtie(carpetaActual.id);
+                                // Delay más largo para asegurar que React procese la actualización
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                                
+                                // Verificar que los datos se recargaron correctamente
+                                const controlDespues = modal.tipo === 'preventivo'
+                                  ? analisisBowtie?.controles_preventivos?.find(c => c.id === modal.controlId)
+                                  : analisisBowtie?.controles_mitigadores?.find(c => c.id === modal.controlId);
+                                
+                                if (controlDespues) {
+                                  console.log('[Modal Guardar] Control después de recargar:', controlDespues.codigo);
+                                  (controlDespues.dimensiones || []).forEach((dim, dimIdx) => {
+                                    (dim.preguntas || []).forEach((preg, pregIdx) => {
+                                      const evidenciasCount = preg.evidencias?.length || 0;
+                                      console.log(`  [Modal Guardar] Pregunta ${pregIdx} después de recargar: ${evidenciasCount} evidencias`);
+                                      if (evidenciasCount > 0) {
+                                        console.log(`    [Modal Guardar] Evidencias recuperadas:`, preg.evidencias.map(ev => ({ id: ev.id, texto: ev.texto?.substring(0, 30) })));
+                                      } else {
+                                        console.error(`    [Modal Guardar] ⚠️⚠️⚠️ Pregunta sin evidencias después de recargar!`);
+                                      }
+                                    });
+                                  });
+                                } else {
+                                  console.error('[Modal Guardar] ⚠️ Control no encontrado después de recargar');
+                                }
+                              }
+                              console.log('[Modal Guardar] Datos recargados, cerrando modal...');
+                              setModalDimensionesPreventivo(null);
+                              setModalDimensionesMitigador(null);
+                              setFiltroTipoDimension('TODAS');
+                            } else {
+                              console.error('[Modal Guardar] Error al guardar, no se cierra el modal');
+                              // No cerrar el modal si hubo error
+                            }
+                          } catch (error) {
+                            console.error('[Modal Guardar] Excepción al guardar:', error);
+                            alert('Error al guardar: ' + (error.message || error));
+                            // No cerrar el modal si hubo excepción
                           }
-                          setModalDimensionesPreventivo(null);
-                          setModalDimensionesMitigador(null);
                         }}
                         style={{
                           background: '#28a745',
@@ -14177,10 +16306,15 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                           <button
                             onClick={() => {
                               // Abrir formulario inline de respuesta
-                              setRespuestasAbiertas(prev => ({
-                                ...prev,
-                                [mensaje.id]: prev[mensaje.id] !== undefined ? undefined : ''
-                              }));
+                              setRespuestasAbiertas(prev => {
+                                const newState = { ...prev };
+                                if (prev[mensaje.id] !== undefined) {
+                                  delete newState[mensaje.id];
+                                } else {
+                                  newState[mensaje.id] = '';
+                                }
+                                return newState;
+                              });
                               // También mantener compatibilidad con el formulario superior
                               setMensajeRespondiendo(mensaje);
                             }}
@@ -18569,38 +20703,30 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
                 // Word Documents (.doc, .docx)
                 if (['doc', 'docx'].includes(extension) || tipoMime.includes('word') || tipoMime.includes('document')) {
-                  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                  // Verificar si estamos en localhost (los visores externos no funcionan con localhost)
+                  const isLocalhost = urlArchivo.includes('localhost') || urlArchivo.includes('127.0.0.1');
                   const hasError = officeViewerError.word;
                   
-                  // Usar el endpoint view_office.php que permite acceso desde visores externos
-                  const officeFileUrl = isLocalhost 
-                    ? `http://localhost/rcritico/api/view_office.php?id=${archivoPreview.id}`
-                    : `${API_BASE}/view_office.php?id=${archivoPreview.id}`;
-                  const officeFileUrlEncoded = encodeURIComponent(officeFileUrl);
-                  
-                  // Usar Microsoft Office Online Viewer
-                  const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${officeFileUrlEncoded}`;
-                  
                   return (
-                    <div style={{ width: '100%', height: previewMaximizado ? 'calc(100vh - 120px)' : '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ width: '100%', height: '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ 
                         padding: '10px', 
-                        background: hasError ? '#f8d7da' : '#e3f2fd', 
+                        background: isLocalhost ? '#fff3cd' : hasError ? '#f8d7da' : '#e3f2fd', 
                         borderRadius: '5px',
                         fontSize: '14px',
-                        color: hasError ? '#721c24' : '#FF8C00'
+                        color: isLocalhost ? '#856404' : hasError ? '#721c24' : '#FF8C00'
                       }}>
                         <i className="fa fa-file-word" style={{ marginRight: '8px' }}></i>
-                        {hasError
-                          ? 'Error al cargar el visor. En localhost, los visores externos no funcionan porque requieren acceso público. En producción funcionará correctamente. Usa "Descargar" para abrir el archivo.'
-                          : isLocalhost
-                          ? 'Previsualizando documento Word (en localhost puede no funcionar - en producción funcionará correctamente)'
+                        {isLocalhost 
+                          ? 'Los visores externos no funcionan con localhost. Usa "Descargar" para abrir el archivo.'
+                          : hasError
+                          ? 'Error al cargar el visor. Usa "Descargar" para abrir el archivo.'
                           : 'Previsualizando documento Word usando visor embebido'
                         }
                       </div>
-                      {!hasError && (
+                      {!isLocalhost && !hasError && (
                         <iframe
-                          src={viewerUrl}
+                          src={`https://view.officeapps.live.com/op/embed.aspx?src=${urlArchivoCodificada}`}
                           style={{
                             width: '100%',
                             flex: 1,
@@ -18609,10 +20735,6 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             minHeight: '500px'
                           }}
                           title={archivoPreview.nombre_original}
-                          onError={() => {
-                            console.error('Error cargando visor de Word');
-                            setOfficeViewerError(prev => ({ ...prev, word: true }));
-                          }}
                         />
                       )}
                       {hasError && (
@@ -18630,115 +20752,11 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               {archivoPreview.nombre_original}
                             </div>
                             <div style={{ fontSize: '14px', color: '#999', marginBottom: '20px' }}>
-                              El visor no pudo cargar el documento. Por favor, descarga el archivo para abrirlo.
+                              {hasError 
+                                ? 'El visor no pudo cargar el documento. Por favor, descarga el archivo para abrirlo.'
+                                : 'Haz clic en "Descargar" para abrir el archivo'
+                              }
                             </div>
-                            <button
-                              onClick={() => setOfficeViewerError(prev => ({ ...prev, word: false }))}
-                              style={{
-                                padding: '8px 16px',
-                                background: '#17a2b8',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                marginRight: '10px'
-                              }}
-                            >
-                              Reintentar
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                        {isLocalhost && !hasError && 'Nota: En localhost los visores externos no funcionan (requieren acceso público). En producción funcionará correctamente. '}
-                        {!isLocalhost && 'Si el documento no se muestra, haz clic en "Descargar" para abrirlo en tu aplicación'}
-                        {isLocalhost && 'Usa "Descargar" para abrir el archivo en localhost.'}
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Excel Spreadsheets (.xls, .xlsx)
-                if (['xls', 'xlsx'].includes(extension) || tipoMime.includes('excel') || tipoMime.includes('spreadsheet')) {
-                  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                  const hasError = officeViewerError.excel;
-                  
-                  // Usar el endpoint view_office.php que permite acceso desde visores externos
-                  const officeFileUrl = isLocalhost 
-                    ? `http://localhost/rcritico/api/view_office.php?id=${archivoPreview.id}`
-                    : `${API_BASE}/view_office.php?id=${archivoPreview.id}`;
-                  const officeFileUrlEncoded = encodeURIComponent(officeFileUrl);
-                  
-                  // Usar Microsoft Office Online Viewer
-                  const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${officeFileUrlEncoded}`;
-                  
-                  return (
-                    <div style={{ width: '100%', height: previewMaximizado ? 'calc(100vh - 120px)' : '600px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ 
-                        padding: '10px', 
-                        background: hasError ? '#f8d7da' : '#e8f5e9', 
-                        borderRadius: '5px',
-                        fontSize: '14px',
-                        color: hasError ? '#721c24' : '#1d6f42'
-                      }}>
-                        <i className="fa fa-file-excel" style={{ marginRight: '8px' }}></i>
-                        {hasError
-                          ? 'Error al cargar el visor. En localhost, los visores externos no funcionan porque requieren acceso público. En producción funcionará correctamente. Usa "Descargar" para abrir el archivo.'
-                          : isLocalhost
-                          ? 'Previsualizando hoja de cálculo Excel (en localhost puede no funcionar - en producción funcionará correctamente)'
-                          : 'Previsualizando hoja de cálculo Excel usando visor embebido'
-                        }
-                      </div>
-                      {!hasError && (
-                        <iframe
-                          src={viewerUrl}
-                          style={{
-                            width: '100%',
-                            flex: 1,
-                            border: 'none',
-                            borderRadius: '8px',
-                            minHeight: '500px'
-                          }}
-                          title={archivoPreview.nombre_original}
-                          onError={() => {
-                            console.error('Error cargando visor de Excel');
-                            setOfficeViewerError(prev => ({ ...prev, excel: true }));
-                          }}
-                        />
-                      )}
-                      {hasError && (
-                        <div style={{ 
-                          flex: 1, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          background: '#f8f9fa',
-                          borderRadius: '8px'
-                        }}>
-                          <div style={{ textAlign: 'center' }}>
-                            <i className="fa fa-file-excel" style={{ fontSize: '64px', color: '#1d6f42', marginBottom: '20px' }}></i>
-                            <div style={{ fontSize: '16px', color: '#666', marginBottom: '10px' }}>
-                              {archivoPreview.nombre_original}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#999', marginBottom: '20px' }}>
-                              El visor no pudo cargar la hoja de cálculo. Por favor, descarga el archivo para abrirlo.
-                            </div>
-                            <button
-                              onClick={() => setOfficeViewerError(prev => ({ ...prev, excel: false }))}
-                              style={{
-                                padding: '8px 16px',
-                                background: '#17a2b8',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                marginRight: '10px'
-                              }}
-                            >
-                              Reintentar
-                            </button>
                           </div>
                         </div>
                       )}
@@ -19930,6 +21948,146 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               gap: '0.5rem'
             }}>
               <button
+                onClick={async () => {
+                  // Guardar cambios antes de cerrar
+                  try {
+                    const esPreventivo = modalValidacionObservacion.tipo === 'preventivo';
+                    const datosAGuardar = esPreventivo ? lineaBase : lineaBaseMitigadores;
+                    
+                    // Verificar que datosAGuardar sea un array
+                    if (!Array.isArray(datosAGuardar)) {
+                      console.error('[Guardar Validación] Error: datosAGuardar no es un array:', typeof datosAGuardar, datosAGuardar);
+                      mostrarNotificacion('✗ Error: Los datos no están en el formato correcto', 'error');
+                      return;
+                    }
+                    
+                    if (!carpetaActual || !datosAGuardar || datosAGuardar.length === 0) {
+                      mostrarNotificacion('✗ No hay datos para guardar', 'error');
+                      return;
+                    }
+                    
+                    const endpoint = esPreventivo 
+                      ? `${API_BASE}/archivos/carpeta_linea_base.php`
+                      : `${API_BASE}/archivos/carpeta_linea_base_mitigadores.php`;
+                    
+                    console.log('[Guardar Validación] Enviando datos:', { 
+                      carpeta_id: carpetaActual.id, 
+                      total_items: datosAGuardar.length,
+                      tipo: esPreventivo ? 'preventivo' : 'mitigador'
+                    });
+                    
+                    const datosEnvio = {
+                      carpeta_id: carpetaActual.id,
+                      usuario_id: user.id,
+                      linea_base: datosAGuardar.map(item => ({
+                        id: item.id,
+                        control_preventivo_id: item.control_preventivo_id,
+                        control_mitigador_id: item.control_mitigador_id,
+                        codigo: item.codigo || '',
+                        control_critico_preventivo: item.control_critico_preventivo || '',
+                        control_critico_mitigador: item.control_critico_mitigador || '',
+                        dimension: item.dimension || '',
+                        pregunta: item.pregunta || '',
+                        evidencia: item.evidencia || '',
+                        verificador_responsable: item.verificador_responsable || '',
+                        fecha_verificacion: (item.fecha_verificacion && item.fecha_verificacion.trim() !== '') ? item.fecha_verificacion : null,
+                        implementado_estandar: item.implementado_estandar_desempeno || '',
+                        accion_ejecutar: item.accion_a_ejecutar || '',
+                        responsable_cierre: item.responsable_cierre_accion || '',
+                        fecha_cierre: (item.fecha_cierre && item.fecha_cierre.trim() !== '') ? item.fecha_cierre : null,
+                        criticidad: item.criticidad || '',
+                        porcentaje_avance: (item.porcentaje_avance_implementacion_accion !== '' && item.porcentaje_avance_implementacion_accion != null) ? parseFloat(item.porcentaje_avance_implementacion_accion) : null,
+                        nombre_dueno_control: item.nombre_dueno_control_critico_tecnico || '',
+                        comentario_trabajador: item.comentario_trabajador || '',
+                        archivos_respaldo: JSON.stringify(item.archivos_respaldo || []),
+                        conversacion_seguimiento: JSON.stringify(item.conversacion_seguimiento || []),
+                        ultimo_usuario_edito: item.ultimo_usuario_edito || '',
+                        estado_validacion: item.estado_validacion || null,
+                        comentario_validacion: item.comentario_validacion || '',
+                        usuario_validacion: item.usuario_validacion || '',
+                        fecha_validacion: (item.fecha_validacion && item.fecha_validacion.trim() !== '') ? item.fecha_validacion : null,
+                        ponderacion: item.ponderacion !== undefined ? item.ponderacion : (item.estado_validacion === 'validado' ? 100 : 0)
+                      }))
+                    };
+                    
+                    const res = await fetch(endpoint, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(datosEnvio)
+                    });
+
+                    // Verificar respuesta antes de parsear JSON
+                    const contentType = res.headers.get('content-type');
+                    let data;
+                    
+                    if (!res.ok) {
+                      const errorText = await res.text();
+                      console.error('[Guardar Validación] Error HTTP:', res.status, errorText);
+                      throw new Error(`Error ${res.status}: ${errorText.substring(0, 200)}`);
+                    }
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                      const text = await res.text();
+                      try {
+                        data = JSON.parse(text);
+                        console.log('[Guardar Validación] Respuesta exitosa:', data);
+                      } catch (e) {
+                        console.error('[Guardar Validación] Error parseando JSON:', e);
+                        console.error('[Guardar Validación] Texto recibido:', text.substring(0, 500));
+                        throw new Error('El servidor devolvió una respuesta que no es JSON válido: ' + text.substring(0, 200));
+                      }
+                    } else {
+                      const text = await res.text();
+                      console.error('[Guardar Validación] Respuesta no JSON:', text.substring(0, 500));
+                      throw new Error('El servidor devolvió una respuesta no válida: ' + text.substring(0, 200));
+                    }
+                    
+                    if (data.success) {
+                      // Recargar línea base para obtener datos actualizados
+                      if (esPreventivo) {
+                        await cargarLineaBase(carpetaActual.id);
+                      } else {
+                        await cargarLineaBaseMitigadores(carpetaActual.id);
+                      }
+                      mostrarNotificacion('✓ Cambios guardados correctamente', 'success');
+                      setModalValidacionObservacion(null);
+                    } else {
+                      mostrarNotificacion('✗ Error al guardar: ' + (data.error || 'Error desconocido'), 'error');
+                    }
+                  } catch (error) {
+                    console.error('Error guardando validación:', error);
+                    mostrarNotificacion('✗ Error al guardar los cambios', 'error');
+                  }
+                }}
+                style={{
+                  padding: '10px 18px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: '#28a745',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#218838';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 4px 8px rgba(40, 167, 69, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#28a745';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <i className="fa fa-save" style={{ marginRight: '4px' }}></i>
+                Guardar Cambios
+              </button>
+              <button
                 onClick={() => setModalValidacionObservacion(null)}
                 style={{
                   padding: '10px 18px',
@@ -20239,14 +22397,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         }} onClick={() => setModalEditarLineaBase(null)}>
           <div style={{
             background: '#fff',
-            borderRadius: '16px',
-            width: '700px',
-            maxWidth: '95vw',
-            maxHeight: '90vh',
+            borderRadius: modalLineaBaseMaximizado ? '0' : '16px',
+            width: modalLineaBaseMaximizado ? '100vw' : '700px',
+            height: modalLineaBaseMaximizado ? '100vh' : 'auto',
+            maxWidth: modalLineaBaseMaximizado ? '100vw' : '95vw',
+            maxHeight: modalLineaBaseMaximizado ? '100vh' : '90vh',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.3)'
+            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.3)',
+            transition: 'all 0.3s ease'
           }} onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div style={{
@@ -20273,7 +22433,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 Editar Control {modalEditarLineaBase?.tipo === 'mitigador' ? 'Mitigador' : 'Preventivo'} - Línea Base
               </h3>
               <button
-                onClick={() => setModalEditarLineaBase(null)}
+                onClick={() => setModalLineaBaseMaximizado(!modalLineaBaseMaximizado)}
                 style={{
                   width: '32px',
                   height: '32px',
@@ -20285,7 +22445,44 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#fff',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  marginRight: '0.5rem',
+                  transition: 'all 0.2s ease'
+                }}
+                title={modalLineaBaseMaximizado ? 'Restaurar' : 'Maximizar'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                }}
+              >
+                <i className={`fa ${modalLineaBaseMaximizado ? 'fa-compress' : 'fa-expand'}`}></i>
+              </button>
+              <button
+                onClick={() => {
+                  setModalEditarLineaBase(null);
+                  setModalLineaBaseMaximizado(false);
+                }}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  border: 'none',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
                 }}
               >
                 <i className="fa fa-times"></i>
@@ -20459,7 +22656,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
             <div style={{
               padding: '1.5rem',
               overflowY: 'auto',
-              flex: 1
+              flex: 1,
+              maxHeight: modalLineaBaseMaximizado ? 'calc(100vh - 140px)' : 'none'
             }}>
               {/* PESTAÑA: INFORMACIÓN */}
               {pestanaModalLineaBase === 'informacion' && (
@@ -20782,6 +22980,143 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     }}
                     placeholder="Describe la acción a ejecutar..."
                   />
+                </div>
+              )}
+
+              {/* Sección de Validación y Observaciones */}
+              {(formLineaBase.estado_validacion || formLineaBase.comentario_validacion) && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: formLineaBase.estado_validacion === 'con_observaciones' ? '2px solid #ffc107' : formLineaBase.estado_validacion === 'validado' ? '2px solid #28a745' : '1px solid #dee2e6',
+                  background: formLineaBase.estado_validacion === 'con_observaciones' ? '#fff3cd' : formLineaBase.estado_validacion === 'validado' ? '#d4edda' : '#f8f9fa'
+                }}>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: '#495057',
+                    textTransform: 'uppercase',
+                    marginBottom: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <i className={`fa fa-${formLineaBase.estado_validacion === 'validado' ? 'check-circle' : formLineaBase.estado_validacion === 'con_observaciones' ? 'exclamation-triangle' : 'info-circle'}`}
+                       style={{ 
+                         color: formLineaBase.estado_validacion === 'validado' ? '#28a745' : formLineaBase.estado_validacion === 'con_observaciones' ? '#ffc107' : '#6c757d',
+                         fontSize: '1rem'
+                       }}
+                    ></i>
+                    Estado de Validación
+                  </div>
+
+                  {/* Estado */}
+                  {formLineaBase.estado_validacion && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        background: formLineaBase.estado_validacion === 'validado' ? '#28a745' : formLineaBase.estado_validacion === 'con_observaciones' ? '#ffc107' : '#6c757d',
+                        color: '#fff'
+                      }}>
+                        {formLineaBase.estado_validacion === 'validado' ? '✓ Validado' : formLineaBase.estado_validacion === 'con_observaciones' ? '⚠ Con Observaciones' : 'Sin validar'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Observaciones/Comentarios */}
+                  {formLineaBase.comentario_validacion && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <div style={{
+                        fontSize: '0.7rem',
+                        color: '#6c757d',
+                        textTransform: 'uppercase',
+                        marginBottom: '0.35rem',
+                        fontWeight: 600
+                      }}>
+                        <i className="fa fa-comment" style={{ marginRight: '0.35rem' }}></i>
+                        Observaciones:
+                      </div>
+                      <div style={{
+                        background: '#fff',
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid #e9ecef',
+                        fontSize: '0.85rem',
+                        color: '#495057',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+                        {formLineaBase.comentario_validacion}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Usuario y Fecha de Validación */}
+                  {(formLineaBase.usuario_validacion || formLineaBase.fecha_validacion) && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '0.75rem',
+                      marginTop: '0.75rem',
+                      paddingTop: '0.75rem',
+                      borderTop: '1px solid #dee2e6'
+                    }}>
+                      {formLineaBase.usuario_validacion && (
+                        <div>
+                          <div style={{
+                            fontSize: '0.65rem',
+                            color: '#6c757d',
+                            textTransform: 'uppercase',
+                            marginBottom: '0.25rem',
+                            fontWeight: 600
+                          }}>
+                            <i className="fa fa-user" style={{ marginRight: '0.25rem' }}></i>
+                            Validado por:
+                          </div>
+                          <div style={{
+                            fontSize: '0.8rem',
+                            color: '#495057',
+                            fontWeight: 500
+                          }}>
+                            {formLineaBase.usuario_validacion}
+                          </div>
+                        </div>
+                      )}
+                      {formLineaBase.fecha_validacion && (
+                        <div>
+                          <div style={{
+                            fontSize: '0.65rem',
+                            color: '#6c757d',
+                            textTransform: 'uppercase',
+                            marginBottom: '0.25rem',
+                            fontWeight: 600
+                          }}>
+                            <i className="fa fa-calendar" style={{ marginRight: '0.25rem' }}></i>
+                            Fecha:
+                          </div>
+                          <div style={{
+                            fontSize: '0.8rem',
+                            color: '#495057',
+                            fontWeight: 500
+                          }}>
+                            {new Date(formLineaBase.fecha_validacion).toLocaleString('es-CL', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
                 </>
@@ -21146,7 +23481,12 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
               {/* PESTAÑA: DOCUMENTOS */}
               {pestanaModalLineaBase === 'documentos' && (
-                <div style={{ minHeight: '400px' }}>
+                <div style={{ 
+                  minHeight: '400px',
+                  maxHeight: modalLineaBaseMaximizado ? 'calc(100vh - 140px)' : 'none',
+                  overflowY: modalLineaBaseMaximizado ? 'auto' : 'visible',
+                  padding: '1.5rem'
+                }}>
                   {/* Toolbar de documentos */}
                   <div style={{
                     display: 'flex',
@@ -21856,16 +24196,18 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               <button
                 onClick={async () => {
                   try {
+                    setGuardandoLineaBase(true);
                     const esMitigador = modalEditarLineaBase?.tipo === 'mitigador';
                     
                     if (esMitigador) {
                       // Actualizar el item en lineaBaseMitigadores
                       const nuevaLineaBase = [...lineaBaseMitigadores];
-                      nuevaLineaBase[modalEditarLineaBase.index] = {
+                      const itemActualizado = {
                         ...nuevaLineaBase[modalEditarLineaBase.index],
                         ...formLineaBase,
                         ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
                       };
+                      nuevaLineaBase[modalEditarLineaBase.index] = itemActualizado;
                       
                       setLineaBaseMitigadores(nuevaLineaBase);
                       
@@ -21874,23 +24216,39 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     } else {
                       // Actualizar el item en lineaBase (preventivo)
                       const nuevaLineaBase = [...lineaBase];
-                      nuevaLineaBase[modalEditarLineaBase.index] = {
+                      
+                      // Validar que el índice existe
+                      if (!nuevaLineaBase[modalEditarLineaBase.index]) {
+                        throw new Error('Índice de línea base no válido');
+                      }
+                      
+                      const itemActualizado = {
                         ...nuevaLineaBase[modalEditarLineaBase.index],
                         ...formLineaBase,
                         ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
                       };
+                      nuevaLineaBase[modalEditarLineaBase.index] = itemActualizado;
+                      
+                      console.log('[Modal Guardar] Guardando línea base completa:', {
+                        total_registros: nuevaLineaBase.length,
+                        indice_actualizado: modalEditarLineaBase.index,
+                        item_actualizado_id: itemActualizado.id
+                      });
                       
                       setLineaBase(nuevaLineaBase);
                       
                       // Guardar en base de datos PASANDO LOS DATOS ACTUALIZADOS
+                      // IMPORTANTE: Se envía TODA la línea base para evitar que otros registros se marquen como eliminados
                       await guardarLineaBase(nuevaLineaBase);
                     }
                     
                     setModalEditarLineaBase(null);
                     mostrarNotificacion('✓ Cambios guardados correctamente', 'success');
                   } catch (error) {
-                    console.error('Error al guardar:', error);
-                    mostrarNotificacion('✗ Error al guardar cambios', 'error');
+                    console.error('Error al guardar cambios desde modal:', error);
+                    mostrarNotificacion('✗ Error al guardar cambios: ' + (error.message || 'Error desconocido'), 'error', 5000);
+                  } finally {
+                    setGuardandoLineaBase(false);
                   }
                 }}
                 disabled={guardandoLineaBase || guardandoLineaBaseMitigadores}

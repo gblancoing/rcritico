@@ -19,32 +19,16 @@ $zipFile = "$projectDir\rcritico_produccion_$timestamp.zip"
 # Cambiar al directorio del proyecto
 Set-Location $projectDir
 
-# Paso 1: Limpiar y regenerar build de React (SIEMPRE para incluir últimas mejoras)
-Write-Host "[1/7] Limpiando y regenerando build de React..." -ForegroundColor Yellow
-Write-Host "   Esto asegura que todas las mejoras recientes estén incluidas" -ForegroundColor Gray
-
-# Limpiar build anterior para forzar regeneración completa
-if (Test-Path "build") {
-    Write-Host "   Eliminando build anterior..." -ForegroundColor Gray
-    Remove-Item -Recurse -Force "build"
-    Write-Host "   Build anterior eliminado" -ForegroundColor Green
-}
-
-# Limpiar cache de node_modules si existe
-if (Test-Path "node_modules\.cache") {
-    Write-Host "   Eliminando cache de node_modules..." -ForegroundColor Gray
-    Remove-Item -Recurse -Force "node_modules\.cache"
-    Write-Host "   Cache eliminado" -ForegroundColor Green
-}
-
-# Regenerar build desde cero
-Write-Host "   Ejecutando: npm run build" -ForegroundColor Gray
-npm run build
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "   ERROR: Fallo el build de React" -ForegroundColor Red
-    exit 1
-}
-Write-Host "   Build regenerado exitosamente desde cero" -ForegroundColor Green
+# Paso 1: Verificar y regenerar build de React
+Write-Host "[1/7] Verificando y regenerando build de React..." -ForegroundColor Yellow
+# Siempre regenerar el build para asegurar que incluya los últimos cambios
+Write-Host "   Regenerando build para incluir últimos cambios..." -ForegroundColor Yellow
+    npm run build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "   ERROR: Fallo el build de React" -ForegroundColor Red
+        exit 1
+    }
+Write-Host "   Build regenerado exitosamente" -ForegroundColor Green
 
 # Paso 2: Limpiar deploy anterior
 Write-Host "[2/7] Limpiando deploy anterior..." -ForegroundColor Yellow
@@ -63,32 +47,6 @@ Write-Host "[4/7] Copiando build de React..." -ForegroundColor Yellow
 Copy-Item -Recurse "$projectDir\build\*" "$deployDir\" -Force
 Write-Host "   Build copiado" -ForegroundColor Green
 
-# Paso 4.5: Copiar carpeta public (imágenes necesarias para reportes)
-Write-Host "[4.5/7] Copiando carpeta public (imágenes)..." -ForegroundColor Yellow
-if (Test-Path "$projectDir\public") {
-    # Crear directorio destino si no existe
-    if (-not (Test-Path "$deployDir\public")) {
-        New-Item -ItemType Directory -Path "$deployDir\public" -Force | Out-Null
-    }
-    # Copiar todo el contenido de public
-    Copy-Item -Recurse "$projectDir\public\*" "$deployDir\public\" -Force
-    Write-Host "   Carpeta public copiada (incluye muro.jpg y logo-codelco.png)" -ForegroundColor Green
-    
-    # Verificar que las imágenes críticas estén presentes
-    if (Test-Path "$deployDir\public\img\muro.jpg") {
-        Write-Host "   OK: muro.jpg encontrado" -ForegroundColor Green
-    } else {
-        Write-Host "   ERROR: muro.jpg NO encontrado" -ForegroundColor Red
-    }
-    if (Test-Path "$deployDir\public\img\logo-codelco.png") {
-        Write-Host "   OK: logo-codelco.png encontrado" -ForegroundColor Green
-    } else {
-        Write-Host "   ERROR: logo-codelco.png NO encontrado" -ForegroundColor Red
-    }
-} else {
-    Write-Host "   ADVERTENCIA: Carpeta public no encontrada" -ForegroundColor Yellow
-}
-
 # Paso 5: Copiar API (excluyendo archivos temporales y backups)
 Write-Host "[5/7] Copiando API (excluyendo temporales)..." -ForegroundColor Yellow
 
@@ -96,8 +54,6 @@ Write-Host "[5/7] Copiando API (excluyendo temporales)..." -ForegroundColor Yell
 New-Item -ItemType Directory -Path "$deployDir\api" -Force | Out-Null
 
 # Archivos y carpetas a EXCLUIR
-# NOTA: NO excluir archivos de stockholders (crear_tabla.php, agregar_columna_parametros.php)
-# ya que son necesarios para la instalación en producción
 $excludePatterns = @(
     "*.zip",
     "*.log",
@@ -133,41 +89,18 @@ $excludePatterns = @(
     "EXPORTAR_*.sql",
     "ACTIVAR_*.sql",
     "COPIAR_*.sql",
-    "rcritico_produccion_*.zip",
-    # Excluir archivos de prueba específicos, pero NO los de instalación
-    "test_archivo_pdf.php",
-    "test_pdf_version.php",
-    "test_pdf_simple.php",
-    "test_reporte_completo.php"
+    "rcritico_produccion_*.zip"
 )
 
 # Copiar API recursivamente, excluyendo patrones
-# IMPORTANTE: NO excluir archivos de instalación de stockholders
 $apiFiles = Get-ChildItem "$projectDir\api" -Recurse -File | Where-Object {
     $shouldExclude = $false
-    $fileName = $_.Name
-    
-    # Excepciones: NO excluir estos archivos aunque coincidan con patrones
-    $excepciones = @(
-        "crear_tabla.php",
-        "agregar_columna_parametros.php",
-        "create_informes_stockholders_table.sql",
-        "add_parametros_informes.sql"
-    )
-    
-    # Si está en la lista de excepciones, NO excluir
-    if ($excepciones -contains $fileName) {
-        $shouldExclude = $false
-    } else {
-        # Aplicar patrones de exclusión
-        foreach ($pattern in $excludePatterns) {
-            if ($fileName -like $pattern) {
-                $shouldExclude = $true
-                break
-            }
+    foreach ($pattern in $excludePatterns) {
+        if ($_.Name -like $pattern) {
+            $shouldExclude = $true
+            break
         }
     }
-    
     -not $shouldExclude
 }
 
@@ -199,96 +132,6 @@ foreach ($file in $apiFiles) {
 
 Write-Host "   API copiada ($copied archivos)" -ForegroundColor Green
 
-# Copiar archivos SQL de base de datos (mejoras recientes)
-Write-Host "[5.5/7] Copiando archivos SQL de base de datos..." -ForegroundColor Yellow
-$sqlFiles = @(
-    "api\database\create_informes_stockholders_table.sql",
-    "api\database\add_parametros_informes.sql"
-)
-$sqlCopied = 0
-foreach ($sqlFile in $sqlFiles) {
-    $rutaOrigen = Join-Path $projectDir $sqlFile
-    if (Test-Path $rutaOrigen) {
-        $rutaDestino = Join-Path $deployDir $sqlFile
-        $dirDestino = Split-Path $rutaDestino -Parent
-        if (-not (Test-Path $dirDestino)) {
-            New-Item -ItemType Directory -Path $dirDestino -Force | Out-Null
-        }
-        Copy-Item $rutaOrigen $rutaDestino -Force
-        $sqlCopied++
-        Write-Host "   OK $sqlFile" -ForegroundColor Green
-    }
-}
-if ($sqlCopied -gt 0) {
-    Write-Host "   SQL copiado ($sqlCopied archivos)" -ForegroundColor Green
-}
-
-# Copiar composer.json si existe (para dependencias TCPDF)
-Write-Host "[5.6/7] Copiando composer.json..." -ForegroundColor Yellow
-if (Test-Path "$projectDir\composer.json") {
-    Copy-Item "$projectDir\composer.json" "$deployDir\composer.json" -Force
-    Write-Host "   composer.json copiado" -ForegroundColor Green
-} else {
-    Write-Host "   composer.json no encontrado (opcional)" -ForegroundColor Yellow
-}
-
-# Paso 5.7: Copiar carpeta vendor (CRÍTICO para TCPDF)
-Write-Host "[5.7/7] Copiando carpeta vendor (TCPDF y dependencias)..." -ForegroundColor Yellow
-if (Test-Path "$projectDir\vendor") {
-    # Crear directorio destino si no existe
-    if (-not (Test-Path "$deployDir\api\vendor")) {
-        New-Item -ItemType Directory -Path "$deployDir\api\vendor" -Force | Out-Null
-    }
-    
-    # Esperar un momento para asegurar que no hay archivos bloqueados
-    Start-Sleep -Seconds 1
-    
-    # Copiar todo el contenido de vendor (excluyendo archivos temporales)
-    try {
-        # Copiar autoload.php primero
-        if (Test-Path "$projectDir\vendor\autoload.php") {
-            Copy-Item "$projectDir\vendor\autoload.php" "$deployDir\api\vendor\autoload.php" -Force
-        }
-        
-        # Copiar composer/
-        if (Test-Path "$projectDir\vendor\composer") {
-            Copy-Item -Recurse "$projectDir\vendor\composer" "$deployDir\api\vendor\composer" -Force -ErrorAction SilentlyContinue
-        }
-        
-        # Copiar tecnickcom/tcpdf (lo más importante)
-        if (Test-Path "$projectDir\vendor\tecnickcom") {
-            Copy-Item -Recurse "$projectDir\vendor\tecnickcom" "$deployDir\api\vendor\tecnickcom" -Force -ErrorAction SilentlyContinue
-        }
-        
-        # Copiar phpmailer si existe
-        if (Test-Path "$projectDir\vendor\phpmailer") {
-            Copy-Item -Recurse "$projectDir\vendor\phpmailer" "$deployDir\api\vendor\phpmailer" -Force -ErrorAction SilentlyContinue
-        }
-        
-        Write-Host "   Carpeta vendor copiada" -ForegroundColor Green
-    } catch {
-        Write-Host "   ADVERTENCIA: Algunos archivos de vendor pueden estar bloqueados" -ForegroundColor Yellow
-        Write-Host "   Reintentando copia completa..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 2
-        Copy-Item -Recurse "$projectDir\vendor\*" "$deployDir\api\vendor\" -Force -ErrorAction SilentlyContinue
-    }
-    
-    # Verificar que TCPDF esté presente
-    if (Test-Path "$deployDir\api\vendor\tecnickcom\tcpdf") {
-        Write-Host "   OK: TCPDF encontrado en vendor" -ForegroundColor Green
-    } else {
-        Write-Host "   ERROR: TCPDF NO encontrado en vendor" -ForegroundColor Red
-    }
-    if (Test-Path "$deployDir\api\vendor\autoload.php") {
-        Write-Host "   OK: autoload.php encontrado" -ForegroundColor Green
-    } else {
-        Write-Host "   ERROR: autoload.php NO encontrado" -ForegroundColor Red
-    }
-} else {
-    Write-Host "   ADVERTENCIA: Carpeta vendor no encontrada" -ForegroundColor Yellow
-    Write-Host "   IMPORTANTE: TCPDF no estara disponible sin vendor/" -ForegroundColor Red
-}
-
 # NO copiar uploads (para no sobrescribir archivos en producción)
 # Solo crear estructura vacía
 Write-Host "[6/7] Creando estructura de uploads (vacía)..." -ForegroundColor Yellow
@@ -306,8 +149,8 @@ foreach ($dir in $uploadsDirs) {
 }
 Write-Host "   Estructura uploads creada (vacía - no sobrescribe producción)" -ForegroundColor Green
 
-# Crear .htaccess para React Router
-Write-Host "[7/7] Creando archivos de configuración..." -ForegroundColor Yellow
+# Paso 9: Crear archivos de configuración
+Write-Host "[9/9] Creando archivos de configuración..." -ForegroundColor Yellow
 $htaccessContent = @"
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -329,6 +172,62 @@ if (Test-Path "$projectDir\_redirects") {
 # Copiar index.php si existe
 if (Test-Path "$projectDir\index.php") {
     Copy-Item "$projectDir\index.php" "$deployDir\index.php" -Force
+}
+
+# Copiar package.json y package-lock.json si existen (para referencia)
+if (Test-Path "$projectDir\package.json") {
+    Copy-Item "$projectDir\package.json" "$deployDir\package.json" -Force
+}
+if (Test-Path "$projectDir\package-lock.json") {
+    Copy-Item "$projectDir\package-lock.json" "$deployDir\package-lock.json" -Force
+}
+
+# Copiar README si existe
+if (Test-Path "$projectDir\README.md") {
+    Copy-Item "$projectDir\README.md" "$deployDir\README.md" -Force
+}
+
+# Verificar que los archivos de reportes mejorados estén incluidos
+$reportFiles = @(
+    "api\dashboard\generar_reporte_html.php",
+    "api\dashboard\generar_reporte_pdf.php"
+)
+$missingReports = @()
+foreach ($file in $reportFiles) {
+    if (-not (Test-Path "$deployDir\$file")) {
+        $missingReports += $file
+    }
+}
+
+if ($missingReports.Count -gt 0) {
+    Write-Host "   ADVERTENCIA: Archivos de reportes faltantes:" -ForegroundColor Yellow
+    foreach ($file in $missingReports) {
+        Write-Host "     - $file" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   Archivos de reportes mejorados incluidos" -ForegroundColor Green
+}
+
+# Verificar archivos críticos corregidos
+$criticalFiles = @(
+    "api\archivos\linea_base_carpetas.php",
+    "api\archivos\carpetas.php",
+    "api\carpetas.php"
+)
+$missingCritical = @()
+foreach ($file in $criticalFiles) {
+    if (-not (Test-Path "$deployDir\$file")) {
+        $missingCritical += $file
+    }
+}
+
+if ($missingCritical.Count -gt 0) {
+    Write-Host "   ADVERTENCIA: Archivos críticos faltantes:" -ForegroundColor Yellow
+    foreach ($file in $missingCritical) {
+        Write-Host "     - $file" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   Archivos críticos incluidos" -ForegroundColor Green
 }
 
 Write-Host "   Archivos de configuración creados" -ForegroundColor Green
@@ -391,54 +290,56 @@ Write-Host ""
 
 # Verificar contenido importante
 Write-Host "Verificando contenido del paquete..." -ForegroundColor Yellow
+
+# Verificar en la carpeta de deploy primero (más confiable)
+Write-Host "   Verificando archivos en deploy_rcritico..." -ForegroundColor Gray
+
+$checks = @{
+    "Build JS" = (Get-ChildItem "$deployDir\static\js\main.*.js" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*.map" } | Measure-Object).Count -gt 0
+    "index.html" = Test-Path "$deployDir\index.html"
+    "API PHP" = (Get-ChildItem "$deployDir\api" -Recurse -Filter "*.php" -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0
+    "Reporte HTML" = Test-Path "$deployDir\api\dashboard\generar_reporte_html.php"
+    "Reporte PDF" = Test-Path "$deployDir\api\dashboard\generar_reporte_pdf.php"
+    "linea_base_carpetas.php" = Test-Path "$deployDir\api\archivos\linea_base_carpetas.php"
+    "carpetas.php" = Test-Path "$deployDir\api\carpetas.php"
+    "Archivos públicos" = Test-Path "$deployDir\public"
+}
+
+# También verificar en el ZIP
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile)
-# Buscar en la estructura del ZIP (puede tener prefijo deploy_rcritico/)
-$buildJs = $zip.Entries | Where-Object { ($_.FullName -like "*/static/js/main.*.js" -or $_.FullName -like "static/js/main.*.js") -and $_.FullName -notlike "*.map" }
-$indexHtml = $zip.Entries | Where-Object { $_.FullName -like "*/index.html" -or $_.FullName -eq "index.html" }
-$apiFiles = $zip.Entries | Where-Object { ($_.FullName -like "*/api/*.php" -or $_.FullName -like "api/*.php") -and $_.FullName -notlike "*/test*" -and $_.FullName -notlike "*/debug*" }
-$stockholdersFiles = $zip.Entries | Where-Object { $_.FullName -like "*/api/stockholders/*.php" -or $_.FullName -like "api/stockholders/*.php" }
-$sqlFiles = $zip.Entries | Where-Object { $_.FullName -like "*/api/database/*informes*.sql" -or $_.FullName -like "api/database/*informes*.sql" }
-$composerJson = $zip.Entries | Where-Object { $_.FullName -like "*/composer.json" -or $_.FullName -eq "composer.json" }
+$zipEntries = $zip.Entries | ForEach-Object { $_.FullName }
 $zip.Dispose()
 
-if ($buildJs) {
-    Write-Host "   [OK] Build JS encontrado" -ForegroundColor Green
+foreach ($check in $checks.GetEnumerator()) {
+    if ($check.Value) {
+        Write-Host "   [OK] $($check.Key)" -ForegroundColor Green
 } else {
-    Write-Host "   [ADVERTENCIA] Build JS no encontrado (puede estar en otra ruta)" -ForegroundColor Yellow
+        Write-Host "   [ERROR] $($check.Key) no encontrado" -ForegroundColor Red
+}
 }
 
-if ($indexHtml) {
-    Write-Host "   [OK] index.html encontrado" -ForegroundColor Green
-} else {
-    Write-Host "   [ERROR] ADVERTENCIA: index.html no encontrado" -ForegroundColor Red
-}
+# Verificar también en el ZIP
+$zipBuildJs = $zipEntries | Where-Object { $_ -like "static/js/main.*.js" -and $_ -notlike "*.map" }
+$zipApiFiles = $zipEntries | Where-Object { $_ -like "api/*.php" }
+$zipReportHtml = $zipEntries | Where-Object { $_ -eq "api/dashboard/generar_reporte_html.php" -or $_ -like "*generar_reporte_html.php" }
+$zipReportPdf = $zipEntries | Where-Object { $_ -eq "api/dashboard/generar_reporte_pdf.php" -or $_ -like "*generar_reporte_pdf.php" }
+$zipLineaBase = $zipEntries | Where-Object { $_ -like "*linea_base_carpetas.php" }
 
-if ($apiFiles.Count -gt 0) {
-    $apiCount = $apiFiles.Count
-    Write-Host "   [OK] API encontrada ($apiCount archivos PHP)" -ForegroundColor Green
-} else {
-    Write-Host "   [ADVERTENCIA] API no encontrada (puede estar en otra ruta)" -ForegroundColor Yellow
+if ($zipBuildJs) {
+    Write-Host "   [OK] Build JS verificado en ZIP" -ForegroundColor Green
 }
-
-if ($stockholdersFiles.Count -gt 0) {
-    $stockCount = $stockholdersFiles.Count
-    Write-Host "   [OK] API Stockholders encontrada ($stockCount archivos)" -ForegroundColor Green
-} else {
-    Write-Host "   [ADVERTENCIA] API Stockholders no encontrada" -ForegroundColor Yellow
+if ($zipApiFiles.Count -gt 0) {
+    Write-Host "   [OK] API verificada en ZIP ($($zipApiFiles.Count) archivos PHP)" -ForegroundColor Green
 }
-
-if ($sqlFiles.Count -gt 0) {
-    $sqlCount = $sqlFiles.Count
-    Write-Host "   [OK] Archivos SQL encontrados ($sqlCount archivos)" -ForegroundColor Green
-} else {
-    Write-Host "   [ADVERTENCIA] Archivos SQL no encontrados" -ForegroundColor Yellow
+if ($zipReportHtml) {
+    Write-Host "   [OK] Reporte HTML verificado en ZIP" -ForegroundColor Green
 }
-
-if ($composerJson) {
-    Write-Host "   [OK] composer.json encontrado" -ForegroundColor Green
-} else {
-    Write-Host "   [ADVERTENCIA] composer.json no encontrado (opcional)" -ForegroundColor Yellow
+if ($zipReportPdf) {
+    Write-Host "   [OK] Reporte PDF verificado en ZIP" -ForegroundColor Green
+}
+if ($zipLineaBase) {
+    Write-Host "   [OK] linea_base_carpetas.php verificado en ZIP" -ForegroundColor Green
 }
 
 Write-Host ""
@@ -461,18 +362,7 @@ Write-Host ""
 Write-Host "4. La base de datos ya está configurada en:" -ForegroundColor White
 Write-Host "   api/config/config.php" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "5. IMPORTANTE: Ejecutar scripts SQL para nuevas tablas:" -ForegroundColor Yellow
-Write-Host "   - api/database/create_informes_stockholders_table.sql" -ForegroundColor Yellow
-Write-Host "   - api/database/add_parametros_informes.sql" -ForegroundColor Yellow
-Write-Host "   O usar los scripts PHP de instalacion:" -ForegroundColor Yellow
-Write-Host "   - http://tu-dominio/api/stockholders/crear_tabla.php" -ForegroundColor Cyan
-Write-Host "   - http://tu-dominio/api/stockholders/agregar_columna_parametros.php" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "6. Si usas Composer, instalar dependencias:" -ForegroundColor White
-Write-Host "   composer install" -ForegroundColor Cyan
-Write-Host "   (Necesario para TCPDF en reportes PDF)" -ForegroundColor Gray
-Write-Host ""
-Write-Host "7. NO se copiaron archivos de uploads para no sobrescribir" -ForegroundColor Yellow
+Write-Host "5. NO se copiaron archivos de uploads para no sobrescribir" -ForegroundColor Yellow
 Write-Host "   producción. La estructura de carpetas está vacía." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
