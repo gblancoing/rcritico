@@ -308,18 +308,10 @@ const convertirEvidenciasArrayATexto = (evidencias) => {
   return '';
 };
 
-const pestañasGenerales = ['guia', 'riesgo', 'diagrama', 'linea_base', 'archivos', 'foro', 'tareas']; // Nivel 1: sin BOWTIE
-const pestañasTerceraCascada = ['bowtie', 'linea_base', 'archivos', 'foro', 'tareas']; // Nivel 2: con BOWTIE
+const pestañasGenerales = ['guia', 'riesgo', 'bases', 'diagrama', 'linea_base', 'archivos', 'foro', 'tareas']; // Nivel 1: sin BOWTIE
+const pestañasTerceraCascada = ['linea_base', 'archivos', 'foro', 'tareas']; // Nivel 2: sin BOWTIE
 const pestañasContenedor = ['archivos']; // Nivel 3+: Solo archivos (NO BOWTIE)
 
-// Función auxiliar para verificar si el usuario puede editar análisis Bowtie
-// admin solo puede editar en nivel 2, super_admin puede editar en todos los niveles
-const puedeEditarBowtie = (user, rutaNavegacion) => {
-  if (!user) return false;
-  if (user.rol === 'super_admin') return true;
-  if (user.rol === 'admin' && rutaNavegacion.length === 2) return true; // Solo nivel 2
-  return false;
-};
 
 // Función auxiliar para verificar si el usuario puede editar Línea Base
 // admin solo puede editar en nivel 2, super_admin puede editar en todos los niveles
@@ -1032,6 +1024,46 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [pdfPages, setPdfPages] = useState([]); // Páginas del PDF renderizadas
   const [galeriaImagenes, setGaleriaImagenes] = useState(null); // { imagenes: [], indiceActual: 0 } - Galería de imágenes
   const [navegacionDesdeNotificacion, setNavegacionDesdeNotificacion] = useState(false); // Flag para evitar reseteo de pestaña
+  
+  // Estados para modal de notificaciones moderno
+  const [modalNotificacion, setModalNotificacion] = useState(null); // { tipo: 'success'|'error'|'warning'|'info', mensaje: string, titulo?: string }
+  const [modalConfirmacion, setModalConfirmacion] = useState(null); // { mensaje: string, titulo?: string, onConfirm: function, onCancel?: function }
+
+  // Funciones helper para mostrar modales de notificaciones modernas
+  const mostrarModalNotificacion = (tipo, mensaje, titulo = null) => {
+    setModalNotificacion({ tipo, mensaje, titulo });
+    // Auto-cerrar después de 4 segundos para success/info, 6 segundos para error/warning
+    const tiempo = (tipo === 'success' || tipo === 'info') ? 4000 : 6000;
+    setTimeout(() => {
+      setModalNotificacion(null);
+    }, tiempo);
+  };
+
+  const mostrarModalConfirmacion = (mensaje, titulo = 'Confirmar', onConfirm, onCancel = null) => {
+    setModalConfirmacion({ mensaje, titulo, onConfirm, onCancel });
+  };
+
+  // Funciones wrapper para reemplazar alert() y confirm()
+  const mostrarAlertaModal = (mensaje, tipo = 'info') => {
+    mostrarModalNotificacion(tipo, mensaje);
+  };
+
+  const mostrarConfirmModal = (mensaje, titulo = 'Confirmar') => {
+    return new Promise((resolve) => {
+      mostrarModalConfirmacion(
+        mensaje,
+        titulo,
+        () => {
+          setModalConfirmacion(null);
+          resolve(true);
+        },
+        () => {
+          setModalConfirmacion(null);
+          resolve(false);
+        }
+      );
+    });
+  };
 
   // Manejo de teclado para galería de imágenes
   useEffect(() => {
@@ -1070,6 +1102,7 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [officeViewerError, setOfficeViewerError] = useState({ word: false, excel: false, powerpoint: false }); // Errores de visores de Office
   const [uploadProgress, setUploadProgress] = useState(null); // { archivo: nombre, progreso: 0-100, estado: 'subiendo'|'completado'|'error' }
   const [archivosSubiendo, setArchivosSubiendo] = useState([]); // Lista de archivos en proceso de subida
+  const [descargaProgress, setDescargaProgress] = useState(null); // { visible: boolean, progreso: 0-100, estado: 'preparando'|'descargando'|'completado'|'error', mensaje: string }
   const [vistaArchivos, setVistaArchivos] = useState('lista'); // Opciones: 'lista', 'iconos_grandes', 'iconos_medianos', 'detalles'
   
   // Estados para carpetas de archivos (pestaña Archivos nivel 1)
@@ -1108,31 +1141,12 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [pestañaActiva, setPestañaActiva] = useState('guia');
   const [informacionRiesgo, setInformacionRiesgo] = useState(null);
   const [editandoRiesgo, setEditandoRiesgo] = useState(false);
-  const [analisisBowtie, setAnalisisBowtie] = useState(null);
-  const [cargandoBowtie, setCargandoBowtie] = useState(false);
-  const [mostrarGuiaBowtie, setMostrarGuiaBowtie] = useState(true);
-  const [guiaBowtieMinimizada, setGuiaBowtieMinimizada] = useState(true);
-  const [guardandoBowtie, setGuardandoBowtie] = useState(false);
-  const [guardandoCausas, setGuardandoCausas] = useState(false);
-  const [guardandoConsecuencias, setGuardandoConsecuencias] = useState(false);
-  const [guardandoControlesPreventivos, setGuardandoControlesPreventivos] = useState(false);
-  const [guardandoControlesMitigadores, setGuardandoControlesMitigadores] = useState(false);
-  const [guardandoControlesPreventivosGenerales, setGuardandoControlesPreventivosGenerales] = useState(false);
-  const [guardandoControlesMitigadoresGenerales, setGuardandoControlesMitigadoresGenerales] = useState(false);
-  const [causasEditando, setCausasEditando] = useState(new Set()); // IDs de causas en modo edición
-  const [consecuenciasEditando, setConsecuenciasEditando] = useState(new Set()); // IDs de consecuencias en modo edición
-  const [controlesPreventivosEditando, setControlesPreventivosEditando] = useState(new Set()); // IDs de controles preventivos en modo edición
-  const [controlesMitigadoresEditando, setControlesMitigadoresEditando] = useState(new Set()); // IDs de controles mitigadores en modo edición
-  const [controlesPreventivosGeneralesEditando, setControlesPreventivosGeneralesEditando] = useState(new Set()); // IDs de controles preventivos generales en modo edición
-  const [controlesMitigadoresGeneralesEditando, setControlesMitigadoresGeneralesEditando] = useState(new Set()); // IDs de controles mitigadores generales en modo edición
-  const [tablasBowtieMinimizadas, setTablasBowtieMinimizadas] = useState({
-    causas: false,
-    consecuencias: false,
-    controles_preventivos_criticos: false,
-    controles_preventivos_generales: false,
-    controles_mitigadores_criticos: false,
-    controles_mitigadores_generales: false
-  });
+  const [analisisBowtie, setAnalisisBowtie] = useState(null); // Análisis Bowtie de la carpeta actual
+  const [cargandoBowtie, setCargandoBowtie] = useState(false); // Estado de carga del análisis Bowtie
+  const [basesControles, setBasesControles] = useState({ controles: [] }); // { controles: [{codigo, nombre, tipo, clasificacion, objetivos, preguntas_trabajador, preguntas_supervisor, preguntas_ejecutivo, desviaciones, requisitos: [{requisito, evidencia, monitoreo}]}]}
+  const [editandoBases, setEditandoBases] = useState(false);
+  const [controlExpandido, setControlExpandido] = useState(null); // ID del control expandido para ver requisitos
+  const [modalInfoAdicional, setModalInfoAdicional] = useState(null); // { controlId: number, control: object } - Modal para mostrar/editar información adicional del control
   const [lineaBase, setLineaBase] = useState([]);
   const [cargandoLineaBase, setCargandoLineaBase] = useState(false);
   const [guardandoLineaBase, setGuardandoLineaBase] = useState(false);
@@ -1169,6 +1183,10 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
     supervisor_mitigador: false,
     trabajador_preventivo: false,
     trabajador_mitigador: false,
+    trabajador_preguntas: false,
+    supervisor_preguntas: false,
+    ejecutivo_preguntas: false,
+    ejecutivo_estandares: false,
     informacion_riesgo: false
   });
   const [mensajesForo, setMensajesForo] = useState([]);
@@ -1183,8 +1201,10 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
     descripcion: '',
     asignados_a: [], // Array de IDs de usuarios asignados
     fecha_vencimiento: '',
+    fecha_inicio: '', // Solo para tareas "para realizar"
     prioridad: 'media',
-    recordatorio_en: ''
+    recordatorio_en: '',
+    tipo_tarea: 'para_realizar' // 'para_realizar' o 'para_programar'
   });
   const [comentariosTarea, setComentariosTarea] = useState({}); // { tareaId: [comentarios] }
   const [nuevoComentario, setNuevoComentario] = useState({}); // { tareaId: texto }
@@ -1196,6 +1216,13 @@ const GestorArchivos = ({ proyectoId, centroCostoId, carpetaId, user, sidebarCol
   const [participantesCarpeta, setParticipantesCarpeta] = useState([]); // Lista de participantes de la carpeta
   const [cargandoParticipantes, setCargandoParticipantes] = useState(false); // Estado de carga de participantes
   const [modalValidacionObservacion, setModalValidacionObservacion] = useState(null); // { itemIndex, tipo: 'preventivo'|'mitigador', item }
+  const [modalProgramarAviso, setModalProgramarAviso] = useState(null); // { item, controlIndex, requisitoIndex } - Para programar avisos por correo
+  const [formProgramarAviso, setFormProgramarAviso] = useState({
+    fecha_inicio: '',
+    fecha_limite: '',
+    fecha_recordatorio: '',
+    monitoreo: ''
+  });
   const [notificaciones, setNotificaciones] = useState([]); // Array de notificaciones toast
   
   // Función para mostrar notificaciones toast
@@ -1372,92 +1399,15 @@ const pestañasDisponibles = React.useMemo(() => {
     return pestañasTerceraCascada.filter(p => p !== 'bowtie');
   }
   
-  // Nivel 2: rutaNavegacion.length === 1 → CON bowtie + guia, riesgo, diagrama
+  // Nivel 1: rutaNavegacion.length === 1 → SIN bowtie + guia, riesgo, bases, diagrama
   if (nivelReal === 1) {
-    return ['guia', 'riesgo', 'diagrama', 'bowtie', 'linea_base', 'archivos', 'foro', 'tareas'];
+    return ['guia', 'riesgo', 'bases', 'diagrama', 'linea_base', 'archivos', 'foro', 'tareas'];
   }
   
   // Nivel 0-1: rutaNavegacion.length === 0 → pestañas generales (sin bowtie)
   return pestañasGenerales;
 }, [nivelReal]);
 
-const aplicarAnalisisBowtie = (analisis) => {
-  // Convertir evidencias de texto a array de objetos con ID al cargar
-  const convertirEvidenciasEnAnalisis = (analisisData) => {
-    if (!analisisData) return analisisData;
-    
-    const convertirControles = (controles) => {
-      if (!controles || !Array.isArray(controles)) return controles;
-      return controles.map(control => {
-        const dimensiones = (control.dimensiones || []).map(dimension => {
-          const preguntas = (dimension.preguntas || []).map(pregunta => {
-            // CRÍTICO: Procesar evidencias para asegurar formato correcto
-            let evidenciasFinales = [];
-            
-            // Si ya tiene evidencias como array, procesarlas
-            if (pregunta.evidencias && Array.isArray(pregunta.evidencias) && pregunta.evidencias.length > 0) {
-              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: Procesando ${pregunta.evidencias.length} evidencias (array)`);
-              evidenciasFinales = pregunta.evidencias.map((ev, index) => {
-                // Si es un objeto con id y texto, mantenerlo
-                if (ev && typeof ev === 'object' && ev.id && ev.texto !== undefined) {
-                  return {
-                    id: ev.id,
-                    texto: ev.texto || ''
-                  };
-                }
-                // Si es un string, convertirlo a objeto
-                if (typeof ev === 'string') {
-                  return {
-                    id: `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
-                    texto: ev
-                  };
-                }
-                // Si es un objeto sin id, agregar id
-                return {
-                  id: ev?.id || `${pregunta.id || 'preg'}_${index}_${Date.now()}`,
-                  texto: ev?.texto || ev || ''
-                };
-              });
-              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: ${evidenciasFinales.length} evidencias procesadas`);
-            }
-            // Si tiene evidencia (texto) pero no evidencias (array), convertir
-            else if (pregunta.evidencia && (!pregunta.evidencias || !Array.isArray(pregunta.evidencias) || pregunta.evidencias.length === 0)) {
-              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: Convirtiendo evidencia (texto) a array`);
-              evidenciasFinales = convertirEvidenciasTextoAArray(pregunta.evidencia, pregunta.id);
-              console.log(`[Aplicar BOWTIE] Pregunta ID ${pregunta.id}: ${evidenciasFinales.length} evidencias convertidas`);
-            }
-            // Si no tiene ni evidencia ni evidencias, crear array vacío
-            else {
-              evidenciasFinales = [];
-            }
-            
-            return {
-              ...pregunta,
-              evidencias: evidenciasFinales
-            };
-          });
-          return { ...dimension, preguntas };
-        });
-        return { ...control, dimensiones };
-      });
-    };
-    
-    return {
-      ...analisisData,
-      controles_preventivos: convertirControles(analisisData.controles_preventivos),
-      controles_mitigadores: convertirControles(analisisData.controles_mitigadores)
-    };
-  };
-  
-  const analisisConvertido = convertirEvidenciasEnAnalisis(analisis);
-  setAnalisisBowtie(analisisConvertido);
-  setCausasEditando(new Set());
-  setConsecuenciasEditando(new Set());
-  setControlesPreventivosEditando(new Set());
-  setControlesMitigadoresEditando(new Set());
-  setControlesPreventivosGeneralesEditando(new Set());
-  setControlesMitigadoresGeneralesEditando(new Set());
-};
 
 useEffect(() => {
   if (!carpetaActual) return;
@@ -1473,13 +1423,9 @@ useEffect(() => {
   // Usar pestañasDisponibles que ya tiene la lógica correcta
   if (!pestañasDisponibles.includes(pestañaActiva)) {
     // Si la pestaña actual no está disponible, cambiar a una válida
-    if (pestañasDisponibles.includes('bowtie')) {
-      // Si bowtie está disponible (nivel 2), ir a bowtie
-      console.log('[useEffect pestañaActiva] Cambiando a bowtie (nivel 2)');
-      setPestañaActiva('bowtie');
-    } else if (pestañasDisponibles.includes('guia')) {
-      // Si no, ir a guia (nivel 0-1)
-      console.log('[useEffect pestañaActiva] Cambiando a guia (nivel 0-1)');
+    if (pestañasDisponibles.includes('guia')) {
+      // Ir a guia
+      console.log('[useEffect pestañaActiva] Cambiando a guia');
       setPestañaActiva('guia');
     } else if (pestañasDisponibles.includes('linea_base')) {
       // Si no hay guia, ir a linea_base (nivel 3+)
@@ -1752,9 +1698,17 @@ useEffect(() => {
       
       // Limpiar información de riesgo antes de cargar la nueva
       setInformacionRiesgo(null);
+      // CRÍTICO: Solo limpiar analisisBowtie si NO estamos en nivel 1 o 2
+      // Para nivel 1 y 2, no necesitamos analisisBowtie, pero limpiarlo no debería afectar basesControles
+      if (nivelReal >= 3) {
       setAnalisisBowtie(null);
+      }
+      // Solo limpiar lineaBase si NO estamos en nivel 1 o 2 (donde usamos basesControles)
+      if (nivelReal >= 3) {
       setLineaBase([]);
       setLineaBaseMitigadores([]);
+      }
+      // NO limpiar basesControles en ningún nivel, ya que se usa en nivel 1 y 2
       
       // Resetear navegación de carpetas de archivos
       setArchivosCarpetaActual(null);
@@ -1768,6 +1722,12 @@ useEffect(() => {
       cargarMensajesForo(carpetaActual.id);
       cargarTareas(carpetaActual.id);
       cargarInformacionRiesgo(carpetaActual.id);
+      cargarBasesControles(carpetaActual.id);
+      // BOWTIE eliminado del nivel 1 - no cargar
+      // Nivel 2: No cargar BOWTIE ni lineaBase desde BOWTIE, solo usar basesControles
+      // Nivel 3+: Cargar BOWTIE y lineaBase normalmente
+      if (nivelReal >= 3) {
+        // Solo para nivel 3 y superiores, cargar BOWTIE y línea base
       cargarAnalisisBowtie(carpetaActual.id).then(() => {
         // Cargar línea base después de que BOWTIE esté cargado
         // Usar un delay para asegurar que el estado de analisisBowtie esté actualizado
@@ -1777,6 +1737,12 @@ useEffect(() => {
           await cargarLineaBaseMitigadores(carpetaActual.id);
         }, 500);
       });
+      } else {
+        // En nivel 1 y 2: No cargar BOWTIE ni lineaBase desde BOWTIE
+        // Nivel 1: usa basesControles para línea base
+        // Nivel 2: usa basesControles para línea base (sin depender de BOWTIE)
+        // No hacer nada aquí, los datos vienen de basesControles
+      }
       // Resetear estados de edición al cambiar de carpeta
       setEditandoTabla({
         evento_no_deseado: false,
@@ -1785,6 +1751,10 @@ useEffect(() => {
         supervisor_mitigador: false,
         trabajador_preventivo: false,
         trabajador_mitigador: false,
+        trabajador_preguntas: false,
+        supervisor_preguntas: false,
+        ejecutivo_preguntas: false,
+        ejecutivo_estandares: false,
         informacion_riesgo: false
       });
       // Limpiar comentarios al cambiar de carpeta
@@ -1843,6 +1813,13 @@ useEffect(() => {
   useEffect(() => {
     if (!carpetaActual || !carpetaActual.id) return;
     
+    // CRÍTICO: En nivel 1 y 2, NO cargar línea base mitigadores desde BOWTIE
+    // Nivel 1: no tiene mitigadores
+    // Nivel 2: no tiene mitigadores (solo preventivos desde basesControles)
+    if (nivelReal === 1 || nivelReal === 2) {
+      return; // No hacer nada
+    }
+    
     if (analisisBowtie && analisisBowtie.controles_mitigadores && analisisBowtie.controles_mitigadores.length > 0) {
       // Cargar línea base existente si hay, sino crear nueva
       cargarLineaBaseMitigadores(carpetaActual.id);
@@ -1850,7 +1827,7 @@ useEffect(() => {
       // Si no hay controles, intentar cargar desde API directamente o limpiar
       cargarLineaBaseMitigadores(carpetaActual.id);
     }
-  }, [controlesMitigadoresFirma, carpetaActual?.id]);
+  }, [controlesMitigadoresFirma, carpetaActual?.id, nivelReal]);
 
   // Scroll al mensaje específico cuando se carga desde ResumenComentarios
   useEffect(() => {
@@ -1943,15 +1920,61 @@ useEffect(() => {
     }
   }, [lineaBase, lineaBaseMitigadores, lineaBaseIdResaltar, carpetaActual]);
 
+  // Función para cargar comentarios de una tarea desde la API
+  const cargarComentariosTarea = async (tareaId) => {
+    try {
+      const res = await fetch(`${API_BASE}/archivos/carpeta_tarea_comentarios.php?tarea_id=${tareaId}`);
+      if (!res.ok) {
+        console.error('Error cargando comentarios:', res.status);
+        setComentariosTarea(prev => ({ ...prev, [tareaId]: prev[tareaId] || [] }));
+        return;
+      }
+      const data = await res.json();
+      const comentarios = Array.isArray(data) ? data : (data.comentarios || []);
+      setComentariosTarea(prev => ({
+        ...prev,
+        [tareaId]: comentarios
+      }));
+    } catch (error) {
+      console.error('Error cargando comentarios:', error);
+      setComentariosTarea(prev => ({ ...prev, [tareaId]: prev[tareaId] || [] }));
+    }
+  };
+
   // Cargar comentarios y adjuntos cuando se expande una tarea
   useEffect(() => {
     if (tareaExpandida && tareas.length > 0) {
       const tarea = tareas.find(t => t.id === tareaExpandida);
-      if (tarea && tarea.comentarios) {
-        setComentariosTarea(prev => ({
+      // Actualizar comentarios desde la tarea si están disponibles
+      if (tarea && tarea.comentarios && Array.isArray(tarea.comentarios)) {
+        setComentariosTarea(prev => {
+          // Si ya hay comentarios en el estado, combinarlos (evitar duplicados)
+          const comentariosExistentes = prev[tareaExpandida] || [];
+          const comentariosNuevos = tarea.comentarios || [];
+          
+          // Combinar y eliminar duplicados por ID
+          const comentariosCombinados = [...comentariosExistentes];
+          comentariosNuevos.forEach(nuevo => {
+            if (!comentariosCombinados.find(c => c.id === nuevo.id)) {
+              comentariosCombinados.push(nuevo);
+            }
+          });
+          
+          // Ordenar por fecha de creación (más recientes primero)
+          comentariosCombinados.sort((a, b) => {
+            const fechaA = new Date(a.creado_en || 0);
+            const fechaB = new Date(b.creado_en || 0);
+            return fechaB - fechaA;
+          });
+          
+          return {
           ...prev,
-          [tareaExpandida]: tarea.comentarios
-        }));
+            [tareaExpandida]: comentariosCombinados
+          };
+        });
+      } else if (!tarea || !tarea.comentarios) {
+        // Si no hay comentarios en la tarea, cargar desde la API
+        cargarComentariosTarea(tareaExpandida);
       }
       // Cargar adjuntos
       cargarAdjuntosTarea(tareaExpandida);
@@ -2229,18 +2252,32 @@ useEffect(() => {
       }
 
       if (data.success && data.comentario) {
-        // Agregar el nuevo comentario a la lista
+        // Agregar el nuevo comentario a la lista (al inicio para mostrarlo primero)
         setComentariosTarea(prev => ({
           ...prev,
-          [tareaId]: [...(prev[tareaId] || []), data.comentario]
+          [tareaId]: [data.comentario, ...(prev[tareaId] || [])]
         }));
         // Limpiar el campo de comentario
         setNuevoComentario(prev => ({
           ...prev,
           [tareaId]: ''
         }));
-        // Recargar tareas para actualizar contador
+        // Actualizar la tarea en el estado para reflejar el nuevo comentario
+        setTareas(prev => prev.map(t => {
+          if (t.id === tareaId) {
+            const cantidadActual = t.cantidad_comentarios || 0;
+            return {
+              ...t,
+              cantidad_comentarios: cantidadActual + 1,
+              comentarios: [data.comentario, ...(t.comentarios || [])]
+            };
+          }
+          return t;
+        }));
+        // Recargar tareas para sincronizar (opcional, en segundo plano)
+        setTimeout(() => {
         cargarTareas(carpetaActual.id);
+        }, 500);
       } else if (data.error) {
         alert('Error al crear comentario: ' + data.error);
       } else {
@@ -2328,14 +2365,21 @@ useEffect(() => {
       }
 
       // Parsear JSON de controles si existen
-      let controlesSupervisor = { preventivos: [], mitigadores: [] };
-      let controlesTrabajador = { preventivos: [], mitigadores: [] };
+      let controlesSupervisor = { preguntas: [] };
+      let controlesTrabajador = { preguntas: [] };
+      let controlesEjecutivo = { preguntas: [], estandares_desempeno: [] };
       
       try {
         if (carpeta.controles_supervisor) {
-          controlesSupervisor = typeof carpeta.controles_supervisor === 'string' 
+          const parsed = typeof carpeta.controles_supervisor === 'string' 
             ? JSON.parse(carpeta.controles_supervisor) 
             : carpeta.controles_supervisor;
+          // Compatibilidad: si tiene estructura antigua (preventivos/mitigadores), convertir
+          if (parsed.preventivos || parsed.mitigadores) {
+            controlesSupervisor = { preguntas: [...(parsed.preventivos || []), ...(parsed.mitigadores || [])] };
+          } else {
+            controlesSupervisor = parsed.preguntas ? parsed : { preguntas: parsed.preguntas || [] };
+          }
         }
       } catch (e) {
         console.error('Error parseando controles_supervisor:', e);
@@ -2343,12 +2387,31 @@ useEffect(() => {
       
       try {
         if (carpeta.controles_trabajador) {
-          controlesTrabajador = typeof carpeta.controles_trabajador === 'string'
+          const parsed = typeof carpeta.controles_trabajador === 'string'
             ? JSON.parse(carpeta.controles_trabajador)
             : carpeta.controles_trabajador;
+          // Compatibilidad: si tiene estructura antigua (preventivos/mitigadores), convertir
+          if (parsed.preventivos || parsed.mitigadores) {
+            controlesTrabajador = { preguntas: [...(parsed.preventivos || []), ...(parsed.mitigadores || [])] };
+          } else {
+            controlesTrabajador = parsed.preguntas ? parsed : { preguntas: parsed.preguntas || [] };
+          }
         }
       } catch (e) {
         console.error('Error parseando controles_trabajador:', e);
+      }
+      
+      try {
+        if (carpeta.controles_ejecutivo) {
+          controlesEjecutivo = typeof carpeta.controles_ejecutivo === 'string'
+            ? JSON.parse(carpeta.controles_ejecutivo)
+            : carpeta.controles_ejecutivo;
+          // Asegurar estructura correcta
+          if (!controlesEjecutivo.preguntas) controlesEjecutivo.preguntas = [];
+          if (!controlesEjecutivo.estandares_desempeno) controlesEjecutivo.estandares_desempeno = [];
+        }
+      } catch (e) {
+        console.error('Error parseando controles_ejecutivo:', e);
       }
 
       setInformacionRiesgo({
@@ -2356,6 +2419,7 @@ useEffect(() => {
         evento_riesgo: carpeta.evento_riesgo || '',
         controles_supervisor: controlesSupervisor,
         controles_trabajador: controlesTrabajador,
+        controles_ejecutivo: controlesEjecutivo,
         informacion_riesgo: carpeta.informacion_riesgo || ''
       });
     } catch (error) {
@@ -2363,11 +2427,283 @@ useEffect(() => {
       setInformacionRiesgo({
         evento_no_deseado: '',
         evento_riesgo: '',
-        controles_supervisor: { preventivos: [], mitigadores: [] },
-        controles_trabajador: { preventivos: [], mitigadores: [] },
+        controles_supervisor: { preguntas: [] },
+        controles_trabajador: { preguntas: [] },
+        controles_ejecutivo: { preguntas: [], estandares_desempeno: [] },
         informacion_riesgo: ''
       });
     }
+  };
+
+  const cargarBasesControles = async (carpetaId) => {
+    if (!carpetaId) {
+      console.log('[cargarBasesControles] Sin carpetaId, limpiando basesControles');
+      // CRÍTICO: Solo limpiar si NO estamos en nivel 1 o 2 (donde basesControles es crítico)
+      // Para nivel 1 y 2, mantener los datos existentes si ya los hay
+      if (nivelReal >= 3) {
+      setBasesControles({ controles: [] });
+      }
+      return;
+    }
+    
+    // CRÍTICO: Para nivel 2, cargar desde el padre (nivel 1) porque los datos están ahí
+    // Nivel 1: rutaNavegacion.length === 1
+    // Nivel 2: rutaNavegacion.length === 2
+    let carpetaIdACargar = carpetaId;
+    if (nivelReal === 2 && carpetaActual && carpetaActual.carpeta_padre_id) {
+      console.log('[cargarBasesControles] Nivel 2 detectado, cargando desde carpeta padre (nivel 1):', carpetaActual.carpeta_padre_id);
+      carpetaIdACargar = carpetaActual.carpeta_padre_id;
+    }
+    
+    console.log('[cargarBasesControles] Iniciando carga para carpetaId:', carpetaIdACargar, nivelReal === 2 ? '(desde padre para nivel 2)' : '');
+    
+    try {
+      const res = await fetch(`${API_BASE}/archivos/carpetas.php?id=${carpetaIdACargar}`);
+      if (!res.ok) {
+        throw new Error(`Error HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      
+      let carpeta;
+      if (data && !data.error && !Array.isArray(data)) {
+        carpeta = data;
+      } else if (data && !data.error && Array.isArray(data) && data.length > 0) {
+        carpeta = data[0];
+      } else {
+        carpeta = {};
+      }
+
+      let basesControlesData = { controles: [] };
+      
+      try {
+        if (carpeta.bases_controles) {
+          basesControlesData = typeof carpeta.bases_controles === 'string'
+            ? JSON.parse(carpeta.bases_controles)
+            : carpeta.bases_controles;
+          if (!basesControlesData.controles || !Array.isArray(basesControlesData.controles)) {
+            basesControlesData.controles = [];
+          }
+          basesControlesData.controles = basesControlesData.controles.map(control => ({
+            ...control,
+            objetivos: control.objetivos || '',
+            preguntas_trabajador: control.preguntas_trabajador || '',
+            preguntas_supervisor: control.preguntas_supervisor || '',
+            preguntas_ejecutivo: control.preguntas_ejecutivo || '',
+            desviaciones: control.desviaciones || '',
+            requisitos: Array.isArray(control.requisitos) ? control.requisitos.map(requisito => ({
+              ...requisito,
+              // Inicializar campos adicionales si no existen
+              verificador_responsable: requisito.verificador_responsable || '',
+              fecha_verificacion: requisito.fecha_verificacion || '',
+              implementado_estandar_desempeno: requisito.implementado_estandar_desempeno || '',
+              accion_a_ejecutar: requisito.accion_a_ejecutar || '',
+              responsable_cierre_accion: requisito.responsable_cierre_accion || '',
+              fecha_cierre: requisito.fecha_cierre || '',
+              criticidad: requisito.criticidad || '',
+              porcentaje_avance_implementacion_accion: requisito.porcentaje_avance_implementacion_accion || '',
+              nombre_dueno_control_critico_tecnico: requisito.nombre_dueno_control_critico_tecnico || '',
+              comentario_trabajador: requisito.comentario_trabajador || '',
+              conversacion_seguimiento: Array.isArray(requisito.conversacion_seguimiento) ? requisito.conversacion_seguimiento : [],
+              estado_validacion: requisito.estado_validacion || '',
+              comentario_validacion: requisito.comentario_validacion || '',
+              usuario_validacion: requisito.usuario_validacion || '',
+              fecha_validacion: requisito.fecha_validacion || null,
+              conversacion_observaciones: Array.isArray(requisito.conversacion_observaciones) ? requisito.conversacion_observaciones : (typeof requisito.conversacion_observaciones === 'string' ? (requisito.conversacion_observaciones ? JSON.parse(requisito.conversacion_observaciones) : []) : []),
+              ponderacion: requisito.ponderacion || '',
+              ultimo_usuario_edito: requisito.ultimo_usuario_edito || ''
+            })) : []
+          }));
+          
+          console.log('[cargarBasesControles] Datos cargados correctamente:', {
+            cantidadControles: basesControlesData.controles.length,
+            totalRequisitos: basesControlesData.controles.reduce((acc, c) => acc + (c.requisitos?.length || 0), 0)
+          });
+        } else {
+          console.log('[cargarBasesControles] No hay bases_controles en la carpeta');
+        }
+      } catch (e) {
+        console.error('[cargarBasesControles] Error parseando bases_controles:', e);
+      }
+
+      console.log('[cargarBasesControles] Estableciendo basesControles con', basesControlesData.controles.length, 'controles');
+      console.log('[cargarBasesControles] Nivel actual:', nivelReal, '| Carpeta cargada:', carpetaIdACargar, '| Carpeta actual:', carpetaId);
+      
+      // CRÍTICO: Para nivel 1, solo actualizar si hay datos válidos para evitar limpiar la tabla
+      // Para nivel 2, siempre actualizar (incluso si está vacío) porque los datos vienen del padre
+      // Si ya hay datos en basesControles y la nueva carga está vacía SOLO en nivel 1, mantener los datos existentes
+      if (nivelReal === 1 && basesControlesData.controles.length === 0 && basesControles && basesControles.controles && basesControles.controles.length > 0) {
+        console.log('[cargarBasesControles] Nivel 1: Datos vacíos desde servidor, manteniendo datos existentes para evitar tabla vacía');
+        return; // No actualizar, mantener datos existentes
+      }
+      
+      // CRÍTICO: Para nivel 2, verificar que estamos cargando desde el padre correcto
+      if (nivelReal === 2) {
+        console.log('[cargarBasesControles] Nivel 2: Verificando carga desde padre...');
+        console.log('[cargarBasesControles] - Carpeta actual ID:', carpetaId);
+        console.log('[cargarBasesControles] - Carpeta padre ID:', carpetaActual?.carpeta_padre_id);
+        console.log('[cargarBasesControles] - Carpeta cargada ID:', carpetaIdACargar);
+        console.log('[cargarBasesControles] - Controles encontrados:', basesControlesData.controles.length);
+        if (basesControlesData.controles.length === 0) {
+          console.warn('[cargarBasesControles] Nivel 2: ADVERTENCIA - No se encontraron controles en la carpeta padre. La tabla estará vacía.');
+        }
+      }
+      
+      // Para nivel 2, siempre establecer los datos (incluso si están vacíos) porque vienen del padre
+      setBasesControles(basesControlesData);
+    } catch (error) {
+      console.error('[cargarBasesControles] Error cargando bases de controles:', error);
+      // CRÍTICO: Solo limpiar si NO estamos en nivel 1 o 2 (donde basesControles es crítico)
+      // Para nivel 1 y 2, mantener los datos existentes si ya los hay para evitar que la tabla se vacíe
+      if (nivelReal >= 3) {
+      setBasesControles({ controles: [] });
+      } else {
+        console.log('[cargarBasesControles] Error en nivel 1 o 2, manteniendo basesControles existentes para evitar tabla vacía');
+      }
+    }
+  };
+
+  const guardarBasesControles = async () => {
+    if (!carpetaActual || !carpetaActual.id) {
+      mostrarModalNotificacion('error', 'No hay carpeta seleccionada', 'Error');
+      return;
+    }
+
+    if (!user || !user.id) {
+      mostrarModalNotificacion('error', 'Usuario no identificado', 'Error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: carpetaActual.id,
+          nombre: carpetaActual.nombre,
+          descripcion: carpetaActual.descripcion || '',
+          usuario_id: user.id,
+          bases_controles: JSON.stringify(basesControles)
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        mostrarModalNotificacion('success', 'Bases de controles guardadas correctamente', 'Éxito');
+        setEditandoBases(false);
+        // CRÍTICO: NO recargar basesControles después de guardar para evitar que se limpie la tabla
+        // Los datos ya están actualizados en el estado local, no es necesario recargar
+        // Solo recargar si es explícitamente necesario (por ejemplo, si el servidor devuelve datos actualizados)
+        // cargarBasesControles(carpetaActual.id);
+      } else {
+        mostrarModalNotificacion('error', 'Error al guardar: ' + (data.error || 'Error desconocido'), 'Error');
+      }
+    } catch (error) {
+      console.error('Error guardando bases de controles:', error);
+      mostrarModalNotificacion('error', 'Error al guardar las bases de controles', 'Error');
+    }
+  };
+
+  // Funciones para manejar controles críticos
+  const agregarControlCritico = () => {
+    const nuevoControl = {
+      id: Date.now(),
+      codigo: '',
+      nombre: '',
+      tipo: 'Preventivo',
+      clasificacion: 'Sistema',
+      objetivos: '',
+      preguntas_trabajador: '',
+      preguntas_supervisor: '',
+      preguntas_ejecutivo: '',
+      desviaciones: '',
+      requisitos: []
+    };
+    setBasesControles({
+      ...basesControles,
+      controles: [...(basesControles.controles || []), nuevoControl]
+    });
+    setControlExpandido(nuevoControl.id);
+  };
+
+  const eliminarControlCritico = (controlId) => {
+    setBasesControles({
+      ...basesControles,
+      controles: (basesControles.controles || []).filter(c => c.id !== controlId)
+    });
+    if (controlExpandido === controlId) {
+      setControlExpandido(null);
+    }
+  };
+
+  const actualizarControlCritico = (controlId, campo, valor) => {
+    setBasesControles({
+      ...basesControles,
+      controles: (basesControles.controles || []).map(control =>
+        control.id === controlId ? { ...control, [campo]: valor } : control
+      )
+    });
+  };
+
+  // Funciones para manejar requisitos
+  const agregarRequisito = (controlId) => {
+    const nuevoRequisito = {
+      id: Date.now(),
+      requisito: '',
+      evidencia: '',
+      monitoreo: '',
+      // Campos adicionales para nivel 2
+      verificador_responsable: '',
+      fecha_verificacion: '',
+      implementado_estandar_desempeno: '',
+      accion_a_ejecutar: '',
+      responsable_cierre_accion: '',
+      fecha_cierre: '',
+      criticidad: '',
+      porcentaje_avance_implementacion_accion: '',
+      nombre_dueno_control_critico_tecnico: '',
+      comentario_trabajador: '',
+      conversacion_seguimiento: [],
+      estado_validacion: '',
+      ponderacion: '',
+      ultimo_usuario_edito: ''
+    };
+    setBasesControles({
+      ...basesControles,
+      controles: (basesControles.controles || []).map(control =>
+        control.id === controlId
+          ? { ...control, requisitos: [...(control.requisitos || []), nuevoRequisito] }
+          : control
+      )
+    });
+  };
+
+  const eliminarRequisito = (controlId, requisitoId) => {
+    setBasesControles({
+      ...basesControles,
+      controles: (basesControles.controles || []).map(control =>
+        control.id === controlId
+          ? { ...control, requisitos: (control.requisitos || []).filter(r => r.id !== requisitoId) }
+          : control
+      )
+    });
+  };
+
+  const actualizarRequisito = (controlId, requisitoId, campo, valor) => {
+    setBasesControles({
+      ...basesControles,
+      controles: (basesControles.controles || []).map(control =>
+        control.id === controlId
+          ? {
+              ...control,
+              requisitos: (control.requisitos || []).map(req =>
+                req.id === requisitoId ? { ...req, [campo]: valor } : req
+              )
+            }
+          : control
+      )
+    });
   };
 
   const cargarAnalisisBowtie = async (carpetaId) => {
@@ -2738,12 +3074,15 @@ useEffect(() => {
       if (data.success) {
         // Recargar el análisis
         if (carpetaActual && carpetaActual.id) {
+          // Solo recargar BOWTIE y lineaBase si NO estamos en nivel 1 o 2
+          if (nivelReal >= 3) {
           await cargarAnalisisBowtie(carpetaActual.id);
           // CRÍTICO: Recargar línea base después de guardar BOWTIE para sincronizar con cambios
           // Esto asegura que la línea base refleje las evidencias actuales del BOWTIE
           // Usar await en lugar de setTimeout para asegurar que se complete antes de continuar
           await new Promise(resolve => setTimeout(resolve, 300)); // Pequeño delay para asegurar que el BOWTIE se guardó
           await cargarLineaBase(carpetaActual.id);
+          }
           await cargarLineaBaseMitigadores(carpetaActual.id);
         }
         console.log('Análisis Bowtie guardado correctamente');
@@ -2880,8 +3219,20 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
   const cargarLineaBase = async (carpetaId) => {
     if (!carpetaId) {
+      // Solo limpiar si NO estamos en nivel 1 o 2
+      if (nivelReal >= 3) {
       setLineaBase([]);
+      }
       return;
+    }
+
+    // CRÍTICO: En nivel 1 y 2, NO cargar línea base desde BOWTIE
+    // Nivel 1: usa basesControles para línea base
+    // Nivel 2: usa basesControles para línea base (sin depender de BOWTIE)
+    if (nivelReal === 1 || nivelReal === 2) {
+      console.log('[Línea Base] Nivel 1 o 2 detectado, no cargar desde BOWTIE. Los datos vienen de basesControles.');
+      // NO poner cargandoLineaBase en true para evitar que se muestre el spinner
+      return; // No hacer nada, los datos vienen de basesControles
     }
 
     try {
@@ -2890,18 +3241,17 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       let controlesPreventivos = [];
       console.log('[Línea Base] Iniciando carga, analisisBowtie existe?', !!analisisBowtie);
       
-      // Detectar nivel actual: nivel 2 (rutaNavegacion.length === 1) o nivel 3+ (rutaNavegacion.length >= 2)
-      const esNivel2 = rutaNavegacion.length === 1;
+      // CRÍTICO: Este código solo se ejecuta para nivel 3+ (nivelReal >= 3)
+      // Nivel 1 y 2 ya retornaron antes, por lo que aquí solo procesamos nivel 3+
       const esNivel3 = rutaNavegacion.length >= 2;
       
       try {
-        // Si estamos en nivel 2, usar DIRECTAMENTE los controles del BOWTIE padre (nivel 1) que tienen las evidencias
-        // Si estamos en nivel 3+, usar DIRECTAMENTE los controles del BOWTIE del nivel 2 (padre) que tienen las evidencias
-        if (esNivel2 || esNivel3) {
+        // Solo para nivel 3+: usar DIRECTAMENTE los controles del BOWTIE del nivel 2 (padre) que tienen las evidencias
+        if (esNivel3) {
           const carpetaPadreId = carpetaActual?.carpeta_padre_id;
           if (carpetaPadreId) {
             try {
-              console.log(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Cargando controles del BOWTIE padre (ID: ${carpetaPadreId})`);
+              console.log(`[Línea Base] Nivel 3+: Cargando controles del BOWTIE padre (ID: ${carpetaPadreId})`);
               // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
               const timestamp = Date.now();
               const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaPadreId}&_t=${timestamp}`, {
@@ -2915,17 +3265,17 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               if (dataPadre && dataPadre.controles_preventivos && dataPadre.controles_preventivos.length > 0) {
                 // Usar los controles del padre directamente (tienen las evidencias)
                 controlesPreventivos = dataPadre.controles_preventivos;
-                console.log(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Usando controles del BOWTIE padre con evidencias:`, controlesPreventivos.length, 'controles');
+                console.log(`[Línea Base] Nivel 3+: Usando controles del BOWTIE padre con evidencias:`, controlesPreventivos.length, 'controles');
               } else {
-                console.log(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: No se encontraron controles en el BOWTIE padre`);
+                console.log(`[Línea Base] Nivel 3+: No se encontraron controles en el BOWTIE padre`);
               }
             } catch (errorPadre) {
-              console.error(`[Línea Base] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Error al cargar BOWTIE padre:`, errorPadre);
+              console.error(`[Línea Base] Nivel 3+: Error al cargar BOWTIE padre:`, errorPadre);
             }
           }
         }
         
-        // Si no estamos en nivel 2 o no se pudieron cargar controles del padre, cargar del nivel actual
+        // Si no se pudieron cargar controles del padre, cargar del nivel actual (solo nivel 3+)
         if (controlesPreventivos.length === 0) {
         // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
         const timestamp = Date.now();
@@ -3816,7 +4166,38 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     try {
       setCargandoDocumentos(true);
       const carpetaParam = carpetaId === null ? 'null' : carpetaId;
-      const res = await fetch(`${API_BASE}/archivos/linea_base_carpetas.php?linea_base_id=${lineaBaseId}&carpeta_padre_id=${carpetaParam}`);
+      
+      // CRÍTICO: Para nivel 2, usar el identificador pasado como parámetro
+      // El parámetro lineaBaseId puede ser claveUnica (string) o requisitoId (número) para nivel 2
+      const esNivel2 = rutaNavegacion.length === 2;
+      let url;
+      
+      if (esNivel2) {
+        // Para nivel 2, usar el identificador pasado como parámetro (claveUnica o requisitoId)
+        // CRÍTICO: Priorizar requisitoId si está disponible en formLineaBase, sino usar el parámetro
+        const requisitoIdDirecto = formLineaBase?.requisitoId;
+        const esClaveUnica = typeof lineaBaseId === 'string' && lineaBaseId.includes('_');
+        
+        // CRÍTICO: Si tenemos requisitoId directamente, usarlo. Si no, usar el parámetro
+        if (requisitoIdDirecto && typeof requisitoIdDirecto === 'number') {
+          url = `${API_BASE}/archivos/bases_controles_carpetas.php?requisito_id=${requisitoIdDirecto}&carpeta_padre_id=${carpetaParam}`;
+          console.log('[Cargar Documentos] Nivel 2: Usando requisito_id directamente de formLineaBase:', requisitoIdDirecto);
+        } else if (esClaveUnica) {
+          // Es claveUnica (código + requisito)
+          url = `${API_BASE}/archivos/bases_controles_carpetas.php?clave_unica=${encodeURIComponent(lineaBaseId)}&carpeta_padre_id=${carpetaParam}`;
+          console.log('[Cargar Documentos] Nivel 2: Usando clave_unica del parámetro (código + requisito):', lineaBaseId);
+        } else {
+          // Es requisitoId (numérico) del parámetro
+          url = `${API_BASE}/archivos/bases_controles_carpetas.php?requisito_id=${lineaBaseId}&carpeta_padre_id=${carpetaParam}`;
+          console.log('[Cargar Documentos] Nivel 2: Usando requisito_id del parámetro:', lineaBaseId);
+        }
+      } else {
+        // Para nivel 3+, usar linea_base_id
+        url = `${API_BASE}/archivos/linea_base_carpetas.php?linea_base_id=${lineaBaseId}&carpeta_padre_id=${carpetaParam}`;
+        console.log('[Cargar Documentos] Nivel 3+: Usando linea_base_id:', lineaBaseId);
+      }
+      
+      const res = await fetch(url);
       
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -3842,10 +4223,14 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       }
       
       if (data.success) {
+        console.log('[Cargar Documentos] Respuesta exitosa - Carpetas:', data.carpetas?.length || 0, 'Archivos:', data.archivos?.length || 0);
+        console.log('[Cargar Documentos] Datos recibidos:', data);
         setDocumentosCarpetas(data.carpetas || []);
         setDocumentosArchivos(data.archivos || []);
         setDocumentosBreadcrumbs(data.breadcrumbs || []);
         setDocumentosCarpetaActual(carpetaId);
+      } else {
+        console.error('[Cargar Documentos] Error en respuesta:', data.error || 'Error desconocido');
       }
     } catch (error) {
       console.error('Error cargando documentos:', error);
@@ -3871,13 +4256,31 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     setCreandoCarpeta(true);
     
     try {
-      let lineaBaseId = formLineaBase.id;
+      // CRÍTICO: Para nivel 2, usar claveUnica como identificador principal
+      // La claveUnica es: codigo_requisito_id (identificador único del item)
+      const esNivel2 = rutaNavegacion.length === 2;
+      let identificador = formLineaBase.id; // Default para nivel 3+
       
-      console.log('[Crear Carpeta] formLineaBase.id:', lineaBaseId);
       console.log('[Crear Carpeta] formLineaBase:', formLineaBase);
+      console.log('[Crear Carpeta] formLineaBase.claveUnica:', formLineaBase.claveUnica);
+      console.log('[Crear Carpeta] formLineaBase.requisitoId:', formLineaBase.requisitoId);
+      console.log('[Crear Carpeta] esNivel2:', esNivel2);
       
-      // Si no tiene ID, necesitamos guardar primero la línea base para obtenerlo
-      if (!lineaBaseId) {
+      // Para nivel 2, usar claveUnica (código + requisito) como identificador principal
+      if (esNivel2) {
+        // CRÍTICO: Usar claveUnica (código + requisito) como identificador principal
+        // La claveUnica es la concatenación: codigo_requisito_requisitoId
+        // Priorizar requisitoId si está disponible, sino usar claveUnica
+        identificador = formLineaBase.requisitoId || formLineaBase.claveUnica;
+        if (!identificador) {
+          mostrarNotificacion('✗ Error: No se encontró la clave única (código + requisito) del item. Cierre el modal y vuelva a intentar.', 'error');
+          setCreandoCarpeta(false);
+          return;
+        }
+        console.log('[Crear Carpeta] Nivel 2: Usando identificador:', identificador, 'tipo:', typeof identificador);
+        console.log('[Crear Carpeta] Nivel 2: Es requisitoId?', typeof identificador === 'number', 'Es claveUnica?', typeof identificador === 'string');
+      } else if (!identificador) {
+        // Para nivel 3+, si no tiene ID, necesitamos guardar primero la línea base para obtenerlo
         mostrarNotificacion('Guardando línea base primero...', 'info');
         
         // Determinar si es preventivo o mitigador basado en el modal
@@ -3970,10 +4373,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           });
           
           if (itemEncontrado && itemEncontrado.id) {
-            lineaBaseId = itemEncontrado.id;
+            identificador = itemEncontrado.id;
             // Actualizar el formLineaBase con el nuevo ID
-            setFormLineaBase(prev => ({ ...prev, id: lineaBaseId }));
-            console.log('[Crear Carpeta] ID encontrado:', lineaBaseId);
+            setFormLineaBase(prev => ({ ...prev, id: identificador }));
+            console.log('[Crear Carpeta] ID encontrado:', identificador);
           } else {
             console.error('[Crear Carpeta] No se encontró el item:', {
               buscando: {
@@ -4002,25 +4405,69 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       }
       
       // Verificación final antes de crear la carpeta
-      if (!lineaBaseId) {
-        mostrarNotificacion('✗ Error: No se pudo obtener el ID de la evidencia. Guarde la línea base primero.', 'error');
+      if (!identificador) {
+        mostrarNotificacion('✗ Error: No se pudo obtener el identificador del registro. Guarde la línea base primero.', 'error');
         setCreandoCarpeta(false);
         return;
       }
       
-      console.log('[Crear Carpeta] Creando carpeta con lineaBaseId:', lineaBaseId);
+      console.log('[Crear Carpeta] Creando carpeta con identificador:', identificador);
       
-      // Crear la carpeta con el ID válido
-      const res = await fetch(`${API_BASE}/archivos/linea_base_carpetas.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          linea_base_id: lineaBaseId,
+      // CRÍTICO: Para nivel 2, necesitamos usar el endpoint existente pero con requisito_id
+      // El endpoint linea_base_carpetas.php puede aceptar requisito_id como alternativa
+      let endpointCarpeta = `${API_BASE}/archivos/linea_base_carpetas.php`;
+      let bodyData;
+      
+      if (esNivel2) {
+        // Para nivel 2, usar endpoint de bases_controles
+        // CRÍTICO: Priorizar requisitoId sobre claveUnica para asegurar que se use el requisito_id correcto
+        endpointCarpeta = `${API_BASE}/archivos/bases_controles_carpetas.php`;
+        
+        // Si tenemos requisitoId directamente, usarlo. Si no, usar claveUnica
+        const requisitoIdDirecto = formLineaBase.requisitoId;
+        const esClaveUnica = typeof identificador === 'string' && identificador.includes('_');
+        
+        bodyData = {
           carpeta_padre_id: documentosCarpetaActual,
           nombre: nombreNuevaCarpeta.trim(),
           usuario_id: user?.id,
           usuario_nombre: user?.nombre || user?.email
-        })
+        };
+        
+        // CRÍTICO: SIEMPRE usar requisitoId directamente de formLineaBase
+        // Validar que sea un número válido y positivo (puede ser un número grande, como timestamp)
+        if (requisitoIdDirecto && typeof requisitoIdDirecto === 'number' && requisitoIdDirecto > 0 && isFinite(requisitoIdDirecto)) {
+          bodyData.requisito_id = requisitoIdDirecto;
+          console.log('[Crear Carpeta] Nivel 2: Enviando requisito_id directamente de formLineaBase:', bodyData.requisito_id);
+        } else {
+          // Si no hay requisitoId válido, mostrar error con información detallada
+          console.error('[Crear Carpeta] Error: requisitoId inválido en formLineaBase:', {
+            requisitoIdDirecto,
+            tipo: typeof requisitoIdDirecto,
+            formLineaBase: formLineaBase,
+            identificador: identificador
+          });
+          throw new Error(`No se encontró un requisitoId válido en formLineaBase. Valor encontrado: ${requisitoIdDirecto}, tipo: ${typeof requisitoIdDirecto}. Por favor, cierre el modal y vuelva a abrirlo.`);
+        }
+      } else {
+        // Para nivel 3+, usar linea_base_id normalmente
+        bodyData = {
+          linea_base_id: identificador,
+          carpeta_padre_id: documentosCarpetaActual,
+          nombre: nombreNuevaCarpeta.trim(),
+          usuario_id: user?.id,
+          usuario_nombre: user?.nombre || user?.email
+        };
+        console.log('[Crear Carpeta] Nivel 3+: Enviando linea_base_id:', identificador);
+      }
+      
+      console.log('[Crear Carpeta] Datos a enviar:', bodyData);
+      
+      // Crear la carpeta con el identificador válido
+      const res = await fetch(endpointCarpeta, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyData)
       });
       
       if (!res.ok) {
@@ -4042,12 +4489,34 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       }
       
       console.log('[Crear Carpeta] Respuesta crear carpeta:', data);
+      console.log('[Crear Carpeta] Identificador usado:', identificador, 'tipo:', typeof identificador);
+      console.log('[Crear Carpeta] esNivel2:', esNivel2);
       
       if (data.success) {
         mostrarNotificacion('✓ Carpeta creada exitosamente', 'success');
         setNombreNuevaCarpeta('');
         setModalNuevaCarpeta(false);
-        cargarDocumentosLineaBase(lineaBaseId, documentosCarpetaActual);
+        
+        // CRÍTICO: Para nivel 2, usar requisitoId directamente de formLineaBase para recargar
+        // Esto asegura que se use el mismo requisito_id que se usó para crear la carpeta
+        if (esNivel2) {
+          const requisitoIdParaRecargar = formLineaBase.requisitoId;
+          console.log('[Crear Carpeta] Recargando documentos con requisitoId de formLineaBase:', requisitoIdParaRecargar, 'tipo:', typeof requisitoIdParaRecargar);
+          if (requisitoIdParaRecargar) {
+            setTimeout(() => {
+              cargarDocumentosLineaBase(requisitoIdParaRecargar, documentosCarpetaActual);
+            }, 300);
+          } else {
+            console.warn('[Crear Carpeta] No se encontró requisitoId en formLineaBase, usando identificador:', identificador);
+            setTimeout(() => {
+              cargarDocumentosLineaBase(identificador, documentosCarpetaActual);
+            }, 300);
+          }
+        } else {
+          setTimeout(() => {
+            cargarDocumentosLineaBase(identificador, documentosCarpetaActual);
+          }, 300);
+        }
       } else {
         mostrarNotificacion('✗ Error al crear carpeta: ' + (data.error || 'Error desconocido'), 'error');
       }
@@ -4063,7 +4532,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     if (!modalRenombrarCarpeta || !nuevoNombreCarpeta.trim()) return;
     
     try {
-      const res = await fetch(`${API_BASE}/archivos/linea_base_carpetas.php`, {
+      // CRÍTICO: Para nivel 2, usar endpoint de bases_controles
+      const esNivel2 = rutaNavegacion.length === 2;
+      const endpoint = esNivel2 
+        ? `${API_BASE}/archivos/bases_controles_carpetas.php`
+        : `${API_BASE}/archivos/linea_base_carpetas.php`;
+      
+      const res = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4077,7 +4552,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         mostrarNotificacion('✓ Carpeta renombrada', 'success');
         setModalRenombrarCarpeta(null);
         setNuevoNombreCarpeta('');
-        cargarDocumentosLineaBase(formLineaBase.id, documentosCarpetaActual);
+        // CRÍTICO: Para nivel 2, usar claveUnica (código + requisito) como identificador principal
+        const identificador = esNivel2 
+          ? (formLineaBase.claveUnica || formLineaBase.requisitoId)  // Priorizar claveUnica para nivel 2
+          : formLineaBase.id;          // Usar id para nivel 3+
+        if (identificador) {
+          cargarDocumentosLineaBase(identificador, documentosCarpetaActual);
+        }
       } else {
         mostrarNotificacion('✗ Error: ' + data.error, 'error');
       }
@@ -4100,9 +4581,11 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     }
     
     try {
+      // CRÍTICO: Para nivel 2, usar endpoints de bases_controles
+      const esNivel2 = rutaNavegacion.length === 2;
       const endpoint = modalEliminarDocumento.tipo === 'carpeta' 
-        ? `${API_BASE}/archivos/linea_base_carpetas.php`
-        : `${API_BASE}/archivos/linea_base_archivos.php`;
+        ? (esNivel2 ? `${API_BASE}/archivos/bases_controles_carpetas.php` : `${API_BASE}/archivos/linea_base_carpetas.php`)
+        : (esNivel2 ? `${API_BASE}/archivos/bases_controles_archivos.php` : `${API_BASE}/archivos/linea_base_archivos.php`);
         
       console.log('[Eliminar Documento] Enviando DELETE a:', endpoint, 'con id:', modalEliminarDocumento.id);
       
@@ -4142,7 +4625,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
         mostrarNotificacion(`✓ ${modalEliminarDocumento.tipo === 'carpeta' ? 'Carpeta' : 'Archivo'} eliminado`, 'success');
         setModalEliminarDocumento(null);
         setClaveEliminarDocumento('');
-        cargarDocumentosLineaBase(formLineaBase.id, documentosCarpetaActual);
+        // CRÍTICO: Para nivel 2, usar claveUnica (código + requisito) como identificador principal
+        const identificador = esNivel2 
+          ? (formLineaBase.claveUnica || formLineaBase.requisitoId)  // Priorizar claveUnica para nivel 2
+          : formLineaBase.id;          // Usar id para nivel 3+
+        if (identificador) {
+          cargarDocumentosLineaBase(identificador, documentosCarpetaActual);
+        }
       } else {
         mostrarNotificacion('✗ Error: ' + data.error, 'error');
       }
@@ -4163,6 +4652,59 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       return;
     }
     
+    // CRÍTICO: Para nivel 2, usar requisitoId directamente (no intentar guardar en linea_base)
+    const esNivel2 = rutaNavegacion.length === 2;
+    
+    if (esNivel2) {
+      // Para nivel 2, usar claveUnica (código + requisito) como identificador principal
+      const claveUnica = formLineaBase.claveUnica;
+      const requisitoId = formLineaBase.requisitoId;
+      if (!claveUnica && !requisitoId) {
+        mostrarNotificacion('✗ Error: No se encontró la clave única (código + requisito). Por favor, guarde los cambios primero.', 'error');
+        return;
+      }
+      
+      const formData = new FormData();
+      Array.from(files).forEach(file => formData.append('archivos[]', file));
+      
+      // Enviar clave_unica si está disponible, sino requisito_id
+      if (claveUnica) {
+        formData.append('clave_unica', claveUnica); // Enviar clave_unica (código + requisito)
+      }
+      if (requisitoId) {
+        formData.append('requisito_id', requisitoId); // También enviar requisito_id como respaldo
+      }
+      
+      formData.append('carpeta_id', documentosCarpetaActual || '');
+      formData.append('usuario_id', user?.id);
+      formData.append('usuario_nombre', user?.nombre || user?.email);
+      
+      try {
+        setCargandoDocumentos(true);
+        // Usar endpoint de bases_controles para nivel 2
+        const res = await fetch(`${API_BASE}/archivos/bases_controles_archivos.php`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          mostrarNotificacion('✓ Archivos subidos correctamente', 'success');
+          // Recargar documentos usando claveUnica o requisitoId
+          cargarDocumentosLineaBase(claveUnica || requisitoId, documentosCarpetaActual);
+        } else {
+          mostrarNotificacion('✗ Error al subir archivos: ' + (data.error || 'Error desconocido'), 'error');
+        }
+      } catch (error) {
+        console.error('Error subiendo archivos:', error);
+        mostrarNotificacion('✗ Error al subir archivos: ' + error.message, 'error');
+      } finally {
+        setCargandoDocumentos(false);
+      }
+      return; // Salir temprano para nivel 2
+    }
+    
+    // Para nivel 3+, continuar con la lógica original
     let lineaBaseId = formLineaBase.id;
     
     // Si no tiene ID, necesitamos guardar primero la línea base para obtenerlo
@@ -4308,7 +4850,12 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
   const navegarCarpeta = (carpetaId) => {
     setDocumentosCarpetaActual(carpetaId);
-    cargarDocumentosLineaBase(formLineaBase.id, carpetaId);
+    // CRÍTICO: Para nivel 2, usar claveUnica (código + requisito) como identificador principal
+    const esNivel2 = rutaNavegacion.length === 2;
+    const identificador = esNivel2 
+      ? (formLineaBase.claveUnica || formLineaBase.requisitoId)  // Priorizar claveUnica para nivel 2
+      : formLineaBase.id;          // Usar id para nivel 3+
+    cargarDocumentosLineaBase(identificador, carpetaId);
   };
 
   const formatearTamanoArchivo = (bytes) => {
@@ -4344,6 +4891,12 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
   };
 
   const guardarLineaBase = async (lineaBaseActualizada = null, evitarRecarga = false) => {
+    // CRÍTICO: Para nivel 1 y 2, NO ejecutar guardarLineaBase (usan basesControles)
+    if (nivelReal === 1 || nivelReal === 2) {
+      console.log('[guardarLineaBase] Nivel 1 o 2 detectado, NO ejecutar. Los datos se guardan en basesControles.');
+      return;
+    }
+    
     // Validar carpeta actual primero
     if (!carpetaActual) {
       console.error('[Guardar Línea Base] Error: No hay carpeta actual seleccionada');
@@ -4552,9 +5105,11 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       }
       if (data.success) {
         // Solo recargar si no se está evitando la recarga (para evitar bucles infinitos en guardados automáticos)
-        if (!evitarRecarga) {
+        // CRÍTICO: Para nivel 2, NO recargar lineaBase (usa basesControles)
+        if (!evitarRecarga && nivelReal >= 3) {
         await cargarLineaBase(carpetaActual.id);
         }
+        // Para nivel 1 y 2, los datos vienen de basesControles, no se recarga lineaBase
         // Recargar promedio de ponderación
         try {
           const resPromedio = await fetch(`${API_BASE}/archivos/promedio_ponderacion.php?carpeta_id=${carpetaActual.id}`);
@@ -4585,24 +5140,31 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       return;
     }
 
+    // CRÍTICO: En nivel 1 y 2, NO cargar línea base mitigadores desde BOWTIE
+    // Nivel 1: no tiene mitigadores
+    // Nivel 2: no tiene mitigadores (solo preventivos desde basesControles)
+    if (nivelReal === 1 || nivelReal === 2) {
+      console.log('[Línea Base Mitigadores] Nivel 1 o 2 detectado, no cargar desde BOWTIE.');
+      return; // No hacer nada
+    }
+
     try {
       setCargandoLineaBaseMitigadores(true);
       // Siempre intentar cargar desde API primero para obtener datos frescos
       let controlesMitigadores = [];
       console.log('[Línea Base Mitigadores] Iniciando carga, analisisBowtie existe?', !!analisisBowtie);
       
-      // Detectar nivel actual: nivel 2 (rutaNavegacion.length === 1) o nivel 3+ (rutaNavegacion.length >= 2)
-      const esNivel2 = rutaNavegacion.length === 1;
+      // CRÍTICO: Este código solo se ejecuta para nivel 3+ (nivelReal >= 3)
+      // Nivel 1 y 2 ya retornaron antes, por lo que aquí solo procesamos nivel 3+
       const esNivel3 = rutaNavegacion.length >= 2;
       
       try {
-        // Si estamos en nivel 2, usar DIRECTAMENTE los controles del BOWTIE padre (nivel 1) que tienen las evidencias
-        // Si estamos en nivel 3+, usar DIRECTAMENTE los controles del BOWTIE del nivel 2 (padre) que tienen las evidencias
-        if (esNivel2 || esNivel3) {
+        // Solo para nivel 3+: usar DIRECTAMENTE los controles del BOWTIE del nivel 2 (padre) que tienen las evidencias
+        if (esNivel3) {
           const carpetaPadreId = carpetaActual?.carpeta_padre_id;
           if (carpetaPadreId) {
             try {
-              console.log(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Cargando controles del BOWTIE padre (ID: ${carpetaPadreId})`);
+              console.log(`[Línea Base Mitigadores] Nivel 3+: Cargando controles del BOWTIE padre (ID: ${carpetaPadreId})`);
               // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
               const timestamp = Date.now();
               const resPadre = await fetch(`${API_BASE}/archivos/carpeta_bowtie.php?carpeta_id=${carpetaPadreId}&_t=${timestamp}`, {
@@ -4616,17 +5178,17 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               if (dataPadre && dataPadre.controles_mitigadores && dataPadre.controles_mitigadores.length > 0) {
                 // Usar los controles del padre directamente (tienen las evidencias)
                 controlesMitigadores = dataPadre.controles_mitigadores;
-                console.log(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Usando controles del BOWTIE padre con evidencias:`, controlesMitigadores.length, 'controles');
+                console.log(`[Línea Base Mitigadores] Nivel 3+: Usando controles del BOWTIE padre con evidencias:`, controlesMitigadores.length, 'controles');
               } else {
-                console.log(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: No se encontraron controles en el BOWTIE padre`);
+                console.log(`[Línea Base Mitigadores] Nivel 3+: No se encontraron controles en el BOWTIE padre`);
               }
             } catch (errorPadre) {
-              console.error(`[Línea Base Mitigadores] ${esNivel2 ? 'Nivel 2' : 'Nivel 3+'}: Error al cargar BOWTIE padre:`, errorPadre);
+              console.error(`[Línea Base Mitigadores] Nivel 3+: Error al cargar BOWTIE padre:`, errorPadre);
             }
           }
         }
         
-        // Si no estamos en nivel 2 o no se pudieron cargar controles del padre, cargar del nivel actual
+        // Si no se pudieron cargar controles del padre, cargar del nivel actual (solo nivel 3+)
         if (controlesMitigadores.length === 0) {
         // CRÍTICO: Agregar timestamp para evitar cache y obtener datos frescos
         const timestamp = Date.now();
@@ -5926,9 +6488,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       if (data.success) {
         // CRÍTICO: Recargar análisis BOWTIE y línea base después de guardar
         // Esto asegura que las evidencias y preguntas guardadas se reflejen en la línea base
-        if (carpetaActual && carpetaActual.id) {
-          const esNivel2 = rutaNavegacion.length === 1;
-          
+        // SOLO para nivel 3+ (nivel 1 y 2 no usan BOWTIE para línea base)
+        if (carpetaActual && carpetaActual.id && nivelReal >= 3) {
           await cargarAnalisisBowtie(carpetaActual.id);
           // Pequeño delay para asegurar que el BOWTIE se guardó completamente
           await new Promise(resolve => setTimeout(resolve, 300));
@@ -6306,22 +6867,23 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           evento_riesgo: informacionRiesgo.evento_riesgo,
           controles_supervisor: JSON.stringify(informacionRiesgo.controles_supervisor),
           controles_trabajador: JSON.stringify(informacionRiesgo.controles_trabajador),
+          controles_ejecutivo: JSON.stringify(informacionRiesgo.controles_ejecutivo || { preguntas: [], estandares_desempeno: [] }),
           informacion_riesgo: informacionRiesgo.informacion_riesgo
         })
       });
 
       const data = await res.json();
       if (data.success) {
-        alert('Información de riesgo crítico guardada correctamente');
+        mostrarModalNotificacion('success', 'Información de riesgo crítico guardada correctamente', 'Éxito');
         setEditandoRiesgo(false);
         // Recargar la información
         cargarInformacionRiesgo(carpetaActual.id);
       } else {
-        alert('Error al guardar: ' + (data.error || 'Error desconocido'));
+        mostrarModalNotificacion('error', 'Error al guardar: ' + (data.error || 'Error desconocido'), 'Error');
       }
     } catch (error) {
       console.error('Error guardando información de riesgo:', error);
-      alert('Error al guardar la información de riesgo crítico');
+      mostrarModalNotificacion('error', 'Error al guardar la información de riesgo crítico', 'Error');
     }
   };
 
@@ -6344,6 +6906,86 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
     if (!informacionRiesgo) return;
     const nuevosControles = { ...informacionRiesgo };
     nuevosControles[`controles_${rol}`][tipo][index][campo] = valor;
+    setInformacionRiesgo(nuevosControles);
+  };
+
+  // Funciones para manejar preguntas de anexos
+  const agregarPreguntaAnexo = (rol) => {
+    if (!informacionRiesgo) return;
+    const nuevaPregunta = { codigo: '', control_critico: '', pregunta: '' };
+    const nuevosControles = { ...informacionRiesgo };
+    if (!nuevosControles[`controles_${rol}`]) {
+      nuevosControles[`controles_${rol}`] = { preguntas: [] };
+    }
+    if (!nuevosControles[`controles_${rol}`].preguntas) {
+      nuevosControles[`controles_${rol}`].preguntas = [];
+    }
+    nuevosControles[`controles_${rol}`].preguntas.push(nuevaPregunta);
+    setInformacionRiesgo(nuevosControles);
+  };
+
+  const eliminarPreguntaAnexo = (rol, index) => {
+    if (!informacionRiesgo) return;
+    const nuevosControles = { ...informacionRiesgo };
+    if (nuevosControles[`controles_${rol}`] && nuevosControles[`controles_${rol}`].preguntas) {
+      nuevosControles[`controles_${rol}`].preguntas.splice(index, 1);
+      setInformacionRiesgo(nuevosControles);
+    }
+  };
+
+  const actualizarPreguntaAnexo = (rol, index, campo, valor) => {
+    if (!informacionRiesgo) return;
+    const nuevosControles = { ...informacionRiesgo };
+    if (!nuevosControles[`controles_${rol}`]) {
+      nuevosControles[`controles_${rol}`] = { preguntas: [] };
+    }
+    if (!nuevosControles[`controles_${rol}`].preguntas) {
+      nuevosControles[`controles_${rol}`].preguntas = [];
+    }
+    if (!nuevosControles[`controles_${rol}`].preguntas[index]) {
+      nuevosControles[`controles_${rol}`].preguntas[index] = { codigo: '', control_critico: '', pregunta: '' };
+    }
+    nuevosControles[`controles_${rol}`].preguntas[index][campo] = valor;
+    setInformacionRiesgo(nuevosControles);
+  };
+
+  // Funciones para manejar estándares de desempeño (solo ejecutivo)
+  const agregarEstandarDesempeno = () => {
+    if (!informacionRiesgo) return;
+    const nuevoEstandar = { codigo: '', diseño: '', terreno: '' };
+    const nuevosControles = { ...informacionRiesgo };
+    if (!nuevosControles.controles_ejecutivo) {
+      nuevosControles.controles_ejecutivo = { preguntas: [], estandares_desempeno: [] };
+    }
+    if (!nuevosControles.controles_ejecutivo.estandares_desempeno) {
+      nuevosControles.controles_ejecutivo.estandares_desempeno = [];
+    }
+    nuevosControles.controles_ejecutivo.estandares_desempeno.push(nuevoEstandar);
+    setInformacionRiesgo(nuevosControles);
+  };
+
+  const eliminarEstandarDesempeno = (index) => {
+    if (!informacionRiesgo) return;
+    const nuevosControles = { ...informacionRiesgo };
+    if (nuevosControles.controles_ejecutivo && nuevosControles.controles_ejecutivo.estandares_desempeno) {
+      nuevosControles.controles_ejecutivo.estandares_desempeno.splice(index, 1);
+      setInformacionRiesgo(nuevosControles);
+    }
+  };
+
+  const actualizarEstandarDesempeno = (index, campo, valor) => {
+    if (!informacionRiesgo) return;
+    const nuevosControles = { ...informacionRiesgo };
+    if (!nuevosControles.controles_ejecutivo) {
+      nuevosControles.controles_ejecutivo = { preguntas: [], estandares_desempeno: [] };
+    }
+    if (!nuevosControles.controles_ejecutivo.estandares_desempeno) {
+      nuevosControles.controles_ejecutivo.estandares_desempeno = [];
+    }
+    if (!nuevosControles.controles_ejecutivo.estandares_desempeno[index]) {
+      nuevosControles.controles_ejecutivo.estandares_desempeno[index] = { codigo: '', diseño: '', terreno: '' };
+    }
+    nuevosControles.controles_ejecutivo.estandares_desempeno[index][campo] = valor;
     setInformacionRiesgo(nuevosControles);
   };
 
@@ -6446,8 +7088,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           creado_por: user.id,
           asignados_a: nuevaTarea.asignados_a || [], // Array de IDs
           fecha_vencimiento: nuevaTarea.fecha_vencimiento || null,
+          fecha_inicio: nuevaTarea.tipo_tarea === 'para_programar' ? (nuevaTarea.fecha_inicio || null) : null,
           prioridad: nuevaTarea.prioridad,
-          recordatorio_en: nuevaTarea.recordatorio_en || null
+          recordatorio_en: nuevaTarea.recordatorio_en || null,
+          tipo_tarea: nuevaTarea.tipo_tarea || 'para_realizar'
         })
       });
       
@@ -6470,24 +7114,59 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
       }
       
       if (data.success) {
+        // Mostrar mensaje de éxito
+        const asignadosCount = (data.tarea?.asignados?.length || 0);
+        let mensajeExito = '✓ Tarea creada correctamente';
+        if (asignadosCount > 0) {
+          mensajeExito += ` y correo enviado a ${asignadosCount} participante${asignadosCount > 1 ? 's' : ''}`;
+        }
+        mostrarNotificacion(mensajeExito, 'success', 5000);
+        
+        // Cerrar modal y limpiar formulario
         setModalCrearTarea(false);
         setNuevaTarea({
           titulo: '',
           descripcion: '',
           asignados_a: [],
           fecha_vencimiento: '',
+          fecha_inicio: '',
           prioridad: 'media',
-          recordatorio_en: ''
+          recordatorio_en: '',
+          tipo_tarea: 'para_realizar'
         });
+        
+        // Recargar lista de tareas
         cargarTareas(carpetaActual.id);
       } else if (data.error) {
-        alert('Error al crear tarea: ' + data.error);
+        mostrarNotificacion('✗ Error al crear tarea: ' + data.error, 'error', 5000);
       } else {
-        alert('Error al crear tarea: Respuesta inesperada del servidor');
+        mostrarNotificacion('✗ Error al crear tarea: Respuesta inesperada del servidor', 'error', 5000);
       }
     } catch (error) {
       console.error('Error creando tarea:', error);
-      alert('Error al crear tarea: ' + (error.message || 'Error de conexión'));
+      // Si hay un error pero la tarea puede haberse creado, verificar
+      mostrarNotificacion('✗ Error al crear tarea: ' + (error.message || 'Error de conexión'), 'error', 5000);
+      
+      // IMPORTANTE: Intentar cerrar el modal incluso si hay error
+      // porque la tarea puede haberse creado en el servidor (error 500 después de crear)
+      setModalCrearTarea(false);
+      
+      // Limpiar formulario
+      setNuevaTarea({
+        titulo: '',
+        descripcion: '',
+        asignados_a: [],
+        fecha_vencimiento: '',
+        fecha_inicio: '',
+        prioridad: 'media',
+        recordatorio_en: '',
+        tipo_tarea: 'para_realizar'
+      });
+      
+      // Recargar tareas por si acaso se creó
+      setTimeout(() => {
+        cargarTareas(carpetaActual.id);
+      }, 1000);
     }
   };
 
@@ -7701,38 +8380,170 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           {/* Botón Descargar RC - Solo en nivel 1 */}
           {rutaNavegacion.length === 1 && (
             <button
-              onClick={() => {
-                // Abrir descarga del ZIP
-                const url = `${API_BASE}/archivos/descargar_rc.php?carpeta_id=${carpetaActual.id}`;
-                window.open(url, '_blank');
+              onClick={async () => {
+                if (descargaProgress && descargaProgress.visible) {
+                  return; // Ya hay una descarga en progreso
+                }
+                
+                try {
+                  setDescargaProgress({
+                    visible: true,
+                    progreso: 0,
+                    estado: 'preparando',
+                    mensaje: 'Preparando archivos...'
+                  });
+
+                  const url = `${API_BASE}/archivos/descargar_rc.php?carpeta_id=${carpetaActual.id}`;
+                  
+                  setDescargaProgress(prev => ({
+                    ...prev,
+                    estado: 'descargando',
+                    progreso: 10,
+                    mensaje: 'Generando archivo ZIP...'
+                  }));
+
+                  // Usar fetch para poder rastrear el progreso
+                  const response = await fetch(url);
+                  
+                  if (!response.ok) {
+                    // Intentar leer el error como JSON
+                    let errorMsg = 'Error al descargar el archivo';
+                    try {
+                      const errorData = await response.json();
+                      errorMsg = errorData.error || errorMsg;
+                    } catch (e) {
+                      errorMsg = `Error ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errorMsg);
+                  }
+
+                  // Obtener el tamaño total del archivo
+                  const contentLength = response.headers.get('content-length');
+                  const total = contentLength ? parseInt(contentLength, 10) : 0;
+                  
+                  // Leer el contenido como blob con progreso
+                  const reader = response.body.getReader();
+                  const chunks = [];
+                  let receivedLength = 0;
+
+                  setDescargaProgress(prev => ({
+                    ...prev,
+                    progreso: 20,
+                    mensaje: 'Descargando archivo...'
+                  }));
+
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    chunks.push(value);
+                    receivedLength += value.length;
+                    
+                    // Actualizar progreso
+                    if (total > 0) {
+                      const progreso = Math.min(95, 20 + Math.round((receivedLength / total) * 75));
+                      setDescargaProgress(prev => ({
+                        ...prev,
+                        progreso: progreso,
+                        mensaje: `Descargando: ${(receivedLength / 1024 / 1024).toFixed(2)} MB`
+                      }));
+                    } else {
+                      // Si no conocemos el tamaño, estimar basado en chunks recibidos
+                      const progreso = Math.min(95, 20 + Math.round((chunks.length / 100) * 75));
+                      setDescargaProgress(prev => ({
+                        ...prev,
+                        progreso: progreso,
+                        mensaje: `Descargando archivo...`
+                      }));
+                    }
+                  }
+
+                  // Crear blob y descargar
+                  const blob = new Blob(chunks, { type: 'application/zip' });
+                  const blobUrl = window.URL.createObjectURL(blob);
+                  
+                  // Obtener nombre del archivo del header o generar uno
+                  const contentDisposition = response.headers.get('content-disposition');
+                  let filename = `RC_${carpetaActual.nombre}_${new Date().toISOString().split('T')[0]}.zip`;
+                  if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+                    if (filenameMatch) {
+                      filename = filenameMatch[1];
+                    }
+                  }
+
+                  setDescargaProgress(prev => ({
+                    ...prev,
+                    progreso: 100,
+                    estado: 'completado',
+                    mensaje: 'Descarga completada'
+                  }));
+
+                  // Crear enlace de descarga y activarlo
+                  const a = document.createElement('a');
+                  a.href = blobUrl;
+                  a.download = filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  
+                  // Limpiar
+                  window.URL.revokeObjectURL(blobUrl);
+                  
+                  // Ocultar barra de progreso después de 1 segundo
+                  setTimeout(() => {
+                    setDescargaProgress(null);
+                  }, 1000);
+                  
+                } catch (error) {
+                  console.error('Error al descargar:', error);
+                  setDescargaProgress({
+                    visible: true,
+                    progreso: 0,
+                    estado: 'error',
+                    mensaje: error.message || 'Error al descargar el archivo'
+                  });
+                  
+                  // Ocultar después de 5 segundos
+                  setTimeout(() => {
+                    setDescargaProgress(null);
+                  }, 5000);
+                }
               }}
+              disabled={descargaProgress && descargaProgress.visible}
               style={{
-                background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                background: descargaProgress && descargaProgress.visible 
+                  ? 'linear-gradient(135deg, #6c757d 0%, #495057 100%)' 
+                  : 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',
                 borderRadius: '8px',
-                cursor: 'pointer',
+                cursor: descargaProgress && descargaProgress.visible ? 'not-allowed' : 'pointer',
                 fontSize: '13px',
                 fontWeight: '600',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                opacity: descargaProgress && descargaProgress.visible ? 0.7 : 1
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
+                if (!descargaProgress || !descargaProgress.visible) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.3)';
               }}
-              title="Descargar todos los archivos de este RC como ZIP"
+              title="Descargar todos los archivos de este RC como ZIP (incluye Nivel 0 completo)"
             >
               <i className="fa fa-download"></i>
-              Descargar RC
+              {descargaProgress && descargaProgress.visible ? 'Descargando...' : 'Descargar RC'}
             </button>
           )}
         </div>
@@ -8373,8 +9184,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   }
                 }}
               >
-                <i className={`fa fa-${pestaña === 'archivos' ? 'file' : pestaña === 'riesgo' ? 'exclamation-triangle' : pestaña === 'bowtie' ? 'project-diagram' : pestaña === 'diagrama' ? 'sitemap' : pestaña === 'linea_base' ? 'chart-line' : pestaña === 'guia' ? 'book' : pestaña === 'foro' ? 'comments' : 'tasks'}`}></i>
-                {pestaña === 'archivos' ? 'Archivos' : pestaña === 'riesgo' ? 'Riesgo Crítico' : pestaña === 'bowtie' ? 'BOWTIE' : pestaña === 'diagrama' ? 'Diagrama' : pestaña === 'linea_base' ? 'Linea Base' : pestaña === 'guia' ? 'Guía Controles Críticos' : pestaña === 'foro' ? 'Foro' : 'Tareas'}
+                <i className={`fa fa-${pestaña === 'archivos' ? 'file' : pestaña === 'riesgo' ? 'exclamation-triangle' : pestaña === 'bases' ? 'database' : pestaña === 'bowtie' ? 'project-diagram' : pestaña === 'diagrama' ? 'sitemap' : pestaña === 'linea_base' ? 'chart-line' : pestaña === 'guia' ? 'book' : pestaña === 'foro' ? 'comments' : 'tasks'}`}></i>
+                {pestaña === 'archivos' ? 'Archivos' : pestaña === 'riesgo' ? 'Anexos' : pestaña === 'bases' ? 'Bases' : pestaña === 'bowtie' ? 'BOWTIE' : pestaña === 'diagrama' ? 'Diagrama' : pestaña === 'linea_base' ? 'Linea Base' : pestaña === 'guia' ? 'Guía Controles Críticos' : pestaña === 'foro' ? 'Foro' : 'Tareas'}
                 {pestaña === 'tareas' && tareas.length > 0 && (
                   <span style={{
                     background: '#dc3545',
@@ -8395,8 +9206,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
 
           {/* Contenido de las pestañas */}
           <div style={{ padding: '1.5rem' }}>
-            {/* Pestaña Análisis BOWTIE - Solo en nivel 2 (rutaNavegacion.length === 1), NUNCA en nivel 3+ */}
-            {pestañaActiva === 'bowtie' && nivelReal === 1 && (
+            {/* Pestaña Análisis BOWTIE - ELIMINADA del nivel 1 */}
+            {false && pestañaActiva === 'bowtie' && nivelReal === 1 && (
               <div>
                 {!carpetaActual ? (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#999' }}>
@@ -11676,7 +12487,280 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                     <i className="fa fa-chart-line" style={{ fontSize: '3rem', marginBottom: '1rem' }}></i>
                     <p>Selecciona una carpeta para ver su línea base</p>
                   </div>
-                ) : cargandoLineaBase ? (
+                ) : rutaNavegacion.length === 1 ? (
+                  // Nivel 1: Mostrar datos de Bases
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{
+                      background: 'white',
+                      padding: '1.5rem',
+                      borderRadius: '8px',
+                      border: '2px solid #17a2b8',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '1rem',
+                        paddingBottom: '1rem',
+                        borderBottom: '2px solid #17a2b8'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <h3 style={{
+                            margin: 0,
+                            color: '#17a2b8',
+                            fontSize: '18px',
+                            fontWeight: '700',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            <i className="fa fa-chart-line"></i>
+                            Línea Base - Controles Críticos / Mitigadores
+                          </h3>
+                        </div>
+                        <button
+                          onClick={() => {
+                            // Función para exportar a Excel desde basesControles
+                            if (!basesControles || !basesControles.controles || basesControles.controles.length === 0) {
+                              mostrarModalNotificacion('warning', 'No hay datos para exportar', 'Advertencia');
+                              return;
+                            }
+
+                            try {
+                              // Expandir datos: cada requisito es una fila
+                              const datosExpandidos = [];
+                              let numeroFila = 1;
+                              
+                              basesControles.controles.forEach(control => {
+                                if (control.requisitos && control.requisitos.length > 0) {
+                                  control.requisitos.forEach(requisito => {
+                                    datosExpandidos.push({
+                                      '#': numeroFila++,
+                                      'Código': control.codigo || '',
+                                      'Nombre': control.nombre || '',
+                                      'Tipo': control.tipo || '',
+                                      'Clasificación': control.clasificacion || '',
+                                      'Requisito': requisito.requisito || '',
+                                      'Evidencia': requisito.evidencia || '',
+                                      'Monitoreo': requisito.monitoreo || ''
+                                    });
+                                  });
+                                } else {
+                                  // Si no tiene requisitos, mostrar una fila con datos del control
+                                  datosExpandidos.push({
+                                    '#': numeroFila++,
+                                    'Código': control.codigo || '',
+                                    'Nombre': control.nombre || '',
+                                    'Tipo': control.tipo || '',
+                                    'Clasificación': control.clasificacion || '',
+                                    'Requisito': '',
+                                    'Evidencia': '',
+                                    'Monitoreo': ''
+                                  });
+                                }
+                              });
+
+                              const wb = XLSX.utils.book_new();
+                              const ws = XLSX.utils.json_to_sheet(datosExpandidos);
+                              
+                              const colWidths = [
+                                { wch: 8 },   // #
+                                { wch: 12 },  // Código
+                                { wch: 50 },  // Nombre
+                                { wch: 15 },  // Tipo
+                                { wch: 15 },  // Clasificación
+                                { wch: 60 },  // Requisito
+                                { wch: 60 },  // Evidencia
+                                { wch: 15 }   // Monitoreo
+                              ];
+                              ws['!cols'] = colWidths;
+                              
+                              XLSX.utils.book_append_sheet(wb, ws, 'Línea Base');
+                              
+                              const nombreCarpeta = carpetaActual?.nombre || 'Carpeta';
+                              const fecha = new Date().toISOString().split('T')[0];
+                              const nombreArchivo = `Linea_Base_${nombreCarpeta}_${fecha}.xlsx`;
+                              
+                              XLSX.writeFile(wb, nombreArchivo);
+                              mostrarModalNotificacion('success', 'Archivo Excel exportado correctamente', 'Éxito');
+                            } catch (error) {
+                              console.error('Error exportando a Excel:', error);
+                              mostrarModalNotificacion('error', 'Error al exportar a Excel: ' + error.message, 'Error');
+                            }
+                          }}
+                          style={{
+                            background: '#1d6f42',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.5rem 1.5rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                          title="Exportar a Excel"
+                        >
+                          <i className="fa fa-file-excel"></i> Exportar Excel
+                        </button>
+                      </div>
+
+                      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+                        {(() => {
+                          // Expandir datos de basesControles: cada requisito es una fila
+                          const datosExpandidos = [];
+                          let numeroFila = 1;
+                          
+                          if (basesControles && basesControles.controles) {
+                            basesControles.controles.forEach(control => {
+                              if (control.requisitos && control.requisitos.length > 0) {
+                                control.requisitos.forEach((requisito, index) => {
+                                  datosExpandidos.push({
+                                    numero: numeroFila++,
+                                    codigo: control.codigo || '',
+                                    nombre: control.nombre || '',
+                                    tipo: control.tipo || '',
+                                    clasificacion: control.clasificacion || '',
+                                    requisito: requisito.requisito || '',
+                                    evidencia: requisito.evidencia || '',
+                                    monitoreo: requisito.monitoreo || '',
+                                    controlId: control.id,
+                                    requisitoId: requisito.id,
+                                    esPrimeraFila: index === 0,
+                                    totalRequisitos: control.requisitos.length
+                                  });
+                                });
+                              } else {
+                                // Si no tiene requisitos, mostrar una fila con datos del control
+                                datosExpandidos.push({
+                                  numero: numeroFila++,
+                                  codigo: control.codigo || '',
+                                  nombre: control.nombre || '',
+                                  tipo: control.tipo || '',
+                                  clasificacion: control.clasificacion || '',
+                                  requisito: '',
+                                  evidencia: '',
+                                  monitoreo: '',
+                                  controlId: control.id,
+                                  requisitoId: null,
+                                  esPrimeraFila: true,
+                                  totalRequisitos: 0
+                                });
+                              }
+                            });
+                          }
+
+                          // Calcular rowspans para agrupar por código
+                          const calcularRowspans = () => {
+                            const rowspans = {};
+                            const gruposPorCodigo = {};
+                            
+                            datosExpandidos.forEach((item, index) => {
+                              const codigo = item.codigo || '';
+                              if (!gruposPorCodigo[codigo]) {
+                                gruposPorCodigo[codigo] = [];
+                              }
+                              gruposPorCodigo[codigo].push(index);
+                            });
+                            
+                            Object.keys(gruposPorCodigo).forEach(codigo => {
+                              const indices = gruposPorCodigo[codigo];
+                              indices.forEach((index, posicionEnGrupo) => {
+                                if (posicionEnGrupo === 0) {
+                                  rowspans[index] = indices.length;
+                                } else {
+                                  rowspans[index] = 0;
+                                }
+                              });
+                            });
+                            
+                            return rowspans;
+                          };
+                          
+                          const rowspans = datosExpandidos.length > 0 ? calcularRowspans() : {};
+
+                          if (datosExpandidos.length === 0) {
+                            return (
+                              <div style={{ textAlign: 'center', padding: '3rem', color: '#999' }}>
+                                <i className="fa fa-database" style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }}></i>
+                                <p style={{ fontSize: '16px', margin: 0 }}>No hay datos de línea base disponibles</p>
+                                <p style={{ fontSize: '14px', marginTop: '0.5rem', color: '#adb5bd' }}>
+                                  Ve a la pestaña "Bases" para agregar controles críticos
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '1000px' }}>
+                              <thead style={{ position: 'sticky', top: 0, zIndex: 100 }}>
+                                <tr style={{ background: '#17a2b8', color: 'white' }}>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', left: 0, top: 0, background: '#17a2b8', zIndex: 101 }}>#</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Código</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Nombre</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Tipo</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Clasificación</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Requisito</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Evidencia</th>
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100 }}>Monitoreo</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {datosExpandidos.map((fila, index) => (
+                                  <tr key={`${fila.controlId}-${fila.requisitoId || index}`} style={{ 
+                                    borderBottom: '1px solid #dee2e6',
+                                    background: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                                  }}>
+                                    <td style={{ 
+                                      padding: '0.75rem', 
+                                      verticalAlign: 'top',
+                                      fontWeight: '600',
+                                      fontSize: '13px'
+                                    }}>
+                                      {fila.numero}
+                                    </td>
+                                    {rowspans[index] > 0 ? (
+                                      <td rowSpan={rowspans[index]} style={{ padding: '0.75rem', verticalAlign: 'top', fontWeight: '600', fontSize: '13px', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                        {fila.codigo}
+                                      </td>
+                                    ) : null}
+                                    {rowspans[index] > 0 ? (
+                                      <td rowSpan={rowspans[index]} style={{ padding: '0.75rem', verticalAlign: 'top', fontSize: '13px', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                        {fila.nombre}
+                                      </td>
+                                    ) : null}
+                                    {rowspans[index] > 0 ? (
+                                      <td rowSpan={rowspans[index]} style={{ padding: '0.75rem', verticalAlign: 'top', fontSize: '13px', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                        {fila.tipo}
+                                      </td>
+                                    ) : null}
+                                    {rowspans[index] > 0 ? (
+                                      <td rowSpan={rowspans[index]} style={{ padding: '0.75rem', verticalAlign: 'top', fontSize: '13px', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                        {fila.clasificacion}
+                                      </td>
+                                    ) : null}
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top', fontSize: '13px', lineHeight: '1.5' }}>
+                                      {fila.requisito || '-'}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top', fontSize: '13px', lineHeight: '1.5' }}>
+                                      {fila.evidencia || '-'}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top', fontSize: '13px' }}>
+                                      {fila.monitoreo || '-'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (cargandoLineaBase && nivelReal >= 3) ? (
                   <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <i className="fa fa-spinner fa-spin" style={{ fontSize: '2rem', color: '#17a2b8' }}></i>
                     <p style={{ marginTop: '1rem', color: '#666' }}>Cargando línea base...</p>
@@ -11709,7 +12793,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             gap: '8px'
                           }}>
                             <i className="fa fa-chart-line"></i>
-                            Línea Base - Controles Críticos Preventivos
+                            Línea Base - Controles Críticos Preventivos / Mitigadores
                           </h3>
                           {rutaNavegacion.length === 2 && promedioPonderacionActual !== null && promedioPonderacionActual !== undefined && (
                             <div style={{
@@ -11760,10 +12844,202 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         {(() => {
                           // Determinar si estamos en el primer nivel (rutaNavegacion.length === 1)
                           const esPrimerNivel = rutaNavegacion.length === 1;
+                          const esNivel2 = rutaNavegacion.length === 2;
+                          
+                          let datosCombinados = [];
+                          let rowspans = {};
+                          let rowspansDimPre = {};
+                          
+                          // Función común para generar datos base desde basesControles (primeras 8 columnas)
+                          // Esta función se usa tanto para nivel 1 como nivel 2
+                          const generarDatosDesdeBasesControles = (incluirCamposAdicionales = false) => {
+                            let datos = [];
+                            let numeroFila = 1;
+                            
+                            if (basesControles && basesControles.controles && basesControles.controles.length > 0) {
+                              basesControles.controles.forEach((control, controlIndex) => {
+                                if (control.requisitos && control.requisitos.length > 0) {
+                                  // Si hay requisitos, crear una fila por cada requisito
+                                  control.requisitos.forEach((requisito, reqIndex) => {
+                                    // CRÍTICO: Clave única basada en código + requisito para identificar cada fila
+                                    // Esto asegura que los datos se mantengan correctamente al recargar
+                                    const claveUnica = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id || reqIndex}`;
+                                    
+                                    // Datos base (primeras 8 columnas) - IGUALES para nivel 1 y 2
+                                    const datosBase = {
+                                      // Columna 1: #
+                                      numero: numeroFila++,
+                                      // Columna 2: Código
+                                      codigo: control.codigo,
+                                      // Columna 3: Nombre
+                                      nombre: control.nombre,
+                                      // Columna 4: Tipo
+                                      tipo: control.tipo,
+                                      // Columna 5: Clasificación
+                                      clasificacion: control.clasificacion,
+                                      // Columna 6: Requisito
+                                      requisito: requisito.requisito || '',
+                                      // Columna 7: Evidencia
+                                      evidencia: requisito.evidencia || '',
+                                      // Columna 8: Monitoreo
+                                      monitoreo: requisito.monitoreo || '',
+                                      // Índices para edición
+                                      controlId: control.id,
+                                      controlIndex: controlIndex,
+                                      requisitoId: requisito.id,
+                                      requisitoIndex: reqIndex,
+                                      esPrimeraFilaRequisito: reqIndex === 0,
+                                      totalRequisitos: control.requisitos.length,
+                                      // CRÍTICO: Clave única para identificar esta fila (código + requisito)
+                                      claveUnica: claveUnica
+                                    };
+                                    
+                                    // Solo para nivel 2: agregar campos adicionales después de las primeras 8 columnas
+                                    if (incluirCamposAdicionales) {
+                                      datos.push({
+                                        ...datosBase,
+                                        // Campos adicionales del requisito (solo nivel 2)
+                                        verificador_responsable: requisito.verificador_responsable || '',
+                                        fecha_verificacion: requisito.fecha_verificacion || '',
+                                        implementado_estandar_desempeno: requisito.implementado_estandar_desempeno || '',
+                                        accion_a_ejecutar: requisito.accion_a_ejecutar || '',
+                                        responsable_cierre_accion: requisito.responsable_cierre_accion || '',
+                                        fecha_cierre: requisito.fecha_cierre || '',
+                                        criticidad: requisito.criticidad || '',
+                                        porcentaje_avance_implementacion_accion: requisito.porcentaje_avance_implementacion_accion || '',
+                                        nombre_dueno_control_critico_tecnico: requisito.nombre_dueno_control_critico_tecnico || '',
+                                        comentario_trabajador: requisito.comentario_trabajador || '',
+                                        conversacion_seguimiento: requisito.conversacion_seguimiento || [],
+                                        estado_validacion: requisito.estado_validacion || '',
+                                        ponderacion: requisito.ponderacion || '',
+                                        ultimo_usuario_edito: requisito.ultimo_usuario_edito || ''
+                                      });
+                                    } else {
+                                      // Nivel 1: solo datos base (primeras 8 columnas)
+                                      datos.push(datosBase);
+                                    }
+                                  });
+                                } else {
+                                  // Si no hay requisitos, crear una fila con datos del control
+                                  const datosBase = {
+                                    numero: numeroFila++,
+                                    codigo: control.codigo,
+                                    nombre: control.nombre,
+                                    tipo: control.tipo,
+                                    clasificacion: control.clasificacion,
+                                    requisito: '',
+                                    evidencia: '',
+                                    monitoreo: '',
+                                    controlId: control.id,
+                                    controlIndex: controlIndex,
+                                    requisitoId: null,
+                                    requisitoIndex: -1,
+                                    esPrimeraFilaRequisito: true,
+                                    totalRequisitos: 0
+                                  };
+                                  
+                                  if (incluirCamposAdicionales) {
+                                    datos.push({
+                                      ...datosBase,
+                                      verificador_responsable: '',
+                                      fecha_verificacion: '',
+                                      implementado_estandar_desempeno: '',
+                                      accion_a_ejecutar: '',
+                                      responsable_cierre_accion: '',
+                                      fecha_cierre: '',
+                                      criticidad: '',
+                                      porcentaje_avance_implementacion_accion: '',
+                                      nombre_dueno_control_critico_tecnico: '',
+                                      comentario_trabajador: '',
+                                      conversacion_seguimiento: [],
+                                      estado_validacion: '',
+                                      ponderacion: '',
+                                      ultimo_usuario_edito: ''
+                                    });
+                                  } else {
+                                    datos.push(datosBase);
+                                  }
+                                }
+                              });
+                            } else {
+                              console.log('[generarDatosDesdeBasesControles] basesControles vacío o sin controles');
+                            }
+                            
+                            console.log('[generarDatosDesdeBasesControles] Retornando', datos.length, 'filas para', incluirCamposAdicionales ? 'nivel 2' : 'nivel 1');
+                            return datos;
+                          };
+                          
+                          // Función común para calcular rowspans
+                          const calcularRowspans = (datos) => {
+                            const rowspansCalc = {};
+                            const gruposPorCodigo = {};
+                            
+                            datos.forEach((item, index) => {
+                              const codigo = item.codigo || '';
+                              if (!gruposPorCodigo[codigo]) {
+                                gruposPorCodigo[codigo] = [];
+                              }
+                              gruposPorCodigo[codigo].push(index);
+                            });
+                            
+                            Object.keys(gruposPorCodigo).forEach(codigo => {
+                              const indices = gruposPorCodigo[codigo];
+                              indices.forEach((index, posicionEnGrupo) => {
+                                if (posicionEnGrupo === 0) {
+                                  rowspansCalc[index] = indices.length;
+                                } else {
+                                  rowspansCalc[index] = 0;
+                                }
+                              });
+                            });
+                            
+                            return rowspansCalc;
+                          };
+                          
+                          // Generar datos según el nivel
+                          // CRÍTICO: Nivel 1 y 2 SOLO usan basesControles, NUNCA lineaBase
+                          if (esNivel2) {
+                            // Nivel 2: usar basesControles con campos adicionales
+                            // NO usar lineaBase para nivel 2 bajo ninguna circunstancia
+                            // Verificar que basesControles esté disponible antes de generar datos
+                            if (basesControles && basesControles.controles && Array.isArray(basesControles.controles)) {
+                              datosCombinados = generarDatosDesdeBasesControles(true);
+                              if (datosCombinados.length > 0) {
+                                rowspans = calcularRowspans(datosCombinados);
+                              } else {
+                                rowspans = {};
+                              }
+                            } else {
+                              // Si basesControles no está disponible, datosCombinados queda vacío
+                              datosCombinados = [];
+                              rowspans = {};
+                            }
+                            rowspansDimPre = {};
+                          } else if (esPrimerNivel) {
+                            // Nivel 1: usar basesControles sin campos adicionales (solo primeras 8 columnas)
+                            // NO usar lineaBase para nivel 1 bajo ninguna circunstancia
+                            // Verificar que basesControles esté disponible antes de generar datos
+                            if (basesControles && basesControles.controles && Array.isArray(basesControles.controles)) {
+                              datosCombinados = generarDatosDesdeBasesControles(false);
+                              if (datosCombinados.length > 0) {
+                                rowspans = calcularRowspans(datosCombinados);
+                              } else {
+                                rowspans = {};
+                              }
+                            } else {
+                              // Si basesControles no está disponible, datosCombinados queda vacío
+                              datosCombinados = [];
+                              rowspans = {};
+                            }
+                            rowspansDimPre = {};
+                          } else {
+                            // Para otros niveles (nivel 3+), usar lógica original con lineaBase
+                            // Solo nivel 3+ puede usar lineaBase
+                            datosCombinados = lineaBase || [];
                           
                           // Calcular rowspan para cada grupo de control (mismo código)
                           const calcularRowspans = () => {
-                            const rowspans = {};
+                              const rowspansCalc = {};
                             const gruposPorCodigo = {};
                             
                             lineaBase.forEach((item, index) => {
@@ -11778,22 +13054,22 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               const indices = gruposPorCodigo[codigo];
                               indices.forEach((index, posicionEnGrupo) => {
                                 if (posicionEnGrupo === 0) {
-                                  rowspans[index] = indices.length;
+                                    rowspansCalc[index] = indices.length;
                                 } else {
-                                  rowspans[index] = 0; // No renderizar esta celda
+                                    rowspansCalc[index] = 0;
                                 }
                               });
                             });
                             
-                            return rowspans;
+                              return rowspansCalc;
                           };
                           
-                          const rowspans = lineaBase && lineaBase.length > 0 ? calcularRowspans() : {};
+                            rowspans = lineaBase && lineaBase.length > 0 ? calcularRowspans() : {};
                           
                           // Calcular rowspan para Dimensión y Pregunta (combinar celdas cuando se repiten)
                           const calcularRowspansDimensionPregunta = () => {
-                            const rowspansDimPre = {};
-                            if (!lineaBase || lineaBase.length === 0) return rowspansDimPre;
+                              const rowspansDimPreCalc = {};
+                              if (!lineaBase || lineaBase.length === 0) return rowspansDimPreCalc;
                             
                             let i = 0;
                             while (i < lineaBase.length) {
@@ -11801,7 +13077,6 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                               const currentPregunta = lineaBase[i].pregunta || '';
                               const currentCodigo = lineaBase[i].codigo || '';
                               
-                              // Contar filas consecutivas con misma dimensión, pregunta Y código
                               let count = 1;
                               let j = i + 1;
                               while (j < lineaBase.length && 
@@ -11812,25 +13087,24 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                 j++;
                               }
                               
-                              // Asignar rowspan al primer elemento del grupo
-                              rowspansDimPre[i] = count;
+                                rowspansDimPreCalc[i] = count;
                               
-                              // Los demás elementos del grupo no renderizan la celda
                               for (let k = i + 1; k < j; k++) {
-                                rowspansDimPre[k] = 0;
+                                  rowspansDimPreCalc[k] = 0;
                               }
                               
                               i = j;
                             }
                             
-                            return rowspansDimPre;
+                              return rowspansDimPreCalc;
                           };
                           
-                          const rowspansDimPre = calcularRowspansDimensionPregunta();
+                            rowspansDimPre = calcularRowspansDimensionPregunta();
+                          }
                           
                           // Anchos de columnas según el nivel - más responsive
                           const anchoCodigo = esPrimerNivel ? '55px' : '60px';
-                          const anchoControl = esPrimerNivel ? '140px' : '160px'; // Reducido para ser más responsive
+                          const anchoControl = esPrimerNivel ? '140px' : '160px';
                           const anchoDimension = esPrimerNivel ? '90px' : '110px';
                           const anchoPregunta = esPrimerNivel ? '180px' : '130px';
                           const anchoEvidencia = esPrimerNivel ? '200px' : '110px';
@@ -11839,42 +13113,57 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                           return (
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', minWidth: minWidthTabla, tableLayout: 'auto' }}>
                               <thead style={{ position: 'sticky', top: 0, zIndex: 100 }}>
-                                <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #17a2b8' }}>
+                                <tr style={{ background: esNivel2 ? '#17a2b8' : '#f8f9fa', borderBottom: '2px solid #17a2b8', color: esNivel2 ? 'white' : 'inherit' }}>
+                                  {esNivel2 ? (
+                                    <>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '50px', position: 'sticky', left: 0, top: 0, background: '#17a2b8', zIndex: 101, fontSize: '10px' }}>#</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '70px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Código</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '180px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Nombre</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '120px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Tipo</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '120px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Clasificación</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '200px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Requisito</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '200px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Evidencia</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: 'white', minWidth: '120px', position: 'sticky', top: 0, background: '#17a2b8', zIndex: 100, fontSize: '10px' }}>Monitoreo</th>
+                                    </>
+                                  ) : (
+                                    <>
                                   <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', minWidth: '70px', position: 'sticky', left: 0, top: 0, background: '#f8f9fa', zIndex: 101, fontSize: '10px' }}>Código</th>
                                   <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', minWidth: '180px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '10px' }}>Control Preventivo</th>
                                   <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '10px' }}>Dimensión</th>
                                   <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', minWidth: '200px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '10px' }}>Pregunta</th>
                                   <th style={{ padding: '0.5rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', minWidth: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '10px' }}>Evidencia</th>
+                                    </>
+                                  )}
                                   {!esPrimerNivel && (
                                     <>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Verificador</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '85px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>F. Verif.</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '80px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px', lineHeight: '1.2' }}>Impl. Estándar</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Acción</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Resp. Cierre</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '85px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>F. Cierre</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Criticidad</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '60px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px' }}>% Avance</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '120px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px', lineHeight: '1.2' }}>Dueño Control</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#28a745', width: '150px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px', lineHeight: '1.2' }}>Comentarios Contratista</th>
-                                      <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: '#6f42c1', width: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px' }}>Respaldos</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '100px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Verificador</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '100px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>F. Verif.</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '80px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px', lineHeight: '1.2' }}>Impl. Estándar</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '120px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Acción</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '100px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Resp. Cierre</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '85px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>F. Cierre</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '70px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Criticidad</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '60px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px' }}>% Avance</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '120px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px', lineHeight: '1.2' }}>Dueño Control</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#28a745', width: '150px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px', lineHeight: '1.2' }}>Comentarios Contratista</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: esNivel2 ? 'white' : '#6f42c1', width: '100px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px' }}>Respaldos</th>
                                       {(user.rol === 'super_admin' || user.rol === 'admin') && (
-                                        <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: '#17a2b8', width: '90px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px' }}>Validación</th>
+                                        <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '90px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px' }}>Validación</th>
                                       )}
                                       {(user.rol === 'super_admin' || user.rol === 'admin') && (
-                                        <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: '#17a2b8', width: '70px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Pond.</th>
+                                        <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '70px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Pond.</th>
                                       )}
-                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: '#17a2b8', width: '100px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '8px' }}>Últ. Editor</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'left', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '100px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '8px' }}>Últ. Editor</th>
                                       {canEditFiles(user) && (
-                                        <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: '#17a2b8', width: '80px', position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Acciones</th>
+                                        <th style={{ padding: '0.35rem', textAlign: 'center', fontWeight: '700', color: esNivel2 ? 'white' : '#17a2b8', width: '80px', position: 'sticky', top: 0, background: esNivel2 ? '#17a2b8' : '#f8f9fa', zIndex: 100, fontSize: '9px' }}>Acciones</th>
                                       )}
                                     </>
                                   )}
                                 </tr>
                               </thead>
                           <tbody>
-                            {lineaBase && lineaBase.length > 0 ? (
-                              lineaBase.map((item, index) => {
+                            {datosCombinados && datosCombinados.length > 0 ? (
+                              datosCombinados.map((item, index) => {
                                 const estaEditando = lineaBaseEditando.has(item.id || `temp-${index}`);
                                 const puedeEditar = puedeEditarLineaBase(user, rutaNavegacion);
                                 const esPrimerNivel = rutaNavegacion.length === 1;
@@ -11882,7 +13171,113 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                 const tieneObservaciones = item.estado_validacion === 'con_observaciones';
                                 
                                 return (
-                                  <tr key={`linea-base-${item.id || 'temp-' + index}-${index}`} id={`linea-base-row-${item.id}`} style={{ borderBottom: '1px solid #dee2e6', backgroundColor: tieneObservaciones ? '#fff3cd' : 'transparent', borderLeft: tieneObservaciones ? '4px solid #ffc107' : 'none' }}>
+                                  <tr key={`linea-base-${item.id || 'temp-' + index}-${index}`} id={`linea-base-row-${item.id}`} style={{ borderBottom: '1px solid #dee2e6', backgroundColor: tieneObservaciones ? '#fff3cd' : (index % 2 === 0 ? '#ffffff' : '#f8f9fa'), borderLeft: tieneObservaciones ? '4px solid #ffc107' : 'none' }}>
+                                    {esNivel2 ? (
+                                      <>
+                                        {/* Columna # */}
+                                        <td style={{ padding: '0.4rem', fontWeight: '600', color: '#495057', fontSize: '11px' }}>
+                                          {item.numero || index + 1}
+                                        </td>
+                                        {/* Columna Código */}
+                                        {rowspans[index] > 0 ? (
+                                          <td 
+                                            rowSpan={rowspans[index]} 
+                                            style={{ 
+                                              padding: '0.5rem', 
+                                              verticalAlign: 'top', 
+                                              fontWeight: '600',
+                                              fontSize: '11px',
+                                              background: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                                            }}
+                                          >
+                                            {item.codigo || ''}
+                                          </td>
+                                        ) : null}
+                                        {/* Columna Nombre */}
+                                        {rowspans[index] > 0 ? (
+                                          <td 
+                                            rowSpan={rowspans[index]} 
+                                            style={{ 
+                                              padding: '0.5rem', 
+                                              verticalAlign: 'top', 
+                                              fontSize: '11px',
+                                              lineHeight: '1.5',
+                                              background: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                                            }}
+                                          >
+                                            {item.nombre || ''}
+                                          </td>
+                                        ) : null}
+                                        {/* Columna Tipo */}
+                                        {rowspans[index] > 0 ? (
+                                          <td 
+                                            rowSpan={rowspans[index]} 
+                                            style={{ 
+                                              padding: '0.5rem', 
+                                              verticalAlign: 'top', 
+                                              fontSize: '11px',
+                                              background: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                                            }}
+                                          >
+                                            {item.tipo || ''}
+                                          </td>
+                                        ) : null}
+                                        {/* Columna Clasificación */}
+                                        {rowspans[index] > 0 ? (
+                                          <td 
+                                            rowSpan={rowspans[index]} 
+                                            style={{ 
+                                              padding: '0.5rem', 
+                                              verticalAlign: 'top', 
+                                              fontSize: '11px',
+                                              background: index % 2 === 0 ? '#ffffff' : '#f8f9fa'
+                                            }}
+                                          >
+                                            {item.clasificacion || ''}
+                                          </td>
+                                        ) : null}
+                                        {/* Columna Requisito */}
+                                        <td style={{ padding: '0.5rem', verticalAlign: 'top', fontSize: '11px', lineHeight: '1.5' }}>
+                                          {item.requisito || '-'}
+                                        </td>
+                                        {/* Columna Evidencia */}
+                                        <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
+                                          {puedeEditarColumnaLineaBase(user, rutaNavegacion, 'evidencia') && estaEditando ? (
+                                            <textarea
+                                              value={item.evidencia || ''}
+                                              onChange={(e) => {
+                                                // Actualizar directamente en basesControles
+                                                const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                                if (item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                                  nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].evidencia = e.target.value;
+                                                  nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                                }
+                                                setBasesControles(nuevasBases);
+                                              }}
+                                              style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px', minHeight: '60px', resize: 'vertical' }}
+                                              placeholder="Ingrese las evidencias"
+                                            />
+                                          ) : (
+                                            <div style={{ 
+                                              fontSize: '11px', 
+                                              color: item.evidencia ? '#111827' : '#9ca3af',
+                                              fontStyle: item.evidencia ? 'normal' : 'italic',
+                                              padding: '0.25rem',
+                                              background: '#f8fafc',
+                                              borderRadius: '4px',
+                                              lineHeight: '1.5'
+                                            }}>
+                                              {item.evidencia || 'Sin evidencia'}
+                                            </div>
+                                          )}
+                                        </td>
+                                        {/* Columna Monitoreo */}
+                                        <td style={{ padding: '0.5rem', verticalAlign: 'top', fontSize: '11px' }}>
+                                          {item.monitoreo || '-'}
+                                        </td>
+                                      </>
+                                    ) : (
+                                      <>
                                     <td style={{ padding: '0.4rem', background: '#f8f9fa', fontWeight: '600', color: '#495057', position: 'sticky', left: 0, zIndex: 5 }}>
                                       <div>{item.codigo || ''}</div>
                                     </td>
@@ -11935,7 +13330,6 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                     </td>
                                     )}
                                     <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
-                                      {/* Evidencia: editable en nivel 1 por admin/super_admin, en nivel 2 también por trabajador */}
                                       {puedeEditarColumnaLineaBase(user, rutaNavegacion, 'evidencia') && estaEditando ? (
                                         <textarea
                                           value={item.evidencia || ''}
@@ -11960,6 +13354,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         </div>
                                       )}
                                     </td>
+                                      </>
+                                    )}
                                     {!esPrimerNivel && (
                                       <>
                                         <td style={{ padding: '0.4rem', verticalAlign: 'top' }}>
@@ -11967,9 +13363,18 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                             <select
                                               value={item.verificador_responsable || ''}
                                               onChange={(e) => {
+                                                if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                                  // Guardar en basesControles
+                                                  const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                                  nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].verificador_responsable = e.target.value;
+                                                  nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                                  setBasesControles(nuevasBases);
+                                                } else {
+                                                  // Para otros niveles, usar lineaBase
                                                 const nuevaLineaBase = [...lineaBase];
                                                 nuevaLineaBase[index] = {...nuevaLineaBase[index], verificador_responsable: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                                 setLineaBase(nuevaLineaBase);
+                                                }
                                               }}
                                               style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                             >
@@ -11990,9 +13395,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                           type="date"
                                           value={item.fecha_verificacion || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].fecha_verificacion = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], fecha_verificacion: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         />
@@ -12005,9 +13417,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         <select
                                           value={item.implementado_estandar_desempeno || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].implementado_estandar_desempeno = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], implementado_estandar_desempeno: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         >
@@ -12025,9 +13444,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         <textarea
                                           value={item.accion_a_ejecutar || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].accion_a_ejecutar = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], accion_a_ejecutar: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', minHeight: '50px', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px', resize: 'vertical' }}
                                         />
@@ -12040,9 +13466,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         <select
                                           value={item.responsable_cierre_accion || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].responsable_cierre_accion = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], responsable_cierre_accion: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         >
@@ -12063,9 +13496,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                           type="date"
                                           value={item.fecha_cierre || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].fecha_cierre = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], fecha_cierre: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         />
@@ -12078,9 +13518,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         <select
                                           value={item.criticidad || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].criticidad = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], criticidad: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         >
@@ -12102,9 +13549,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                           max="100"
                                           value={item.porcentaje_avance_implementacion_accion || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].porcentaje_avance_implementacion_accion = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], porcentaje_avance_implementacion_accion: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         />
@@ -12117,9 +13571,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         <select
                                           value={item.nombre_dueno_control_critico_tecnico || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].nombre_dueno_control_critico_tecnico = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], nombre_dueno_control_critico_tecnico: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ced4da', fontSize: '11px' }}
                                         >
@@ -12140,9 +13601,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         <textarea
                                           value={item.comentario_trabajador || ''}
                                           onChange={(e) => {
+                                            if (esNivel2 && item.controlIndex !== undefined && item.requisitoIndex !== undefined && item.requisitoIndex >= 0) {
+                                              const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].comentario_trabajador = e.target.value;
+                                              nuevasBases.controles[item.controlIndex].requisitos[item.requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                                              setBasesControles(nuevasBases);
+                                            } else {
                                             const nuevaLineaBase = [...lineaBase];
                                             nuevaLineaBase[index] = {...nuevaLineaBase[index], comentario_trabajador: e.target.value, ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)};
                                             setLineaBase(nuevaLineaBase);
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '0.25rem', borderRadius: '4px', border: '1px solid #28a745', fontSize: '10px', minHeight: '50px', resize: 'vertical' }}
                                           placeholder="Comentario del trabajador..."
@@ -12191,13 +13659,44 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         {puedeEditarLineaBase(user, rutaNavegacion) ? (
                                           <button
                                             onClick={() => {
-                                              // Obtener el item actualizado del estado para asegurar que tiene los datos más recientes
-                                              const itemActualizado = lineaBase[index];
+                                              // Para nivel 2, buscar el item actualizado en basesControles para asegurar datos frescos
+                                              // Para nivel 3+, obtener el item actualizado del estado lineaBase
+                                              if (esNivel2) {
+                                                // CRÍTICO: Buscar el item actualizado en basesControles para tener conversacion_observaciones actualizada
+                                                const itemActualizado = basesControles?.controles?.flatMap(control => 
+                                                  (control.requisitos || []).filter(requisito => {
+                                                    const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                                                    const claveUnicaItem = item.claveUnica || `${item.codigo || ''}_${item.requisito || ''}_${item.requisitoId || item.id}`;
+                                                    const coincidePorClave = claveUnicaRequisito === claveUnicaItem;
+                                                    const coincidePorId = requisito.id === (item.requisitoId || item.id);
+                                                    return coincidePorClave || coincidePorId;
+                                                  })
+                                                )?.[0];
+                                                
+                                                // Usar el item actualizado si existe, sino usar el item de la tabla
+                                                const itemFinal = itemActualizado ? {
+                                                  ...item,
+                                                  ...itemActualizado,
+                                                  claveUnica: item.claveUnica || itemActualizado.claveUnica,
+                                                  requisitoId: item.requisitoId || itemActualizado.id,
+                                                  controlId: item.controlId || itemActualizado.controlId
+                                                } : item;
+                                                
+                                                setModalValidacionObservacion({ 
+                                                  itemIndex: index, 
+                                                  tipo: 'preventivo', 
+                                                  item: itemFinal
+                                                });
+                                              } else {
+                                                // Para nivel 3+, obtener el item actualizado del estado
+                                                const indiceOriginal = index;
+                                              const itemActualizado = lineaBase[indiceOriginal];
                                               setModalValidacionObservacion({ 
-                                                itemIndex: index, 
+                                                itemIndex: indiceOriginal, 
                                                 tipo: 'preventivo', 
                                                 item: itemActualizado || item 
                                               });
+                                              }
                                             }}
                                             style={{
                                               background: item.estado_validacion === 'validado' ? '#28a745' : item.estado_validacion === 'con_observaciones' ? '#ffc107' : '#6c757d',
@@ -12363,13 +13862,81 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                   <i className="fa fa-trash"></i>
                                                 </button>
                                                 )}
+                                                {/* Botón Programar Aviso - Solo cuando está validado y es nivel 2 */}
+                                                {esNivel2 && item.estado_validacion === 'validado' && (
+                                                  <button
+                                                    onClick={() => {
+                                                      // Calcular fecha límite basada en monitoreo
+                                                      const monitoreo = item.monitoreo || '';
+                                                      const fechaInicio = new Date();
+                                                      let fechaLimite = new Date();
+                                                      
+                                                      // Calcular fecha límite según monitoreo
+                                                      if (monitoreo.toLowerCase().includes('mensual')) {
+                                                        fechaLimite.setMonth(fechaLimite.getMonth() + 1);
+                                                      } else if (monitoreo.toLowerCase().includes('trimestral')) {
+                                                        fechaLimite.setMonth(fechaLimite.getMonth() + 3);
+                                                      } else if (monitoreo.toLowerCase().includes('semestral')) {
+                                                        fechaLimite.setMonth(fechaLimite.getMonth() + 6);
+                                                      } else if (monitoreo.toLowerCase().includes('anual')) {
+                                                        fechaLimite.setFullYear(fechaLimite.getFullYear() + 1);
+                                                      }
+                                                      
+                                                      // Calcular fecha de recordatorio (3 días antes)
+                                                      const fechaRecordatorio = new Date(fechaLimite);
+                                                      fechaRecordatorio.setDate(fechaRecordatorio.getDate() - 3);
+                                                      
+                                                      // Formatear fechas para input date
+                                                      const formatearFecha = (fecha) => {
+                                                        const year = fecha.getFullYear();
+                                                        const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(fecha.getDate()).padStart(2, '0');
+                                                        return `${year}-${month}-${day}`;
+                                                      };
+                                                      
+                                                      setFormProgramarAviso({
+                                                        fecha_inicio: formatearFecha(fechaInicio),
+                                                        fecha_limite: formatearFecha(fechaLimite),
+                                                        fecha_recordatorio: formatearFecha(fechaRecordatorio),
+                                                        monitoreo: monitoreo
+                                                      });
+                                                      
+                                                      setModalProgramarAviso({
+                                                        item: item,
+                                                        controlIndex: item.controlIndex,
+                                                        requisitoIndex: item.requisitoIndex
+                                                      });
+                                                    }}
+                                                    style={{
+                                                      background: '#28a745',
+                                                      color: 'white',
+                                                      border: 'none',
+                                                      padding: '0.3rem 0.45rem',
+                                                      borderRadius: '4px',
+                                                      cursor: 'pointer',
+                                                      fontSize: '12px',
+                                                      marginLeft: '0.2rem'
+                                                    }}
+                                                    title="Programar aviso por correo"
+                                                  >
+                                                    <i className="fa fa-bell"></i>
+                                                </button>
+                                                )}
                                               </>
                                             ) : estaEditando ? (
                                               <>
                                                 <button
                                                   onClick={async () => {
                                                     try {
+                                                      // CRÍTICO: Para nivel 2, guardar en basesControles, NO en lineaBase
+                                                      if (rutaNavegacion.length === 2) {
+                                                        // Nivel 2: guardar basesControles
+                                                        await guardarBasesControles();
+                                                      } else if (nivelReal >= 3) {
+                                                        // Nivel 3+: guardar lineaBase
                                                       await guardarLineaBase();
+                                                      }
+                                                      // Nivel 1: los datos se guardan desde la pestaña Bases
                                                       setLineaBaseEditando(prev => {
                                                         const nuevo = new Set(prev);
                                                         nuevo.delete(item.id || `temp-${index}`);
@@ -12402,7 +13969,15 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                       return nuevo;
                                                     });
                                                     // Recargar datos para cancelar cambios
+                                                    // CRÍTICO: Para nivel 2, recargar basesControles, NO lineaBase
+                                                    if (rutaNavegacion.length === 2) {
+                                                      // Nivel 2: recargar basesControles
+                                                      cargarBasesControles(carpetaActual.id);
+                                                    } else if (nivelReal >= 3) {
+                                                      // Nivel 3+: recargar lineaBase
                                                     cargarLineaBase(carpetaActual.id);
+                                                    }
+                                                    // Nivel 1: no hacer nada, los datos vienen de basesControles
                                                   }}
                                                   style={{
                                                     background: '#6c757d',
@@ -12429,7 +14004,15 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             ) : (
                               <tr>
                                 <td colSpan={esPrimerNivel ? 5 : (canEditFiles(user) ? ((user.rol === 'super_admin' || user.rol === 'admin') ? 17 : 15) : ((user.rol === 'super_admin' || user.rol === 'admin') ? 16 : 14))} style={{ padding: '2rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                  {esNivel2 ? (
+                                    <>
+                                      No hay datos de línea base disponibles. Ve a la pestaña "Bases" para agregar controles críticos y sus requisitos.
+                                    </>
+                                  ) : (
+                                    <>
                                   No hay controles preventivos en BOWTIE. Primero debes agregar controles críticos preventivos en la pestaña BOWTIE.
+                                    </>
+                                  )}
                                 </td>
                               </tr>
                             )}
@@ -12440,7 +14023,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       </div>
                     </div>
 
-                    {/* Segunda Tabla: Línea Base Controles Críticos Mitigadores */}
+                    {/* Segunda Tabla: Línea Base Controles Críticos Mitigadores - SOLO para nivel 3+ */}
+                    {rutaNavegacion.length > 2 && (
                     <div style={{
                       background: 'white',
                       padding: '1.5rem',
@@ -13193,6 +14777,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         })()}
                       </div>
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -15276,9 +16861,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
             {/* Pestaña Información del Riesgo Crítico - NO mostrar en nivel contenedor (3+) */}
             {pestañaActiva === 'riesgo' && !esNivelContenedor && (
               <div>
-
                 {informacionRiesgo ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     {/* Mensaje informativo sobre permisos */}
                     {!canEditFiles(user) && (
                       <div style={{
@@ -15293,347 +16877,300 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         gap: '6px'
                       }}>
                         <i className="fa fa-info-circle"></i>
-                        <span>Solo administradores pueden editar la información de riesgo crítico. Esta información está asociada a la carpeta <strong>{carpetaActual.nombre}</strong>.</span>
+                        <span>Solo administradores pueden editar los anexos. Esta información está asociada a la carpeta <strong>{carpetaActual.nombre}</strong>.</span>
                       </div>
                     )}
                     
-                    {/* Evento No Deseado y Evento de Riesgo */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      {/* Evento No Deseado */}
+                    {/* Tabla 1: Trabajador/a */}
                       <div style={{
-                        background: 'linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)',
+                      background: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1px solid #dee2e6',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                      overflow: 'hidden'
+                    }}>
+                      {/* Header naranja con icono */}
+                      <div style={{
+                        background: '#17a2b8',
+                        color: 'white',
                         padding: '0.75rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #ffc107'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontWeight: '700',
+                        fontSize: '16px'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
-                          <div style={{ fontWeight: '700', color: '#856404', fontSize: '11px', textTransform: 'uppercase' }}>
-                            EVENTO NO DESEADO:
-                          </div>
+                        <i className="fa fa-cog" style={{ fontSize: '18px' }}></i>
+                        <span>TRABAJADOR/A</span>
                           {canEditFiles(user) && (
+                          <div style={{ marginLeft: 'auto' }}>
                             <button
                               onClick={() => {
-                                if (editandoTabla.evento_no_deseado) {
+                                const key = 'trabajador_preguntas';
+                                if (editandoTabla[key]) {
                                   guardarInformacionRiesgo();
-                                  setEditandoTabla({...editandoTabla, evento_no_deseado: false});
+                                  setEditandoTabla({...editandoTabla, [key]: false});
                                 } else {
-                                  setEditandoTabla({...editandoTabla, evento_no_deseado: true});
+                                  setEditandoTabla({...editandoTabla, [key]: true});
                                 }
                               }}
                               style={{
-                                background: editandoTabla.evento_no_deseado ? '#28a745' : '#ffc107',
-                                color: editandoTabla.evento_no_deseado ? 'white' : '#856404',
-                                border: 'none',
-                                padding: '4px 8px',
+                                background: editandoTabla.trabajador_preguntas ? '#28a745' : '#ffffff',
+                                color: editandoTabla.trabajador_preguntas ? 'white' : '#17a2b8',
+                                border: '1px solid white',
+                                padding: '4px 12px',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
+                                fontSize: '12px',
+                                fontWeight: '600'
                               }}
                             >
-                              <i className={`fa fa-${editandoTabla.evento_no_deseado ? 'save' : 'edit'}`}></i>
-                              {editandoTabla.evento_no_deseado ? 'Guardar' : 'Editar'}
+                              <i className={`fa fa-${editandoTabla.trabajador_preguntas ? 'save' : 'edit'}`}></i>
+                              {' '}
+                              {editandoTabla.trabajador_preguntas ? 'Guardar' : 'Editar'}
                             </button>
+                          </div>
                           )}
                         </div>
-                        {editandoTabla.evento_no_deseado ? (
-                          <textarea
-                            value={informacionRiesgo.evento_no_deseado}
-                            onChange={(e) => setInformacionRiesgo({...informacionRiesgo, evento_no_deseado: e.target.value})}
+
+                      {/* Tabla */}
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: '#f8f9fa' }}>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Control Crítico</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Pregunta del Trabajador/a</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(informacionRiesgo.controles_trabajador?.preguntas || []).length > 0 ? (
+                              informacionRiesgo.controles_trabajador.preguntas.map((pregunta, index) => (
+                                <tr key={index} style={{ borderBottom: '1px solid #dee2e6', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                    {editandoTabla.trabajador_preguntas ? (
+                                      <input
+                                        type="text"
+                                        value={pregunta.control_critico || ''}
+                                        onChange={(e) => actualizarPreguntaAnexo('trabajador', index, 'control_critico', e.target.value)}
+                                        placeholder="Ej: CCP1: Personal Acreditado para trabajos eléctricos"
                             style={{
                               width: '100%',
+                                          padding: '6px',
+                                          border: '1px solid #ced4da',
+                                          borderRadius: '4px',
+                                          fontSize: '13px'
+                                        }}
+                                      />
+                                    ) : (
+                                      <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                        {pregunta.codigo && `${pregunta.codigo}: `}
+                                        {pregunta.control_critico || 'Sin especificar'}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                    {editandoTabla.trabajador_preguntas ? (
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                        <input
+                                          type="text"
+                                          value={pregunta.codigo || ''}
+                                          onChange={(e) => actualizarPreguntaAnexo('trabajador', index, 'codigo', e.target.value)}
+                                          placeholder="CCP1"
+                                          style={{
+                                            width: '60px',
+                                            padding: '6px',
+                                            border: '1px solid #ced4da',
+                                            borderRadius: '4px',
+                                            fontSize: '13px',
+                                            fontWeight: '600'
+                                          }}
+                                        />
+                                        <textarea
+                                          value={pregunta.pregunta || ''}
+                                          onChange={(e) => actualizarPreguntaAnexo('trabajador', index, 'pregunta', e.target.value)}
+                                          placeholder="¿Cuento con mi Licencia Eléctrica vigente..."
+                                          style={{
+                                            flex: 1,
                               minHeight: '50px',
-                              padding: '0.5rem',
-                              border: '1px solid #ffc107',
+                                            padding: '6px',
+                                            border: '1px solid #ced4da',
                               borderRadius: '4px',
                               fontSize: '13px',
-                              fontFamily: 'inherit',
-                              resize: 'vertical'
-                            }}
-                            placeholder="Ej: CONTACTO CON ENERGÍA ELÉCTRICA"
-                          />
+                                            resize: 'vertical',
+                                            fontFamily: 'inherit'
+                                          }}
+                                        />
+                                        <button
+                                          onClick={() => eliminarPreguntaAnexo('trabajador', index)}
+                                          style={{
+                                            background: '#dc3545',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '6px 10px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '11px',
+                                            flexShrink: 0
+                                          }}
+                                          title="Eliminar"
+                                        >
+                                          <i className="fa fa-trash"></i>
+                                        </button>
+                                      </div>
                         ) : (
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#856404' }}>
-                            {informacionRiesgo.evento_no_deseado || 'No especificado'}
+                                      <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                        {pregunta.pregunta || 'Sin pregunta'}
                           </div>
                         )}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan="2" style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                  No hay preguntas registradas
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
 
-                      {/* Evento de Riesgo */}
-                      <div style={{
-                        background: 'linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%)',
-                        padding: '0.75rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #17a2b8'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
-                          <div style={{ fontWeight: '700', color: '#0c5460', fontSize: '11px', textTransform: 'uppercase' }}>
-                            EVENTO DE RIESGO:
-                          </div>
-                          {canEditFiles(user) && (
+                      {editandoTabla.trabajador_preguntas && (
+                        <div style={{ padding: '0.75rem', borderTop: '1px solid #dee2e6', background: '#f8f9fa' }}>
                             <button
-                              onClick={() => {
-                                if (editandoTabla.evento_riesgo) {
-                                  guardarInformacionRiesgo();
-                                  setEditandoTabla({...editandoTabla, evento_riesgo: false});
-                                } else {
-                                  setEditandoTabla({...editandoTabla, evento_riesgo: true});
-                                }
-                              }}
+                            onClick={() => agregarPreguntaAnexo('trabajador')}
                               style={{
-                                background: editandoTabla.evento_riesgo ? '#28a745' : '#17a2b8',
-                                color: editandoTabla.evento_riesgo ? 'white' : 'white',
+                              background: '#17a2b8',
+                              color: 'white',
                                 border: 'none',
-                                padding: '4px 8px',
+                              padding: '8px 16px',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
-                                fontSize: '10px',
+                              fontSize: '13px',
                                 fontWeight: '600',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px'
+                              gap: '6px'
                               }}
                             >
-                              <i className={`fa fa-${editandoTabla.evento_riesgo ? 'save' : 'edit'}`}></i>
-                              {editandoTabla.evento_riesgo ? 'Guardar' : 'Editar'}
+                            <i className="fa fa-plus"></i>
+                            Agregar Pregunta
                             </button>
-                          )}
-                        </div>
-                        {editandoTabla.evento_riesgo ? (
-                          <textarea
-                            value={informacionRiesgo.evento_riesgo}
-                            onChange={(e) => setInformacionRiesgo({...informacionRiesgo, evento_riesgo: e.target.value})}
-                            style={{
-                              width: '100%',
-                              minHeight: '50px',
-                              padding: '0.5rem',
-                              border: '1px solid #17a2b8',
-                              borderRadius: '4px',
-                              fontSize: '13px',
-                              fontFamily: 'inherit',
-                              resize: 'vertical'
-                            }}
-                            placeholder="Ej: INTERACCIÓN CON ENERGÍA ELÉCTRICA"
-                          />
-                        ) : (
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#0c5460' }}>
-                            {informacionRiesgo.evento_riesgo || 'No especificado'}
                           </div>
                         )}
-                      </div>
                     </div>
 
-                    {/* Función para renderizar controles */}
-                    {(() => {
-                      const renderizarControles = (rol, rolLabel, rolColor) => (
-                        <div key={rol} style={{
+                    {/* Tabla 2: Supervisor/a */}
+                    <div style={{
                           background: '#ffffff',
-                          padding: '0',
                           borderRadius: '8px',
-                          border: `1px solid ${rolColor}`,
+                      border: '1px solid #dee2e6',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
                           overflow: 'hidden'
                         }}>
-                          {/* Header del Rol */}
+                      {/* Header naranja con icono */}
                           <div style={{
-                            background: '#495057',
+                        background: '#17a2b8',
                             color: 'white',
-                            padding: '0.625rem 1rem',
+                        padding: '0.75rem 1rem',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            borderBottom: `2px solid ${rolColor}`
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <i className={`fa fa-${rol === 'supervisor' ? 'user-tie' : 'hard-hat'}`} style={{ fontSize: '16px' }}></i>
-                              <span style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '0.3px' }}>{rolLabel.toUpperCase()}</span>
-                            </div>
-                            <i className="fa fa-clipboard-check" style={{ fontSize: '14px', opacity: '0.8' }}></i>
-                          </div>
-
-                          <div style={{ padding: '1rem' }}>
-                            {/* Control Preventivo */}
-                            <div style={{ marginBottom: '1.25rem' }}>
-                              {/* Header con botón de editar/agregar */}
-                              <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '0.5rem'
-                              }}>
-                                <div style={{
-                                  background: 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
-                                  padding: '0.5rem 0.75rem',
-                                  borderRadius: '4px',
+                        gap: '10px',
                                   fontWeight: '700',
-                                  fontSize: '12px',
-                                  color: 'white'
+                        fontSize: '16px'
                                 }}>
-                                  CONTROL PREVENTIVO
-                                </div>
+                        <i className="fa fa-cog" style={{ fontSize: '18px' }}></i>
+                        <span>SUPERVISOR/A</span>
                                 {canEditFiles(user) && (
+                          <div style={{ marginLeft: 'auto' }}>
                                   <button
                                     onClick={() => {
-                                      const key = `${rol}_preventivo`;
+                                const key = 'supervisor_preguntas';
                                       if (editandoTabla[key]) {
-                                        // Guardar cambios
                                         guardarInformacionRiesgo();
                                         setEditandoTabla({...editandoTabla, [key]: false});
                                       } else {
-                                        // Activar edición
                                         setEditandoTabla({...editandoTabla, [key]: true});
                                       }
                                     }}
                                     style={{
-                                      background: editandoTabla[`${rol}_preventivo`] ? '#28a745' : '#17a2b8',
-                                      color: 'white',
-                                      border: 'none',
-                                      padding: '6px 12px',
+                                background: editandoTabla.supervisor_preguntas ? '#28a745' : '#ffffff',
+                                color: editandoTabla.supervisor_preguntas ? 'white' : '#17a2b8',
+                                border: '1px solid white',
+                                padding: '4px 12px',
                                       borderRadius: '4px',
                                       cursor: 'pointer',
                                       fontSize: '12px',
-                                      fontWeight: '600',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(0)';
-                                      e.currentTarget.style.boxShadow = 'none';
-                                    }}
-                                  >
-                                    <i className={`fa fa-${editandoTabla[`${rol}_preventivo`] ? 'save' : 'edit'}`}></i>
-                                    {editandoTabla[`${rol}_preventivo`] ? 'Guardar' : 'Editar'}
+                                fontWeight: '600'
+                              }}
+                            >
+                              <i className={`fa fa-${editandoTabla.supervisor_preguntas ? 'save' : 'edit'}`}></i>
+                              {' '}
+                              {editandoTabla.supervisor_preguntas ? 'Guardar' : 'Editar'}
                                   </button>
+                          </div>
                                 )}
                               </div>
                               
-                              {/* Tabla de Controles Preventivos */}
-                              <div style={{
-                                border: '1px solid #dee2e6',
-                                borderRadius: '4px',
-                                overflow: 'hidden',
-                                marginBottom: '0.75rem'
-                              }}>
-                                {/* Header de la tabla */}
-                                <div style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: '60px 1fr 1fr',
-                                  background: '#17a2b8',
-                                  borderBottom: '1px solid #138496',
-                                  fontWeight: '700',
-                                  fontSize: '12px',
-                                  color: 'white'
-                                }}>
-                                  <div style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.3)' }}>N°</div>
-                                  <div style={{ padding: '0.5rem', borderRight: '1px solid rgba(255,255,255,0.3)' }}>CONTROL PREVENTIVO</div>
-                                  <div style={{ padding: '0.5rem' }}>PREGUNTAS</div>
-                                </div>
-                                
-                                {/* Filas de controles */}
-                                {informacionRiesgo[`controles_${rol}`]?.preventivos?.length > 0 ? (
-                                  informacionRiesgo[`controles_${rol}`].preventivos.map((control, index) => (
-                                    <div 
-                                      key={`preventivo-${index}`}
-                                      style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '60px 1fr 1fr',
-                                        borderBottom: index < informacionRiesgo[`controles_${rol}`].preventivos.length - 1 ? '1px solid #dee2e6' : 'none',
-                                        background: index % 2 === 0 ? '#ffffff' : '#f8f9fa',
-                                        transition: 'background 0.2s'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (!editandoTabla[`${rol}_preventivo`]) {
-                                          e.currentTarget.style.background = '#e7f3ff';
-                                        }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!editandoTabla[`${rol}_preventivo`]) {
-                                          e.currentTarget.style.background = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
-                                        }
-                                      }}
-                                    >
-                                      {/* Columna N° */}
-                                      <div style={{
-                                        padding: '0.75rem 0.5rem',
-                                        textAlign: 'center',
-                                        borderRight: '1px solid #dee2e6',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        background: '#f8f9fa',
-                                        fontWeight: '700',
-                                        color: '#17a2b8',
-                                        fontSize: '14px'
-                                      }}>
-                                        {editandoTabla[`${rol}_preventivo`] ? (
+                      {/* Tabla */}
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: '#f8f9fa' }}>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Control Crítico</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Pregunta del Supervisor/a</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(informacionRiesgo.controles_supervisor?.preguntas || []).length > 0 ? (
+                              informacionRiesgo.controles_supervisor.preguntas.map((pregunta, index) => (
+                                <tr key={index} style={{ borderBottom: '1px solid #dee2e6', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                    {editandoTabla.supervisor_preguntas ? (
                                           <input
                                             type="text"
-                                            value={control.numero || ''}
-                                            onChange={(e) => actualizarControl(rol, 'preventivos', index, 'numero', e.target.value)}
+                                        value={pregunta.control_critico || ''}
+                                        onChange={(e) => actualizarPreguntaAnexo('supervisor', index, 'control_critico', e.target.value)}
+                                        placeholder="Ej: CCP1: Personal Acreditado para trabajos eléctricos"
                                             style={{
                                               width: '100%',
-                                              padding: '4px',
+                                          padding: '6px',
                                               border: '1px solid #ced4da',
                                               borderRadius: '4px',
-                                              fontSize: '12px',
-                                              textAlign: 'center',
-                                              fontWeight: '700'
+                                          fontSize: '13px'
                                             }}
-                                            placeholder="01"
                                           />
                                         ) : (
-                                          control.numero || `0${index + 1}`
-                                        )}
+                                      <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                        {pregunta.codigo && `${pregunta.codigo}: `}
+                                        {pregunta.control_critico || 'Sin especificar'}
                                       </div>
-                                      
-                                      {/* Columna Descripción del Control */}
-                                      <div style={{ 
-                                        padding: '0.75rem', 
-                                        borderRight: '1px solid #dee2e6',
-                                        display: 'flex',
-                                        alignItems: 'center'
-                                      }}>
-                                        {editandoTabla[`${rol}_preventivo`] ? (
-                                          <textarea
-                                            value={control.descripcion || ''}
-                                            onChange={(e) => actualizarControl(rol, 'preventivos', index, 'descripcion', e.target.value)}
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                    {editandoTabla.supervisor_preguntas ? (
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                        <input
+                                          type="text"
+                                          value={pregunta.codigo || ''}
+                                          onChange={(e) => actualizarPreguntaAnexo('supervisor', index, 'codigo', e.target.value)}
+                                          placeholder="CCP1"
                                             style={{
-                                              width: '100%',
-                                              minHeight: '50px',
+                                            width: '60px',
                                               padding: '6px',
                                               border: '1px solid #ced4da',
                                               borderRadius: '4px',
                                               fontSize: '13px',
-                                              resize: 'vertical',
-                                              fontFamily: 'inherit'
-                                            }}
-                                            placeholder="Ej: Identificación y corte efectivo de todas las fuentes de energía."
-                                          />
-                                        ) : (
-                                          <div style={{ fontSize: '13px', color: '#212529', lineHeight: '1.5', width: '100%', fontWeight: '500' }}>
-                                            {control.descripcion || 'Sin descripción'}
-                                          </div>
-                                        )}
-                                      </div>
-                                      
-                                      {/* Columna Pregunta */}
-                                      <div style={{ padding: '0.75rem', display: 'flex', alignItems: 'center' }}>
-                                        {editandoTabla[`${rol}_preventivo`] ? (
-                                          <div style={{ width: '100%', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                            fontWeight: '600'
+                                          }}
+                                        />
                                             <textarea
-                                              value={control.pregunta || ''}
-                                              onChange={(e) => actualizarControl(rol, 'preventivos', index, 'pregunta', e.target.value)}
+                                          value={pregunta.pregunta || ''}
+                                          onChange={(e) => actualizarPreguntaAnexo('supervisor', index, 'pregunta', e.target.value)}
+                                          placeholder="¿Verifiqué que todo el personal..."
                                               style={{
-                                                width: '100%',
+                                            flex: 1,
                                                 minHeight: '50px',
                                                 padding: '6px',
                                                 border: '1px solid #ced4da',
@@ -15642,10 +17179,9 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                 resize: 'vertical',
                                                 fontFamily: 'inherit'
                                               }}
-                                              placeholder="Ej: Eléctrico: ¿La identificación y señalización de los puntos para el corte de energía se encuentran definidos en el procedimiento y/o mapa de energías?"
                                             />
                                             <button
-                                              onClick={() => eliminarControl(rol, 'preventivos', index)}
+                                          onClick={() => eliminarPreguntaAnexo('supervisor', index)}
                                               style={{
                                                 background: '#dc3545',
                                                 color: 'white',
@@ -15654,242 +17190,194 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                 borderRadius: '4px',
                                                 cursor: 'pointer',
                                                 fontSize: '11px',
-                                                flexShrink: 0,
-                                                height: 'fit-content'
+                                            flexShrink: 0
                                               }}
-                                              title="Eliminar control"
+                                          title="Eliminar"
                                             >
                                               <i className="fa fa-trash"></i>
                                             </button>
                                           </div>
                                         ) : (
-                                          <div style={{ fontSize: '13px', color: '#212529', lineHeight: '1.5', width: '100%' }}>
-                                            {control.pregunta || 'Sin pregunta'}
+                                      <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                        {pregunta.pregunta || 'Sin pregunta'}
                                           </div>
                                         )}
-                                      </div>
-                                    </div>
+                                  </td>
+                                </tr>
                                   ))
                                 ) : (
-                                  <div style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px', gridColumn: '1 / -1' }}>
-                                    No hay controles preventivos registrados
-                                  </div>
+                              <tr>
+                                <td colSpan="2" style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                  No hay preguntas registradas
+                                </td>
+                              </tr>
                                 )}
+                          </tbody>
+                        </table>
                               </div>
                               
-                              {editandoTabla[`${rol}_preventivo`] && (
+                      {editandoTabla.supervisor_preguntas && (
+                        <div style={{ padding: '0.75rem', borderTop: '1px solid #dee2e6', background: '#f8f9fa' }}>
                                 <button
-                                  onClick={() => agregarControl(rol, 'preventivos')}
+                            onClick={() => agregarPreguntaAnexo('supervisor')}
                                   style={{
                                     background: '#17a2b8',
                                     color: 'white',
                                     border: 'none',
                                     padding: '8px 16px',
-                                    borderRadius: '5px',
+                              borderRadius: '4px',
                                     cursor: 'pointer',
                                     fontSize: '13px',
                                     fontWeight: '600',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#138496';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#17a2b8';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                              gap: '6px'
                                   }}
                                 >
-                                  <i className="fa fa-plus"></i> Agregar Control Preventivo
+                            <i className="fa fa-plus"></i>
+                            Agregar Pregunta
                                 </button>
+                        </div>
                               )}
                             </div>
 
-                            {/* Control Mitigador */}
-                            <div>
-                              {/* Header con botón de editar/agregar */}
+                    {/* Tabla 3: Ejecutivo/a */}
                               <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '0.5rem'
+                      background: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1px solid #dee2e6',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                      overflow: 'hidden'
                               }}>
+                      {/* Header naranja con icono */}
                                 <div style={{
-                                  background: 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)',
-                                  padding: '0.5rem 0.75rem',
-                                  borderRadius: '4px',
+                        background: '#17a2b8',
+                        color: 'white',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
                                   fontWeight: '700',
-                                  fontSize: '12px',
-                                  color: '#856404'
+                        fontSize: '16px'
                                 }}>
-                                  CONTROL MITIGADOR
-                                </div>
+                        <i className="fa fa-cog" style={{ fontSize: '18px' }}></i>
+                        <span>EJECUTIVO/A</span>
                                 {canEditFiles(user) && (
+                          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
                                   <button
                                     onClick={() => {
-                                      const key = `${rol}_mitigador`;
+                                const key = 'ejecutivo_preguntas';
                                       if (editandoTabla[key]) {
-                                        // Guardar cambios
                                         guardarInformacionRiesgo();
                                         setEditandoTabla({...editandoTabla, [key]: false});
                                       } else {
-                                        // Activar edición
                                         setEditandoTabla({...editandoTabla, [key]: true});
                                       }
                                     }}
                                     style={{
-                                      background: editandoTabla[`${rol}_mitigador`] ? '#28a745' : '#ffc107',
-                                      color: editandoTabla[`${rol}_mitigador`] ? 'white' : '#856404',
-                                      border: 'none',
-                                      padding: '6px 12px',
+                                background: editandoTabla.ejecutivo_preguntas ? '#28a745' : '#ffffff',
+                                color: editandoTabla.ejecutivo_preguntas ? 'white' : '#17a2b8',
+                                border: '1px solid white',
+                                padding: '4px 12px',
                                       borderRadius: '4px',
                                       cursor: 'pointer',
                                       fontSize: '12px',
-                                      fontWeight: '600',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(0)';
-                                      e.currentTarget.style.boxShadow = 'none';
+                                fontWeight: '600'
+                              }}
+                            >
+                              <i className={`fa fa-${editandoTabla.ejecutivo_preguntas ? 'save' : 'edit'}`}></i>
+                              {' '}
+                              {editandoTabla.ejecutivo_preguntas ? 'Guardar' : 'Editar'} Preguntas
+                            </button>
+                            <button
+                              onClick={() => {
+                                const key = 'ejecutivo_estandares';
+                                if (editandoTabla[key]) {
+                                  guardarInformacionRiesgo();
+                                  setEditandoTabla({...editandoTabla, [key]: false});
+                                } else {
+                                  setEditandoTabla({...editandoTabla, [key]: true});
+                                }
+                              }}
+                              style={{
+                                background: editandoTabla.ejecutivo_estandares ? '#28a745' : '#ffffff',
+                                color: editandoTabla.ejecutivo_estandares ? 'white' : '#17a2b8',
+                                border: '1px solid white',
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '600'
                                     }}
                                   >
-                                    <i className={`fa fa-${editandoTabla[`${rol}_mitigador`] ? 'save' : 'edit'}`}></i>
-                                    {editandoTabla[`${rol}_mitigador`] ? 'Guardar' : 'Editar'}
+                              <i className={`fa fa-${editandoTabla.ejecutivo_estandares ? 'save' : 'edit'}`}></i>
+                              {' '}
+                              {editandoTabla.ejecutivo_estandares ? 'Guardar' : 'Editar'} Estándares
                                   </button>
+                          </div>
                                 )}
                               </div>
                               
-                              {/* Tabla de Controles Mitigadores */}
-                              <div style={{
-                                border: '1px solid #dee2e6',
-                                borderRadius: '4px',
-                                overflow: 'hidden',
-                                marginBottom: '0.75rem'
-                              }}>
-                                {/* Header de la tabla */}
-                                <div style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: '60px 1fr 1fr',
-                                  background: '#ffc107',
-                                  borderBottom: '1px solid #ff9800',
-                                  fontWeight: '700',
-                                  fontSize: '12px',
-                                  color: '#856404'
-                                }}>
-                                  <div style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid rgba(133,100,4,0.3)' }}>N°</div>
-                                  <div style={{ padding: '0.5rem', borderRight: '1px solid rgba(133,100,4,0.3)' }}>CONTROL MITIGADOR</div>
-                                  <div style={{ padding: '0.5rem' }}>PREGUNTAS</div>
-                                </div>
-                                
-                                {/* Filas de controles */}
-                                {informacionRiesgo[`controles_${rol}`]?.mitigadores?.length > 0 ? (
-                                  informacionRiesgo[`controles_${rol}`].mitigadores.map((control, index) => (
-                                    <div 
-                                      key={`mitigador-${index}`}
-                                      style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '60px 1fr 1fr',
-                                        borderBottom: index < informacionRiesgo[`controles_${rol}`].mitigadores.length - 1 ? '1px solid #dee2e6' : 'none',
-                                        background: index % 2 === 0 ? '#ffffff' : '#f8f9fa',
-                                        transition: 'background 0.2s'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (!editandoTabla[`${rol}_mitigador`]) {
-                                          e.currentTarget.style.background = '#fff8e1';
-                                        }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!editandoTabla[`${rol}_mitigador`]) {
-                                          e.currentTarget.style.background = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
-                                        }
-                                      }}
-                                    >
-                                      {/* Columna N° */}
-                                      <div style={{
-                                        padding: '0.75rem 0.5rem',
-                                        textAlign: 'center',
-                                        borderRight: '1px solid #dee2e6',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        background: '#f8f9fa',
-                                        fontWeight: '700',
-                                        color: '#17a2b8',
-                                        fontSize: '14px'
-                                      }}>
-                                        {editandoTabla[`${rol}_mitigador`] ? (
+                      {/* Parte 1: Preguntas */}
+                      <div style={{ padding: '1rem', borderBottom: '2px solid #17a2b8' }}>
+                        <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '14px', fontWeight: '700', color: '#495057' }}>Preguntas del Ejecutivo/a</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ background: '#f8f9fa' }}>
+                                <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Control Crítico</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Pregunta del Ejecutivo/a</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(informacionRiesgo.controles_ejecutivo?.preguntas || []).length > 0 ? (
+                                informacionRiesgo.controles_ejecutivo.preguntas.map((pregunta, index) => (
+                                  <tr key={index} style={{ borderBottom: '1px solid #dee2e6', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoTabla.ejecutivo_preguntas ? (
                                           <input
                                             type="text"
-                                            value={control.numero || ''}
-                                            onChange={(e) => actualizarControl(rol, 'mitigadores', index, 'numero', e.target.value)}
+                                          value={pregunta.control_critico || ''}
+                                          onChange={(e) => actualizarPreguntaAnexo('ejecutivo', index, 'control_critico', e.target.value)}
+                                          placeholder="Ej: CCP1: Personal acreditado para trabajos eléctricos"
                                             style={{
                                               width: '100%',
-                                              padding: '4px',
+                                            padding: '6px',
                                               border: '1px solid #ced4da',
                                               borderRadius: '4px',
-                                              fontSize: '12px',
-                                              textAlign: 'center',
-                                              fontWeight: '700'
+                                            fontSize: '13px'
                                             }}
-                                            placeholder="05"
                                           />
                                         ) : (
-                                          control.numero || `0${index + 1}`
-                                        )}
+                                        <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                          {pregunta.codigo && `${pregunta.codigo}: `}
+                                          {pregunta.control_critico || 'Sin especificar'}
                                       </div>
-                                      
-                                      {/* Columna Descripción del Control */}
-                                      <div style={{ 
-                                        padding: '0.75rem', 
-                                        borderRight: '1px solid #dee2e6',
-                                        display: 'flex',
-                                        alignItems: 'center'
-                                      }}>
-                                        {editandoTabla[`${rol}_mitigador`] ? (
-                                          <textarea
-                                            value={control.descripcion || ''}
-                                            onChange={(e) => actualizarControl(rol, 'mitigadores', index, 'descripcion', e.target.value)}
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoTabla.ejecutivo_preguntas ? (
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                          <input
+                                            type="text"
+                                            value={pregunta.codigo || ''}
+                                            onChange={(e) => actualizarPreguntaAnexo('ejecutivo', index, 'codigo', e.target.value)}
+                                            placeholder="CCP1"
                                             style={{
-                                              width: '100%',
-                                              minHeight: '50px',
+                                              width: '60px',
                                               padding: '6px',
                                               border: '1px solid #ced4da',
                                               borderRadius: '4px',
                                               fontSize: '13px',
-                                              resize: 'vertical',
-                                              fontFamily: 'inherit'
+                                              fontWeight: '600'
                                             }}
-                                            placeholder="Ej: Protecciones en sistemas eléctricos de baja, media y alta tensión"
                                           />
-                                        ) : (
-                                          <div style={{ fontSize: '13px', color: '#212529', lineHeight: '1.5', width: '100%', fontWeight: '500' }}>
-                                            {control.descripcion || 'Sin descripción'}
-                                          </div>
-                                        )}
-                                      </div>
-                                      
-                                      {/* Columna Pregunta */}
-                                      <div style={{ padding: '0.75rem', display: 'flex', alignItems: 'center' }}>
-                                        {editandoTabla[`${rol}_mitigador`] ? (
-                                          <div style={{ width: '100%', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
                                             <textarea
-                                              value={control.pregunta || ''}
-                                              onChange={(e) => actualizarControl(rol, 'mitigadores', index, 'pregunta', e.target.value)}
+                                            value={pregunta.pregunta || ''}
+                                            onChange={(e) => actualizarPreguntaAnexo('ejecutivo', index, 'pregunta', e.target.value)}
+                                            placeholder="¿Existe un sistema de autorización..."
                                               style={{
-                                                width: '100%',
+                                              flex: 1,
                                                 minHeight: '50px',
                                                 padding: '6px',
                                                 border: '1px solid #ced4da',
@@ -15898,10 +17386,9 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                 resize: 'vertical',
                                                 fontFamily: 'inherit'
                                               }}
-                                              placeholder="Ej: Eléctrico: ¿Las protecciones eléctricas de los equipos a intervenir se encuentran con sus mantenciones al día?"
                                             />
                                             <button
-                                              onClick={() => eliminarControl(rol, 'mitigadores', index)}
+                                            onClick={() => eliminarPreguntaAnexo('ejecutivo', index)}
                                               style={{
                                                 background: '#dc3545',
                                                 color: 'white',
@@ -15910,178 +17397,257 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                                 borderRadius: '4px',
                                                 cursor: 'pointer',
                                                 fontSize: '11px',
-                                                flexShrink: 0,
-                                                height: 'fit-content'
+                                              flexShrink: 0
                                               }}
-                                              title="Eliminar control"
+                                            title="Eliminar"
                                             >
                                               <i className="fa fa-trash"></i>
                                             </button>
                                           </div>
                                         ) : (
-                                          <div style={{ fontSize: '13px', color: '#212529', lineHeight: '1.5', width: '100%' }}>
-                                            {control.pregunta || 'Sin pregunta'}
+                                        <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                          {pregunta.pregunta || 'Sin pregunta'}
                                           </div>
                                         )}
-                                      </div>
-                                    </div>
+                                    </td>
+                                  </tr>
                                   ))
                                 ) : (
-                                  <div style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px', gridColumn: '1 / -1' }}>
-                                    No hay controles mitigadores registrados
-                                  </div>
+                                <tr>
+                                  <td colSpan="2" style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                    No hay preguntas registradas
+                                  </td>
+                                </tr>
                                 )}
+                            </tbody>
+                          </table>
                               </div>
                               
-                              {editandoTabla[`${rol}_mitigador`] && (
+                        {editandoTabla.ejecutivo_preguntas && (
+                          <div style={{ marginTop: '0.75rem' }}>
                                 <button
-                                  onClick={() => agregarControl(rol, 'mitigadores')}
+                              onClick={() => agregarPreguntaAnexo('ejecutivo')}
                                   style={{
-                                    background: '#ffc107',
-                                    color: '#856404',
+                                background: '#17a2b8',
+                                color: 'white',
                                     border: 'none',
                                     padding: '8px 16px',
-                                    borderRadius: '5px',
+                                borderRadius: '4px',
                                     cursor: 'pointer',
                                     fontSize: '13px',
                                     fontWeight: '600',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#ff9800';
-                                    e.currentTarget.style.color = 'white';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#ffc107';
-                                    e.currentTarget.style.color = '#856404';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                                gap: '6px'
                                   }}
                                 >
-                                  <i className="fa fa-plus"></i> Agregar Control Mitigador
+                              <i className="fa fa-plus"></i>
+                              Agregar Pregunta
                                 </button>
+                          </div>
                               )}
                             </div>
-                          </div>
-                        </div>
-                      );
 
-                      return (
-                        <>
-                          {renderizarControles('supervisor', 'Supervisor', '#17a2b8')}
-                          {renderizarControles('trabajador', 'Trabajador', '#28a745')}
-                        </>
-                      );
-                    })()}
-
-                    {/* Información para Chatbot */}
-                    <div style={{
-                      background: '#f8f9fa',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '6px',
-                      border: '1px solid #dee2e6'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <div style={{ fontWeight: '700', color: '#495057', fontSize: '13px' }}>
-                          <i className="fa fa-robot" style={{ marginRight: '6px' }}></i>
-                          Información para Chatbot (Texto completo del riesgo crítico)
+                      {/* Parte 2: Estándar de Desempeño */}
+                      <div style={{ padding: '1rem' }}>
+                        <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '14px', fontWeight: '700', color: '#495057' }}>ESTÁNDAR DE DESEMPEÑO</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ background: '#f8f9fa' }}>
+                                <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Control Crítico</th>
+                                {editandoTabla.ejecutivo_estandares && (
+                                  <>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Diseño</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Terreno</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Evidencias</th>
+                                  </>
+                                )}
+                                {!editandoTabla.ejecutivo_estandares && (
+                                  <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontWeight: '700', fontSize: '14px', color: '#495057' }}>Evidencias</th>
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(informacionRiesgo.controles_ejecutivo?.estandares_desempeno || []).length > 0 ? (
+                                informacionRiesgo.controles_ejecutivo.estandares_desempeno.map((estandar, index) => {
+                                  // Construir texto de evidencias combinado con formato visual
+                                  const evidenciasTexto = (estandar.diseño || estandar.terreno) ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                      {estandar.diseño && (
+                                        <div style={{ lineHeight: '1.5' }}>
+                                          <span style={{ color: '#17a2b8', fontWeight: '600', fontSize: '13px' }}>Diseño:</span>{' '}
+                                          <span style={{ fontSize: '13px', color: '#495057' }}>{estandar.diseño}</span>
                         </div>
-                        {canEditFiles(user) && (
-                          <button
-                            onClick={() => {
-                              if (editandoTabla.informacion_riesgo) {
-                                guardarInformacionRiesgo();
-                                setEditandoTabla({...editandoTabla, informacion_riesgo: false});
-                              } else {
-                                setEditandoTabla({...editandoTabla, informacion_riesgo: true});
-                              }
-                            }}
+                                      )}
+                                      {estandar.terreno && (
+                                        <div style={{ lineHeight: '1.5' }}>
+                                          <span style={{ color: '#28a745', fontWeight: '600', fontSize: '13px' }}>Terreno:</span>{' '}
+                                          <span style={{ fontSize: '13px', color: '#495057' }}>{estandar.terreno}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : '-';
+                                  
+                                  return (
+                                    <tr key={index} style={{ borderBottom: '1px solid #dee2e6', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                      <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                        {editandoTabla.ejecutivo_estandares ? (
+                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                            <input
+                                              type="text"
+                                              value={estandar.codigo || ''}
+                                              onChange={(e) => actualizarEstandarDesempeno(index, 'codigo', e.target.value)}
+                                              placeholder="CCP1"
+                                              style={{
+                                                width: '100px',
+                                                padding: '6px',
+                                                border: '1px solid #ced4da',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                fontWeight: '600'
+                                              }}
+                                            />
+                                            <button
+                                              onClick={() => eliminarEstandarDesempeno(index)}
                             style={{
-                              background: editandoTabla.informacion_riesgo ? '#28a745' : '#6c757d',
+                                                background: '#dc3545',
                               color: 'white',
                               border: 'none',
-                              padding: '6px 12px',
+                                                padding: '6px 10px',
                               borderRadius: '4px',
                               cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
+                                                fontSize: '11px',
+                                                flexShrink: 0,
+                                                height: 'fit-content'
                             }}
+                                              title="Eliminar"
                           >
-                            <i className={`fa fa-${editandoTabla.informacion_riesgo ? 'save' : 'edit'}`}></i>
-                            {editandoTabla.informacion_riesgo ? 'Guardar' : 'Editar'}
+                                              <i className="fa fa-trash"></i>
                           </button>
-                        )}
                       </div>
-                      {editandoTabla.informacion_riesgo ? (
+                                        ) : (
+                                          <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                            {estandar.codigo || 'Sin código'}
+                                          </div>
+                                        )}
+                                      </td>
+                                      {editandoTabla.ejecutivo_estandares && (
+                                        <>
+                                          <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
                         <textarea
-                          value={informacionRiesgo.informacion_riesgo}
-                          onChange={(e) => setInformacionRiesgo({...informacionRiesgo, informacion_riesgo: e.target.value})}
+                                              value={estandar.diseño || ''}
+                                              onChange={(e) => actualizarEstandarDesempeno(index, 'diseño', e.target.value)}
+                                              placeholder="Solicite el registro..."
                           style={{
                             width: '100%',
-                            minHeight: '150px',
-                            padding: '0.625rem',
-                            border: '1px solid #dee2e6',
+                                                minHeight: '60px',
+                                                padding: '6px',
+                                                border: '1px solid #ced4da',
                             borderRadius: '4px',
                             fontSize: '13px',
-                            fontFamily: 'inherit',
-                            resize: 'vertical'
-                          }}
-                          placeholder="Ingrese toda la información del riesgo crítico en formato texto plano. Esta información será utilizada por el chatbot para responder preguntas sobre este riesgo crítico."
-                        />
-                      ) : (
-                        <div style={{ fontSize: '13px', color: '#495057', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                          {informacionRiesgo.informacion_riesgo || 'No hay información disponible para el chatbot'}
+                                                resize: 'vertical',
+                                                fontFamily: 'inherit'
+                                              }}
+                                            />
+                                          </td>
+                                          <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                            <textarea
+                                              value={estandar.terreno || ''}
+                                              onChange={(e) => actualizarEstandarDesempeno(index, 'terreno', e.target.value)}
+                                              placeholder="Solicite la acreditación..."
+                                              style={{
+                                                width: '100%',
+                                                minHeight: '60px',
+                                                padding: '6px',
+                                                border: '1px solid #ced4da',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                resize: 'vertical',
+                                                fontFamily: 'inherit'
+                                              }}
+                                            />
+                                          </td>
+                                          <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                            <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                              {evidenciasTexto}
                         </div>
-                      )}
+                                          </td>
+                                        </>
+                                      )}
+                                      {!editandoTabla.ejecutivo_estandares && (
+                                        <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                          <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                            {evidenciasTexto}
+                                          </div>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  );
+                                })
+                              ) : (
+                                <tr>
+                                  <td colSpan={editandoTabla.ejecutivo_estandares ? "4" : "2"} style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                    No hay estándares de desempeño registrados
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
                     </div>
 
-                    {/* Mensaje de advertencia */}
-                    <div style={{
-                      background: '#f8d7da',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '6px',
-                      border: '1px solid #dc3545',
-                      color: '#721c24'
-                    }}>
-                      <div style={{ fontWeight: '700', marginBottom: '0.375rem', fontSize: '13px' }}>
-                        <i className="fa fa-exclamation-circle" style={{ marginRight: '6px' }}></i>
-                        IMPORTANTE
+                        {editandoTabla.ejecutivo_estandares && (
+                          <div style={{ marginTop: '0.75rem' }}>
+                            <button
+                              onClick={() => agregarEstandarDesempeno()}
+                              style={{
+                                background: '#17a2b8',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <i className="fa fa-plus"></i>
+                              Agregar Estándar de Desempeño
+                            </button>
                       </div>
-                      <div style={{ fontSize: '12px', lineHeight: '1.4' }}>
-                        Si un Control Crítico no está presente, detenga la actividad. Luego, aplique tarjeta verde y notifique al supervisor para evaluar la desviación y juntos normalizar el control ausente o fallido.
+                        )}
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#6c757d' }}>
                     <i className="fa fa-exclamation-triangle" style={{ fontSize: '3rem', marginBottom: '1rem', color: '#ffc107' }}></i>
-                    <p>No hay información de riesgo crítico disponible para esta carpeta.</p>
+                    <p>No hay información de anexos disponible para esta carpeta.</p>
                     {canEditFiles(user) && (
                       <button
                         onClick={() => {
                           setInformacionRiesgo({
                             evento_no_deseado: '',
                             evento_riesgo: '',
-                            controles_supervisor: { preventivos: [], mitigadores: [] },
-                            controles_trabajador: { preventivos: [], mitigadores: [] },
+                            controles_supervisor: { preguntas: [] },
+                            controles_trabajador: { preguntas: [] },
+                            controles_ejecutivo: { preguntas: [], estandares_desempeno: [] },
                             informacion_riesgo: ''
                           });
                           setEditandoTabla({
-                            evento_no_deseado: true,
+                            evento_no_deseado: false,
                             evento_riesgo: false,
                             supervisor_preventivo: false,
                             supervisor_mitigador: false,
                             trabajador_preventivo: false,
                             trabajador_mitigador: false,
+                            trabajador_preguntas: true,
+                            supervisor_preguntas: false,
+                            ejecutivo_preguntas: false,
+                            ejecutivo_estandares: false,
                             informacion_riesgo: false
                           });
                         }}
@@ -16098,9 +17664,531 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         }}
                       >
                         <i className="fa fa-plus" style={{ marginRight: '8px' }}></i>
-                        Agregar Información de Riesgo Crítico
+                        Agregar Información de Anexos
                       </button>
                     )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pestaña Bases - NO mostrar en nivel contenedor (3+) */}
+            {pestañaActiva === 'bases' && !esNivelContenedor && (
+              <div>
+                {basesControles ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {/* Mensaje informativo sobre permisos */}
+                    {!canEditFiles(user) && (
+                      <div style={{
+                        background: '#fff3cd',
+                        border: '1px solid #ffc107',
+                        borderRadius: '6px',
+                        padding: '0.5rem 0.75rem',
+                        color: '#856404',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <i className="fa fa-info-circle"></i>
+                        <span>Solo administradores pueden editar las bases de controles. Esta información está asociada a la carpeta <strong>{carpetaActual.nombre}</strong>.</span>
+                      </div>
+                    )}
+
+                    {/* Tabla ÍNDICE CONTROLES CRÍTICOS */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1px solid #dee2e6',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                      overflow: 'hidden'
+                    }}>
+                      {/* Header naranja */}
+                      <div style={{
+                        background: '#17a2b8',
+                        color: 'white',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontWeight: '700',
+                        fontSize: '16px'
+                      }}>
+                        <i className="fa fa-cog" style={{ fontSize: '18px' }}></i>
+                        <span>ÍNDICE CONTROLES CRÍTICOS</span>
+                        {canEditFiles(user) && (
+                          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                            {!editandoBases ? (
+                              <button
+                                onClick={() => setEditandoBases(true)}
+                                style={{
+                                  background: 'rgba(255,255,255,0.2)',
+                                  color: 'white',
+                                  border: '1px solid rgba(255,255,255,0.3)',
+                                  padding: '6px 12px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '13px',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                <i className="fa fa-edit" style={{ marginRight: '6px' }}></i>
+                                Editar
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={guardarBasesControles}
+                                  style={{
+                                    background: '#28a745',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: '600'
+                                  }}
+                                >
+                                  <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
+                                  Guardar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditandoBases(false);
+                                    cargarBasesControles(carpetaActual.id);
+                                  }}
+                                  style={{
+                                    background: '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: '600'
+                                  }}
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tabla */}
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: '#17a2b8', color: 'white' }}>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px' }}>#</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px' }}>CÓDIGO</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px' }}>NOMBRE</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px' }}>TIPO</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '14px' }}>CLASIFICACIÓN</th>
+                              {editandoBases && (
+                                <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', fontSize: '14px', width: '100px' }}>ACCIONES</th>
+                              )}
+                              {!editandoBases && (
+                                <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', fontSize: '14px', width: '100px' }}>REQUISITOS</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(basesControles.controles || []).length > 0 ? (
+                              basesControles.controles.map((control, index) => (
+                                <React.Fragment key={control.id || index}>
+                                  <tr style={{ borderBottom: '1px solid #dee2e6', background: index % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoBases ? (
+                                        <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                          {index + 1}
+                                        </div>
+                                      ) : (
+                                        <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                          {index + 1}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoBases ? (
+                                        <input
+                                          type="text"
+                                          value={control.codigo || ''}
+                                          onChange={(e) => actualizarControlCritico(control.id, 'codigo', e.target.value)}
+                                          placeholder="CCP1"
+                                          style={{
+                                            width: '100%',
+                                            padding: '6px',
+                                            border: '1px solid #ced4da',
+                                            borderRadius: '4px',
+                                            fontSize: '13px',
+                                            fontWeight: '600'
+                                          }}
+                                        />
+                                      ) : (
+                                        <div style={{ fontWeight: '600', fontSize: '13px', color: '#212529' }}>
+                                          {control.codigo || '-'}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoBases ? (
+                                        <input
+                                          type="text"
+                                          value={control.nombre || ''}
+                                          onChange={(e) => actualizarControlCritico(control.id, 'nombre', e.target.value)}
+                                          placeholder="Nombre del control..."
+                                          style={{
+                                            width: '100%',
+                                            padding: '6px',
+                                            border: '1px solid #ced4da',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                        />
+                                      ) : (
+                                        <div style={{ fontSize: '13px', color: '#495057' }}>
+                                          {control.nombre || '-'}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoBases ? (
+                                        <select
+                                          value={control.tipo || 'Preventivo'}
+                                          onChange={(e) => actualizarControlCritico(control.id, 'tipo', e.target.value)}
+                                          style={{
+                                            width: '100%',
+                                            padding: '6px',
+                                            border: '1px solid #ced4da',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                        >
+                                          <option value="Preventivo">Preventivo</option>
+                                          <option value="Mitigador">Mitigador</option>
+                                        </select>
+                                      ) : (
+                                        <div style={{ fontSize: '13px', color: '#495057' }}>
+                                          {control.tipo || '-'}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                      {editandoBases ? (
+                                        <select
+                                          value={control.clasificacion || 'Sistema'}
+                                          onChange={(e) => actualizarControlCritico(control.id, 'clasificacion', e.target.value)}
+                                          style={{
+                                            width: '100%',
+                                            padding: '6px',
+                                            border: '1px solid #ced4da',
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                          }}
+                                        >
+                                          <option value="Sistema">Sistema</option>
+                                          <option value="Preventivo">Preventivo</option>
+                                          <option value="Mitigador">Mitigador</option>
+                                        </select>
+                                      ) : (
+                                        <div style={{ fontSize: '13px', color: '#495057' }}>
+                                          {control.clasificacion || '-'}
+                                        </div>
+                                      )}
+                                    </td>
+                                    {editandoBases && (
+                                      <td style={{ padding: '0.75rem', verticalAlign: 'top', textAlign: 'center' }}>
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                          <button
+                                            onClick={() => setControlExpandido(controlExpandido === control.id ? null : control.id)}
+                                            style={{
+                                              background: '#17a2b8',
+                                              color: 'white',
+                                              border: 'none',
+                                              padding: '6px 10px',
+                                              borderRadius: '4px',
+                                              cursor: 'pointer',
+                                              fontSize: '11px'
+                                            }}
+                                            title="Ver requisitos"
+                                          >
+                                            <i className={`fa fa-${controlExpandido === control.id ? 'chevron-up' : 'chevron-down'}`}></i>
+                                          </button>
+                                          <button
+                                            onClick={() => setModalInfoAdicional({ controlId: control.id, control: control })}
+                                            style={{
+                                              background: '#17a2b8',
+                                              color: 'white',
+                                              border: 'none',
+                                              padding: '6px 10px',
+                                              borderRadius: '4px',
+                                              cursor: 'pointer',
+                                              fontSize: '11px'
+                                            }}
+                                            title="Información adicional"
+                                          >
+                                            <i className="fa fa-info-circle"></i>
+                                          </button>
+                                          <button
+                                            onClick={() => eliminarControlCritico(control.id)}
+                                            style={{
+                                              background: '#dc3545',
+                                              color: 'white',
+                                              border: 'none',
+                                              padding: '6px 10px',
+                                              borderRadius: '4px',
+                                              cursor: 'pointer',
+                                              fontSize: '11px'
+                                            }}
+                                            title="Eliminar"
+                                          >
+                                            <i className="fa fa-trash"></i>
+                                          </button>
+                                        </div>
+                                      </td>
+                                    )}
+                                    {!editandoBases && (
+                                      <td style={{ padding: '0.75rem', verticalAlign: 'top', textAlign: 'center' }}>
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                          <button
+                                            onClick={() => setControlExpandido(controlExpandido === control.id ? null : control.id)}
+                                            style={{
+                                              background: '#17a2b8',
+                                              color: 'white',
+                                              border: 'none',
+                                              padding: '6px 12px',
+                                              borderRadius: '4px',
+                                              cursor: 'pointer',
+                                              fontSize: '12px',
+                                              fontWeight: '600'
+                                            }}
+                                          >
+                                            {controlExpandido === control.id ? 'Ocultar' : 'Ver'} ({control.requisitos?.length || 0})
+                                          </button>
+                                          <button
+                                            onClick={() => setModalInfoAdicional({ controlId: control.id, control: control })}
+                                            style={{
+                                              background: '#17a2b8',
+                                              color: 'white',
+                                              border: 'none',
+                                              padding: '6px 12px',
+                                              borderRadius: '4px',
+                                              cursor: 'pointer',
+                                              fontSize: '12px',
+                                              fontWeight: '600'
+                                            }}
+                                            title="Información adicional"
+                                          >
+                                            <i className="fa fa-info-circle" style={{ marginRight: '4px' }}></i>
+                                            Info
+                                          </button>
+                                        </div>
+                                      </td>
+                                    )}
+                                  </tr>
+                                  {/* Fila expandida con requisitos */}
+                                  {controlExpandido === control.id && (
+                                    <tr>
+                                      <td colSpan={editandoBases ? 6 : 6} style={{ padding: '1rem', background: '#f8f9fa' }}>
+                                        <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#495057' }}>
+                                            ESTÁNDAR DE DESEMPEÑO - {control.codigo || 'Sin código'}
+                                          </h4>
+                                          {editandoBases && (
+                                            <button
+                                              onClick={() => agregarRequisito(control.id)}
+                                              style={{
+                                                background: '#28a745',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '6px 12px',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px',
+                                                fontWeight: '600'
+                                              }}
+                                            >
+                                              <i className="fa fa-plus" style={{ marginRight: '6px' }}></i>
+                                              Agregar Requisito
+                                            </button>
+                                          )}
+                                        </div>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: '4px', overflow: 'hidden' }}>
+                                          <thead>
+                                            <tr style={{ background: '#e9ecef' }}>
+                                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '13px', borderBottom: '2px solid #dee2e6' }}>N°</th>
+                                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '13px', borderBottom: '2px solid #dee2e6' }}>Requisito</th>
+                                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '13px', borderBottom: '2px solid #dee2e6' }}>Evidencia</th>
+                                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700', fontSize: '13px', borderBottom: '2px solid #dee2e6' }}>Monitoreo</th>
+                                              {editandoBases && (
+                                                <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '700', fontSize: '13px', borderBottom: '2px solid #dee2e6', width: '80px' }}>Acción</th>
+                                              )}
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {(control.requisitos || []).length > 0 ? (
+                                              control.requisitos.map((requisito, reqIndex) => (
+                                                <tr key={requisito.id || reqIndex} style={{ borderBottom: '1px solid #dee2e6' }}>
+                                                  <td style={{ padding: '0.75rem', verticalAlign: 'top', fontWeight: '600', fontSize: '13px' }}>
+                                                    {reqIndex + 1}
+                                                  </td>
+                                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                                    {editandoBases ? (
+                                                      <textarea
+                                                        value={requisito.requisito || ''}
+                                                        onChange={(e) => actualizarRequisito(control.id, requisito.id, 'requisito', e.target.value)}
+                                                        placeholder="Requisito..."
+                                                        style={{
+                                                          width: '100%',
+                                                          minHeight: '60px',
+                                                          padding: '6px',
+                                                          border: '1px solid #ced4da',
+                                                          borderRadius: '4px',
+                                                          fontSize: '13px',
+                                                          resize: 'vertical',
+                                                          fontFamily: 'inherit'
+                                                        }}
+                                                      />
+                                                    ) : (
+                                                      <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                                        {requisito.requisito || '-'}
+                                                      </div>
+                                                    )}
+                                                  </td>
+                                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                                    {editandoBases ? (
+                                                      <textarea
+                                                        value={requisito.evidencia || ''}
+                                                        onChange={(e) => actualizarRequisito(control.id, requisito.id, 'evidencia', e.target.value)}
+                                                        placeholder="Evidencia..."
+                                                        style={{
+                                                          width: '100%',
+                                                          minHeight: '60px',
+                                                          padding: '6px',
+                                                          border: '1px solid #ced4da',
+                                                          borderRadius: '4px',
+                                                          fontSize: '13px',
+                                                          resize: 'vertical',
+                                                          fontFamily: 'inherit'
+                                                        }}
+                                                      />
+                                                    ) : (
+                                                      <div style={{ fontSize: '13px', color: '#495057', lineHeight: '1.5' }}>
+                                                        {requisito.evidencia || '-'}
+                                                      </div>
+                                                    )}
+                                                  </td>
+                                                  <td style={{ padding: '0.75rem', verticalAlign: 'top' }}>
+                                                    {editandoBases ? (
+                                                      <select
+                                                        value={requisito.monitoreo || ''}
+                                                        onChange={(e) => actualizarRequisito(control.id, requisito.id, 'monitoreo', e.target.value)}
+                                                        style={{
+                                                          width: '100%',
+                                                          padding: '6px',
+                                                          border: '1px solid #ced4da',
+                                                          borderRadius: '4px',
+                                                          fontSize: '13px'
+                                                        }}
+                                                      >
+                                                        <option value="">Seleccionar...</option>
+                                                        <option value="Cada Tarea">Cada Tarea</option>
+                                                        <option value="Semanal">Semanal</option>
+                                                        <option value="Mensual">Mensual</option>
+                                                        <option value="Semestral">Semestral</option>
+                                                        <option value="Trimestral">Trimestral</option>
+                                                        <option value="Anual">Anual</option>
+                                                      </select>
+                                                    ) : (
+                                                      <div style={{ fontSize: '13px', color: '#495057' }}>
+                                                        {requisito.monitoreo || '-'}
+                                                      </div>
+                                                    )}
+                                                  </td>
+                                                  {editandoBases && (
+                                                    <td style={{ padding: '0.75rem', verticalAlign: 'top', textAlign: 'center' }}>
+                                                      <button
+                                                        onClick={() => eliminarRequisito(control.id, requisito.id)}
+                                                        style={{
+                                                          background: '#dc3545',
+                                                          color: 'white',
+                                                          border: 'none',
+                                                          padding: '6px 10px',
+                                                          borderRadius: '4px',
+                                                          cursor: 'pointer',
+                                                          fontSize: '11px'
+                                                        }}
+                                                        title="Eliminar"
+                                                      >
+                                                        <i className="fa fa-trash"></i>
+                                                      </button>
+                                                    </td>
+                                                  )}
+                                                </tr>
+                                              ))
+                                            ) : (
+                                              <tr>
+                                                <td colSpan={editandoBases ? 5 : 4} style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                                  No hay requisitos registrados
+                                                </td>
+                                              </tr>
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={editandoBases ? 6 : 6} style={{ padding: '1.5rem', textAlign: 'center', color: '#6c757d', fontSize: '13px' }}>
+                                  No hay controles críticos registrados
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {editandoBases && (
+                        <div style={{ padding: '1rem', borderTop: '1px solid #dee2e6' }}>
+                          <button
+                            onClick={agregarControlCritico}
+                            style={{
+                              background: '#17a2b8',
+                              color: 'white',
+                              border: 'none',
+                              padding: '8px 16px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <i className="fa fa-plus"></i>
+                            Agregar Control Crítico
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '3rem 2rem',
+                    color: '#6c757d'
+                  }}>
+                    <i className="fa fa-database" style={{ fontSize: '64px', color: '#dee2e6', marginBottom: '1rem' }}></i>
+                    <p style={{ fontSize: '16px', margin: '0.5rem 0' }}>
+                      Cargando bases de controles...
+                    </p>
                   </div>
                 )}
               </div>
@@ -16964,9 +19052,12 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                             {tareaExpandida === tarea.id && (
                               <div>
                                 {/* Lista de comentarios */}
-                                {tarea.comentarios && tarea.comentarios.length > 0 && (
+                                {/* Usar comentariosTarea si está disponible, sino usar tarea.comentarios como fallback */}
+                                {(() => {
+                                  const comentariosMostrar = comentariosTarea[tarea.id] || tarea.comentarios || [];
+                                  return comentariosMostrar.length > 0 && (
                                   <div style={{ marginBottom: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
-                                    {tarea.comentarios.map((comentario) => (
+                                      {comentariosMostrar.map((comentario) => (
                                       <div
                                         key={comentario.id}
                                         style={{
@@ -17012,7 +19103,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                       </div>
                                     ))}
                                   </div>
-                                )}
+                                  );
+                                })()}
                                 
                                 {/* Formulario para agregar comentario */}
                                 {/* Verificar que el usuario puede comentar (creador o asignado) */}
@@ -17049,6 +19141,8 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         e.target.style.boxShadow = 'none';
                                       }}
                                     />
+                                    {/* Botones de acción: Comentario y Adjuntar archivo lado a lado - ambos pequeños */}
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <button
                                       onClick={() => crearComentario(tarea.id)}
                                       disabled={!nuevoComentario[tarea.id]?.trim()}
@@ -17056,17 +19150,75 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                         background: nuevoComentario[tarea.id]?.trim() ? '#17a2b8' : '#ccc',
                                         color: 'white',
                                         border: 'none',
-                                        padding: '8px 16px',
+                                          padding: '6px 12px',
                                         borderRadius: '6px',
                                         cursor: nuevoComentario[tarea.id]?.trim() ? 'pointer' : 'not-allowed',
-                                        fontSize: '13px',
+                                          fontSize: '12px',
                                         fontWeight: '500',
-                                        transition: 'all 0.2s ease'
-                                      }}
-                                    >
-                                      <i className="fa fa-paper-plane" style={{ marginRight: '6px' }}></i>
-                                      Agregar comentario
+                                          transition: 'all 0.2s ease',
+                                          whiteSpace: 'nowrap',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                        title="Agregar comentario"
+                                      >
+                                        <i className="fa fa-paper-plane"></i>
+                                        <span>Agregar comentario</span>
                                     </button>
+                                      
+                                      {/* Botón Adjuntar archivo - pequeño, al lado */}
+                                      {(tarea.creado_por === user.id || 
+                                        (tarea.asignados && tarea.asignados.some(a => a.usuario_id === user.id)) ||
+                                        (!tarea.asignados && tarea.asignado_a === user.id) ||
+                                        user.rol === 'super_admin' || user.rol === 'admin') && (
+                                        <>
+                                          <input
+                                            type="file"
+                                            id={`adjunto-${tarea.id}`}
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                              const archivo = e.target.files[0];
+                                              if (archivo) {
+                                                const descripcion = window.prompt('Descripción del archivo (opcional):', '');
+                                                subirAdjuntoTarea(tarea.id, archivo, descripcion || '');
+                                                // Resetear el input
+                                                e.target.value = '';
+                                              }
+                                            }}
+                                          />
+                                          <button
+                                            onClick={() => document.getElementById(`adjunto-${tarea.id}`).click()}
+                                            disabled={subiendoAdjunto[tarea.id]}
+                                            style={{
+                                              background: subiendoAdjunto[tarea.id] ? '#ccc' : '#28a745',
+                                              color: 'white',
+                                              border: 'none',
+                                              padding: '6px 12px',
+                                              borderRadius: '6px',
+                                              cursor: subiendoAdjunto[tarea.id] ? 'not-allowed' : 'pointer',
+                                              fontSize: '12px',
+                                              fontWeight: '500',
+                                              transition: 'all 0.2s ease',
+                                              whiteSpace: 'nowrap',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}
+                                            title="Adjuntar archivo"
+                                          >
+                                            {subiendoAdjunto[tarea.id] ? (
+                                              <i className="fa fa-spinner fa-spin"></i>
+                                            ) : (
+                                              <>
+                                                <i className="fa fa-paperclip"></i>
+                                                <span>Adjuntar</span>
+                                              </>
+                                            )}
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                                 
@@ -17151,58 +19303,6 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                                           </div>
                                         </div>
                                       ))}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Formulario para adjuntar archivo */}
-                                  {/* Verificar que el usuario puede adjuntar (creador o asignado) */}
-                                  {(tarea.creado_por === user.id || 
-                                    (tarea.asignados && tarea.asignados.some(a => a.usuario_id === user.id)) ||
-                                    (!tarea.asignados && tarea.asignado_a === user.id) ||
-                                    user.rol === 'super_admin' || user.rol === 'admin') && (
-                                    <div>
-                                      <input
-                                        type="file"
-                                        id={`adjunto-${tarea.id}`}
-                                        style={{ display: 'none' }}
-                                        onChange={(e) => {
-                                          const archivo = e.target.files[0];
-                                          if (archivo) {
-                                            const descripcion = window.prompt('Descripción del archivo (opcional):', '');
-                                            subirAdjuntoTarea(tarea.id, archivo, descripcion || '');
-                                            // Resetear el input
-                                            e.target.value = '';
-                                          }
-                                        }}
-                                      />
-                                      <button
-                                        onClick={() => document.getElementById(`adjunto-${tarea.id}`).click()}
-                                        disabled={subiendoAdjunto[tarea.id]}
-                                        style={{
-                                          background: subiendoAdjunto[tarea.id] ? '#ccc' : '#28a745',
-                                          color: 'white',
-                                          border: 'none',
-                                          padding: '8px 16px',
-                                          borderRadius: '6px',
-                                          cursor: subiendoAdjunto[tarea.id] ? 'not-allowed' : 'pointer',
-                                          fontSize: '13px',
-                                          fontWeight: '500',
-                                          transition: 'all 0.2s ease',
-                                          width: '100%'
-                                        }}
-                                      >
-                                        {subiendoAdjunto[tarea.id] ? (
-                                          <>
-                                            <i className="fa fa-spinner fa-spin" style={{ marginRight: '6px' }}></i>
-                                            Subiendo...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <i className="fa fa-paperclip" style={{ marginRight: '6px' }}></i>
-                                            Adjuntar archivo
-                                          </>
-                                        )}
-                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -20202,6 +22302,85 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   />
                 </div>
               </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '6px', 
+                  fontWeight: '600',
+                  color: '#17a2b8',
+                  fontSize: '0.85rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Tipo de Tarea
+                </label>
+                <select
+                  value={nuevaTarea.tipo_tarea || 'para_realizar'}
+                  onChange={(e) => setNuevaTarea({ ...nuevaTarea, tipo_tarea: e.target.value, fecha_inicio: e.target.value === 'para_realizar' ? '' : nuevaTarea.fecha_inicio })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '2px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    background: 'white',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#17a2b8';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e0e0e0';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <option value="para_realizar">Para Realizar</option>
+                  <option value="para_programar">Para Programar</option>
+                </select>
+              </div>
+
+              {/* Campo de Fecha de Inicio - Solo para tareas "Para Programar" */}
+              {nuevaTarea.tipo_tarea === 'para_programar' && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '6px', 
+                    fontWeight: '600',
+                    color: '#17a2b8',
+                    fontSize: '0.85rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Fecha de Inicio <span style={{ color: '#dc3545' }}>*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={nuevaTarea.fecha_inicio || ''}
+                    onChange={(e) => setNuevaTarea({ ...nuevaTarea, fecha_inicio: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '2px solid #e0e0e0',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#17a2b8';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(10, 110, 189, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e0e0e0';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
             
             {/* Footer con botones */}
@@ -20284,6 +22463,248 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 Crear Tarea
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Progreso de Descarga */}
+      {descargaProgress && descargaProgress.visible && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10002
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '25px',
+            minWidth: '400px',
+            maxWidth: '500px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{ 
+              marginTop: 0, 
+              marginBottom: '20px', 
+              color: descargaProgress.estado === 'error' ? '#dc3545' : 
+                     descargaProgress.estado === 'completado' ? '#28a745' : '#17a2b8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              {descargaProgress.estado === 'error' && <i className="fa fa-exclamation-circle"></i>}
+              {descargaProgress.estado === 'completado' && <i className="fa fa-check-circle"></i>}
+              {descargaProgress.estado !== 'error' && descargaProgress.estado !== 'completado' && <i className="fa fa-download"></i>}
+              {descargaProgress.estado === 'error' ? 'Error en la descarga' : 
+               descargaProgress.estado === 'completado' ? 'Descarga completada' : 
+               'Descargando archivo ZIP'}
+            </h3>
+            
+            {/* Barra de progreso */}
+            <div style={{
+              width: '100%',
+              height: '30px',
+              background: '#e0e0e0',
+              borderRadius: '15px',
+              overflow: 'hidden',
+              marginBottom: '15px',
+              position: 'relative'
+            }}>
+              <div style={{
+                width: `${descargaProgress.progreso || 0}%`,
+                height: '100%',
+                background: descargaProgress.estado === 'error' ? '#dc3545' :
+                           descargaProgress.estado === 'completado' ? '#28a745' :
+                           'linear-gradient(90deg, #28a745 0%, #20c997 100%)',
+                transition: 'width 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                boxShadow: descargaProgress.estado !== 'error' && descargaProgress.estado !== 'completado' 
+                  ? 'inset 0 2px 4px rgba(0,0,0,0.1)' : 'none'
+              }}>
+                {descargaProgress.progreso || 0}%
+              </div>
+              {descargaProgress.estado !== 'error' && descargaProgress.estado !== 'completado' && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+                  animation: 'shimmer 1.5s infinite'
+                }}></div>
+              )}
+            </div>
+            
+            {/* Mensaje */}
+            <p style={{
+              margin: 0,
+              fontSize: '14px',
+              color: '#495057',
+              textAlign: 'center'
+            }}>
+              {descargaProgress.mensaje || 'Procesando...'}
+            </p>
+            
+            {/* Botón cerrar solo si hay error o está completado */}
+            {(descargaProgress.estado === 'error' || descargaProgress.estado === 'completado') && (
+              <div style={{
+                marginTop: '20px',
+                display: 'flex',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => setDescargaProgress(null)}
+                  style={{
+                    padding: '8px 20px',
+                    background: descargaProgress.estado === 'error' ? '#dc3545' : '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'opacity 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                  onMouseLeave={(e) => e.target.style.opacity = '1'}
+                >
+                  {descargaProgress.estado === 'error' ? 'Cerrar' : 'Aceptar'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Progreso de Descarga */}
+      {descargaProgress && descargaProgress.visible && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10002
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '25px',
+            minWidth: '400px',
+            maxWidth: '500px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+          }}>
+            <h3 style={{ 
+              marginTop: 0, 
+              marginBottom: '20px', 
+              color: descargaProgress.estado === 'error' ? '#dc3545' : 
+                     descargaProgress.estado === 'completado' ? '#28a745' : '#17a2b8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              {descargaProgress.estado === 'error' && <i className="fa fa-exclamation-circle"></i>}
+              {descargaProgress.estado === 'completado' && <i className="fa fa-check-circle"></i>}
+              {descargaProgress.estado !== 'error' && descargaProgress.estado !== 'completado' && <i className="fa fa-download"></i>}
+              {descargaProgress.estado === 'error' ? 'Error en la descarga' : 
+               descargaProgress.estado === 'completado' ? 'Descarga completada' : 
+               'Descargando archivo ZIP'}
+            </h3>
+            
+            {/* Barra de progreso */}
+            <div style={{
+              width: '100%',
+              height: '30px',
+              background: '#e0e0e0',
+              borderRadius: '15px',
+              overflow: 'hidden',
+              marginBottom: '15px',
+              position: 'relative'
+            }}>
+              <div style={{
+                width: `${descargaProgress.progreso || 0}%`,
+                height: '100%',
+                background: descargaProgress.estado === 'error' ? '#dc3545' :
+                           descargaProgress.estado === 'completado' ? '#28a745' :
+                           'linear-gradient(90deg, #28a745 0%, #20c997 100%)',
+                transition: 'width 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                boxShadow: descargaProgress.estado !== 'error' && descargaProgress.estado !== 'completado' 
+                  ? 'inset 0 2px 4px rgba(0,0,0,0.1)' : 'none'
+              }}>
+                {descargaProgress.progreso || 0}%
+              </div>
+              {descargaProgress.estado !== 'error' && descargaProgress.estado !== 'completado' && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+                  animation: 'shimmer 1.5s infinite'
+                }}></div>
+              )}
+            </div>
+            
+            {/* Mensaje */}
+            <p style={{
+              margin: 0,
+              fontSize: '14px',
+              color: '#495057',
+              textAlign: 'center'
+            }}>
+              {descargaProgress.mensaje || 'Procesando...'}
+            </p>
+            
+            {/* Botón cerrar solo si hay error o está completado */}
+            {(descargaProgress.estado === 'error' || descargaProgress.estado === 'completado') && (
+              <div style={{
+                marginTop: '20px',
+                display: 'flex',
+                justifyContent: 'center'
+              }}>
+                <button
+                  onClick={() => setDescargaProgress(null)}
+                  style={{
+                    padding: '8px 20px',
+                    background: descargaProgress.estado === 'error' ? '#dc3545' : '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'opacity 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                  onMouseLeave={(e) => e.target.style.opacity = '1'}
+                >
+                  {descargaProgress.estado === 'error' ? 'Cerrar' : 'Aceptar'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -21718,14 +24139,81 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button
                     onClick={() => {
-                      const currentItem = modalValidacionObservacion.tipo === 'preventivo' 
-                        ? lineaBase[modalValidacionObservacion.itemIndex]
-                        : lineaBaseMitigadores[modalValidacionObservacion.itemIndex];
+                      // CRÍTICO: Para nivel 2, usar el item del modal directamente (viene de basesControles)
+                      // Para nivel 3+, obtener el item del estado lineaBase o lineaBaseMitigadores
+                      const esNivel2 = rutaNavegacion.length === 2;
+                      let currentItem;
+                      
+                      if (esNivel2) {
+                        // Para nivel 2, usar el item que se pasó al modal (viene de basesControles)
+                        currentItem = modalValidacionObservacion.item || {};
+                      } else {
+                        // Para nivel 3+, obtener del estado correspondiente
+                        currentItem = modalValidacionObservacion.tipo === 'preventivo' 
+                          ? (lineaBase[modalValidacionObservacion.itemIndex] || {})
+                          : (lineaBaseMitigadores[modalValidacionObservacion.itemIndex] || {});
+                      }
+                      
                       const nuevoEstado = currentItem.estado_validacion === 'validado' ? null : 'validado';
                       // Calcular ponderación: 100% si validado, 0% si null
                       const nuevaPonderacion = nuevoEstado === 'validado' ? 100 : 0;
                       
-                      if (modalValidacionObservacion.tipo === 'preventivo') {
+                      // CRÍTICO: Para nivel 2, actualizar basesControles en lugar de lineaBase
+                      if (esNivel2) {
+                        // Para nivel 2, actualizar basesControles usando claveUnica o requisitoId
+                        const itemModal = modalValidacionObservacion.item || {};
+                        const claveUnica = itemModal.claveUnica;
+                        const requisitoId = itemModal.requisitoId;
+                        const controlId = itemModal.controlId;
+                        
+                        if (!basesControles || !basesControles.controles) {
+                          mostrarNotificacion('✗ Error: No se encontraron bases de controles para actualizar', 'error');
+                          return;
+                        }
+                        
+                        // Buscar y actualizar el requisito en basesControles
+                        const controlesActualizados = basesControles.controles.map(control => {
+                          if (control.id === controlId && control.requisitos) {
+                            const requisitosActualizados = control.requisitos.map(requisito => {
+                              const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                              const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                              const coincidePorId = requisito.id === requisitoId;
+                              
+                              if (coincidePorClave || coincidePorId) {
+                                return {
+                                  ...requisito,
+                                  estado_validacion: nuevoEstado,
+                                  comentario_validacion: nuevoEstado === null ? '' : (requisito.comentario_validacion || ''),
+                                  usuario_validacion: nuevoEstado ? obtenerUltimoUsuarioEditoString(user) : '',
+                                  fecha_validacion: nuevoEstado ? new Date().toISOString().slice(0, 19).replace('T', ' ') : '',
+                                  ponderacion: nuevaPonderacion,
+                                  ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
+                                };
+                              }
+                              return requisito;
+                            });
+                            return { ...control, requisitos: requisitosActualizados };
+                          }
+                          return control;
+                        });
+                        
+                        const nuevasBasesControles = { ...basesControles, controles: controlesActualizados };
+                        
+                        // Actualizar el estado local
+                        setBasesControles(nuevasBasesControles);
+                        
+                        // Actualizar el item del modal
+                        const itemActualizado = {
+                          ...itemModal,
+                          estado_validacion: nuevoEstado,
+                          comentario_validacion: nuevoEstado === null ? '' : (itemModal.comentario_validacion || ''),
+                          usuario_validacion: nuevoEstado ? obtenerUltimoUsuarioEditoString(user) : '',
+                          fecha_validacion: nuevoEstado ? new Date().toISOString().slice(0, 19).replace('T', ' ') : '',
+                          ponderacion: nuevaPonderacion
+                        };
+                        setModalValidacionObservacion({ ...modalValidacionObservacion, item: itemActualizado });
+                      } else if (modalValidacionObservacion.tipo === 'preventivo') {
+                        // Para nivel 3+, actualizar lineaBase
                         const nuevaLineaBase = [...lineaBase];
                         nuevaLineaBase[modalValidacionObservacion.itemIndex] = {
                           ...nuevaLineaBase[modalValidacionObservacion.itemIndex],
@@ -21738,6 +24226,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         setLineaBase(nuevaLineaBase);
                         setModalValidacionObservacion({ ...modalValidacionObservacion, item: nuevaLineaBase[modalValidacionObservacion.itemIndex] });
                       } else {
+                        // Para nivel 3+, actualizar lineaBaseMitigadores
                         const nuevaLineaBase = [...lineaBaseMitigadores];
                         nuevaLineaBase[modalValidacionObservacion.itemIndex] = {
                           ...nuevaLineaBase[modalValidacionObservacion.itemIndex],
@@ -21764,34 +24253,101 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       justifyContent: 'center',
                       gap: '0.5rem',
                       transition: 'all 0.2s ease',
-                      background: modalValidacionObservacion.item.estado_validacion === 'validado' ? '#28a745' : 'white',
-                      color: modalValidacionObservacion.item.estado_validacion === 'validado' ? 'white' : '#28a745',
+                      background: (modalValidacionObservacion.item?.estado_validacion || '') === 'validado' ? '#28a745' : 'white',
+                      color: (modalValidacionObservacion.item?.estado_validacion || '') === 'validado' ? 'white' : '#28a745',
                       borderColor: '#28a745'
                     }}
                     onMouseEnter={(e) => {
-                      if (modalValidacionObservacion.item.estado_validacion !== 'validado') {
+                      if ((modalValidacionObservacion.item?.estado_validacion || '') !== 'validado') {
                         e.currentTarget.style.background = '#d4edda';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (modalValidacionObservacion.item.estado_validacion !== 'validado') {
+                      if ((modalValidacionObservacion.item?.estado_validacion || '') !== 'validado') {
                         e.currentTarget.style.background = 'white';
                       }
                     }}
                   >
-                    <i className={`fa fa-${modalValidacionObservacion.item.estado_validacion === 'validado' ? 'check-circle' : 'circle'}`}></i>
+                    <i className={`fa fa-${(modalValidacionObservacion.item?.estado_validacion || '') === 'validado' ? 'check-circle' : 'circle'}`}></i>
                     Validado
                   </button>
                   <button
                     onClick={() => {
-                      const currentItem = modalValidacionObservacion.tipo === 'preventivo' 
-                        ? lineaBase[modalValidacionObservacion.itemIndex]
-                        : lineaBaseMitigadores[modalValidacionObservacion.itemIndex];
-                      const nuevoEstado = currentItem.estado_validacion === 'con_observaciones' ? null : 'con_observaciones';
+                      // CRÍTICO: Para nivel 2, usar el item del modal directamente (viene de basesControles)
+                      // Para nivel 3+, obtener el item del estado lineaBase o lineaBaseMitigadores
+                      const esNivel2 = rutaNavegacion.length === 2;
+                      let currentItem;
+                      
+                      if (esNivel2) {
+                        // Para nivel 2, usar el item que se pasó al modal (viene de basesControles)
+                        currentItem = modalValidacionObservacion.item || {};
+                      } else {
+                        // Para nivel 3+, obtener del estado correspondiente
+                        currentItem = modalValidacionObservacion.tipo === 'preventivo' 
+                          ? (lineaBase[modalValidacionObservacion.itemIndex] || {})
+                          : (lineaBaseMitigadores[modalValidacionObservacion.itemIndex] || {});
+                      }
+                      
+                      const nuevoEstado = (currentItem.estado_validacion || '') === 'con_observaciones' ? null : 'con_observaciones';
                       // Calcular ponderación: 0% si observaciones o null
                       const nuevaPonderacion = 0;
                       
-                      if (modalValidacionObservacion.tipo === 'preventivo') {
+                      // CRÍTICO: Para nivel 2, actualizar basesControles en lugar de lineaBase
+                      if (esNivel2) {
+                        // Para nivel 2, actualizar basesControles usando claveUnica o requisitoId
+                        const itemModal = modalValidacionObservacion.item || {};
+                        const claveUnica = itemModal.claveUnica;
+                        const requisitoId = itemModal.requisitoId;
+                        const controlId = itemModal.controlId;
+                        
+                        if (!basesControles || !basesControles.controles) {
+                          mostrarNotificacion('✗ Error: No se encontraron bases de controles para actualizar', 'error');
+                          return;
+                        }
+                        
+                        // Buscar y actualizar el requisito en basesControles
+                        const controlesActualizados = basesControles.controles.map(control => {
+                          if (control.id === controlId && control.requisitos) {
+                            const requisitosActualizados = control.requisitos.map(requisito => {
+                              const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                              const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                              const coincidePorId = requisito.id === requisitoId;
+                              
+                              if (coincidePorClave || coincidePorId) {
+                                return {
+                                  ...requisito,
+                                  estado_validacion: nuevoEstado,
+                                  comentario_validacion: nuevoEstado === null ? '' : (requisito.comentario_validacion || ''),
+                                  usuario_validacion: nuevoEstado ? obtenerUltimoUsuarioEditoString(user) : '',
+                                  fecha_validacion: nuevoEstado ? new Date().toISOString().slice(0, 19).replace('T', ' ') : '',
+                                  ponderacion: nuevaPonderacion,
+                                  ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
+                                };
+                              }
+                              return requisito;
+                            });
+                            return { ...control, requisitos: requisitosActualizados };
+                          }
+                          return control;
+                        });
+                        
+                        const nuevasBasesControles = { ...basesControles, controles: controlesActualizados };
+                        
+                        // Actualizar el estado local
+                        setBasesControles(nuevasBasesControles);
+                        
+                        // Actualizar el item del modal
+                        const itemActualizado = {
+                          ...itemModal,
+                          estado_validacion: nuevoEstado,
+                          comentario_validacion: nuevoEstado === null ? '' : (itemModal.comentario_validacion || ''),
+                          usuario_validacion: nuevoEstado ? obtenerUltimoUsuarioEditoString(user) : '',
+                          fecha_validacion: nuevoEstado ? new Date().toISOString().slice(0, 19).replace('T', ' ') : '',
+                          ponderacion: nuevaPonderacion
+                        };
+                        setModalValidacionObservacion({ ...modalValidacionObservacion, item: itemActualizado });
+                      } else if (modalValidacionObservacion.tipo === 'preventivo') {
+                        // Para nivel 3+, actualizar lineaBase
                         const nuevaLineaBase = [...lineaBase];
                         nuevaLineaBase[modalValidacionObservacion.itemIndex] = {
                           ...nuevaLineaBase[modalValidacionObservacion.itemIndex],
@@ -21804,6 +24360,7 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         setLineaBase(nuevaLineaBase);
                         setModalValidacionObservacion({ ...modalValidacionObservacion, item: nuevaLineaBase[modalValidacionObservacion.itemIndex] });
                       } else {
+                        // Para nivel 3+, actualizar lineaBaseMitigadores
                         const nuevaLineaBase = [...lineaBaseMitigadores];
                         nuevaLineaBase[modalValidacionObservacion.itemIndex] = {
                           ...nuevaLineaBase[modalValidacionObservacion.itemIndex],
@@ -21830,110 +24387,448 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       justifyContent: 'center',
                       gap: '0.5rem',
                       transition: 'all 0.2s ease',
-                      background: modalValidacionObservacion.item.estado_validacion === 'con_observaciones' ? '#ffc107' : 'white',
-                      color: modalValidacionObservacion.item.estado_validacion === 'con_observaciones' ? '#856404' : '#ffc107',
+                      background: (modalValidacionObservacion.item?.estado_validacion || '') === 'con_observaciones' ? '#ffc107' : 'white',
+                      color: (modalValidacionObservacion.item?.estado_validacion || '') === 'con_observaciones' ? '#856404' : '#ffc107',
                       borderColor: '#ffc107'
                     }}
                     onMouseEnter={(e) => {
-                      if (modalValidacionObservacion.item.estado_validacion !== 'con_observaciones') {
+                      if ((modalValidacionObservacion.item?.estado_validacion || '') !== 'con_observaciones') {
                         e.currentTarget.style.background = '#fff3cd';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (modalValidacionObservacion.item.estado_validacion !== 'con_observaciones') {
+                      if ((modalValidacionObservacion.item?.estado_validacion || '') !== 'con_observaciones') {
                         e.currentTarget.style.background = 'white';
                       }
                     }}
                   >
-                    <i className={`fa fa-${modalValidacionObservacion.item.estado_validacion === 'con_observaciones' ? 'exclamation-triangle' : 'exclamation-circle'}`}></i>
+                    <i className={`fa fa-${(modalValidacionObservacion.item?.estado_validacion || '') === 'con_observaciones' ? 'exclamation-triangle' : 'exclamation-circle'}`}></i>
                     Con Observaciones
                   </button>
                 </div>
               </div>
 
-              {/* Comentarios (solo si tiene observaciones) */}
-              {modalValidacionObservacion.item.estado_validacion === 'con_observaciones' && (
-                <div>
-                  <label style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
+
+              {/* Foro de Observaciones (siempre visible, independientemente del estado) */}
+              {modalValidacionObservacion.item && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <div style={{
+                    fontSize: '14px',
                     fontWeight: '600',
                     color: '#495057',
-                    fontSize: '14px'
+                    marginBottom: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}>
-                    Comentarios de Observaciones:
-                  </label>
-                  <textarea
-                    value={modalValidacionObservacion.item.comentario_validacion || ''}
-                    onChange={(e) => {
-                      if (modalValidacionObservacion.tipo === 'preventivo') {
-                        const nuevaLineaBase = [...lineaBase];
-                        nuevaLineaBase[modalValidacionObservacion.itemIndex] = {
-                          ...nuevaLineaBase[modalValidacionObservacion.itemIndex],
-                          comentario_validacion: e.target.value
-                        };
-                        setLineaBase(nuevaLineaBase);
-                        setModalValidacionObservacion({ ...modalValidacionObservacion, item: nuevaLineaBase[modalValidacionObservacion.itemIndex] });
-                      } else {
-                        const nuevaLineaBase = [...lineaBaseMitigadores];
-                        nuevaLineaBase[modalValidacionObservacion.itemIndex] = {
-                          ...nuevaLineaBase[modalValidacionObservacion.itemIndex],
-                          comentario_validacion: e.target.value
-                        };
-                        setLineaBaseMitigadores(nuevaLineaBase);
-                        setModalValidacionObservacion({ ...modalValidacionObservacion, item: nuevaLineaBase[modalValidacionObservacion.itemIndex] });
-                      }
-                    }}
-                    placeholder="Ingrese los comentarios de las observaciones..."
-                    style={{
-                      width: '100%',
-                      minHeight: '120px',
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      border: '1px solid #ced4da',
-                      fontSize: '14px',
-                      fontFamily: 'inherit',
-                      resize: 'vertical'
-                    }}
-                  />
+                    <i className="fa fa-comments" style={{ color: '#ffc107' }}></i>
+                    Foro de Observaciones:
                 </div>
-              )}
 
-              {/* Mostrar comentarios existentes si hay observaciones */}
-              {modalValidacionObservacion.item.estado_validacion === 'con_observaciones' && modalValidacionObservacion.item.comentario_validacion && (
+                  {/* Historial de mensajes */}
+                  {modalValidacionObservacion.item?.conversacion_observaciones && Array.isArray(modalValidacionObservacion.item.conversacion_observaciones) && modalValidacionObservacion.item.conversacion_observaciones.length > 0 ? (
                 <div style={{
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  background: '#fff3cd',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      marginBottom: '1rem',
+                      padding: '0.5rem',
+                      background: '#f8f9fa',
                   borderRadius: '8px',
-                  border: '1px solid #ffc107'
+                      border: '1px solid #e9ecef'
+                    }}>
+                      {(modalValidacionObservacion.item?.conversacion_observaciones || []).map((mensaje, idx) => (
+                        <div key={idx} style={{
+                          marginBottom: '0.75rem',
+                          padding: '0.75rem',
+                          background: 'white',
+                          borderRadius: '6px',
+                          border: '1px solid #dee2e6'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            marginBottom: '0.5rem'
                 }}>
                   <div style={{
                     fontSize: '12px',
-                    color: '#856404',
                     fontWeight: '600',
-                    marginBottom: '0.5rem'
+                              color: '#495057'
                   }}>
-                    <i className="fa fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
-                    Comentarios Actuales:
+                              {mensaje.usuario_nombre || 'Usuario'}
                   </div>
                   <div style={{
-                    fontSize: '14px',
-                    color: '#856404',
-                    whiteSpace: 'pre-wrap'
+                              fontSize: '11px',
+                              color: '#6c757d'
                   }}>
-                    {modalValidacionObservacion.item.comentario_validacion}
+                              {mensaje.fecha ? new Date(mensaje.fecha).toLocaleString('es-CL') : ''}
                   </div>
-                  {modalValidacionObservacion.item.usuario_validacion && (
+                          </div>
                     <div style={{
-                      fontSize: '11px',
-                      color: '#856404',
+                            fontSize: '13px',
+                            color: '#495057',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                          }}>
+                            {mensaje.texto || ''}
+                          </div>
+                          {mensaje.archivos && Array.isArray(mensaje.archivos) && mensaje.archivos.length > 0 && (
+                            <div style={{
                       marginTop: '0.5rem',
-                      fontStyle: 'italic'
-                    }}>
-                      Por: {modalValidacionObservacion.item.usuario_validacion.split('|')[0]} - {modalValidacionObservacion.item.fecha_validacion ? new Date(modalValidacionObservacion.item.fecha_validacion).toLocaleString('es-CL') : ''}
+                              paddingTop: '0.5rem',
+                              borderTop: '1px solid #e9ecef'
+                            }}>
+                              {mensaje.archivos.map((archivo, archIdx) => (
+                                <a
+                                  key={archIdx}
+                                  href={`${API_BASE}/${archivo.ruta}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: 'inline-block',
+                                    marginRight: '0.5rem',
+                                    marginBottom: '0.25rem',
+                                    padding: '0.25rem 0.5rem',
+                                    background: '#e9ecef',
+                                    borderRadius: '4px',
+                                    fontSize: '0.7rem',
+                                    color: '#495057',
+                                    textDecoration: 'none'
+                                  }}
+                                >
+                                  {archivo.tipo?.includes('image') ? (
+                                    <i className="fa fa-image" style={{ color: '#28a745' }}></i>
+                                  ) : archivo.tipo?.includes('pdf') ? (
+                                    <i className="fa fa-file-pdf" style={{ color: '#dc3545' }}></i>
+                                  ) : (
+                                    <i className="fa fa-file" style={{ color: '#17a2b8' }}></i>
+                                  )}
+                                  {archivo.nombre?.length > 20 ? archivo.nombre.substring(0, 17) + '...' : archivo.nombre}
+                                </a>
+                              ))}
                     </div>
                   )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '1rem',
+                      textAlign: 'center',
+                      color: '#6c757d',
+                      fontSize: '13px',
+                      background: '#f8f9fa',
+                      borderRadius: '8px',
+                      border: '1px dashed #dee2e6',
+                      marginBottom: '1rem'
+                    }}>
+                      No hay mensajes en el foro de observaciones aún.
+                </div>
+              )}
+
+                  {/* Formulario para nuevo mensaje */}
+                  <div style={{ 
+                    background: '#fff', 
+                    border: '2px solid #ffc107', 
+                    borderRadius: '8px', 
+                    padding: '0.75rem'
+                  }}>
+                    <div style={{ fontSize: '0.7rem', color: '#ffc107', fontWeight: 600, marginBottom: '0.5rem' }}>
+                      <i className="fa fa-plus-circle"></i> Nuevo mensaje
+                    </div>
+                    <textarea
+                      id="nuevo-mensaje-observaciones"
+                      placeholder="Escribe tu comentario sobre las observaciones aquí..."
+                      style={{ 
+                        width: '100%',
+                        padding: '0.5rem', 
+                        border: '1px solid #e2e8f0', 
+                        borderRadius: '6px', 
+                        fontSize: '0.85rem', 
+                        background: '#f8fafc',
+                        minHeight: '60px',
+                        resize: 'vertical',
+                        marginBottom: '0.5rem'
+                      }}
+                    />
+                    
+                    {/* Archivos a adjuntar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <label style={{ 
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        padding: '0.35rem 0.75rem',
+                        background: '#ffc107',
+                        color: '#856404',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}>
+                        <i className="fa fa-paperclip"></i> Adjuntar archivos
+                        <input
+                          type="file"
+                          id="archivos-nuevo-mensaje-observaciones"
+                          multiple
+                          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const fileList = document.getElementById('lista-archivos-observaciones');
+                            const files = Array.from(e.target.files);
+                            if (fileList) {
+                              fileList.innerHTML = files.map(f => `<span style="background:#fff3cd;padding:2px 6px;border-radius:3px;font-size:11px;margin-right:4px;color:#856404;">${f.name}</span>`).join('');
+                            }
+                          }}
+                        />
+                      </label>
+                      <div id="lista-archivos-observaciones" style={{ fontSize: '0.75rem', color: '#6c757d' }}></div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const textoInput = document.getElementById('nuevo-mensaje-observaciones');
+                        const archivosInput = document.getElementById('archivos-nuevo-mensaje-observaciones');
+                        const texto = textoInput?.value?.trim();
+                        
+                        if (!texto) {
+                          mostrarNotificacion('Escribe un mensaje antes de enviar', 'warning');
+                          return;
+                        }
+
+                        let archivosSubidos = [];
+                        
+                        // Subir archivos si hay
+                        if (archivosInput?.files?.length > 0) {
+                          const formData = new FormData();
+                          Array.from(archivosInput.files).forEach(file => formData.append('archivos[]', file));
+                          formData.append('carpeta_id', carpetaActual?.id);
+                          formData.append('tipo', 'foro_observaciones');
+                          
+                          // CRÍTICO: Para nivel 2, usar claveUnica como item_id
+                          const esNivel2 = rutaNavegacion.length === 2;
+                          const itemModal = modalValidacionObservacion.item || {};
+                          const itemId = esNivel2 
+                            ? (itemModal.claveUnica || itemModal.requisitoId || 'nuevo')
+                            : (itemModal.id || 'nuevo');
+                          formData.append('item_id', itemId);
+                          
+                          try {
+                            const res = await fetch(`${API_BASE}/archivos/subir_respaldo.php`, {
+                              method: 'POST',
+                              body: formData
+                            });
+                            const data = await res.json();
+                            if (data.success && data.archivos) {
+                              archivosSubidos = data.archivos;
+                            }
+                          } catch (error) {
+                            console.error('Error subiendo archivos:', error);
+                          }
+                        }
+
+                        // Crear nuevo mensaje
+                        const nuevoMensaje = {
+                          id: Date.now(),
+                          usuario_id: user?.id,
+                          usuario_nombre: user?.nombre || user?.email || 'Usuario',
+                          usuario_rol: user?.rol || 'usuario',
+                          texto: texto,
+                          archivos: archivosSubidos,
+                          fecha: new Date().toISOString()
+                        };
+
+                        // Actualizar y guardar automáticamente
+                        try {
+                          const esNivel2 = rutaNavegacion.length === 2;
+                          
+                          if (esNivel2) {
+                            const itemModal = modalValidacionObservacion.item || {};
+                            const claveUnica = itemModal.claveUnica;
+                            const requisitoId = itemModal.requisitoId;
+                            const controlId = itemModal.controlId;
+                            
+                            if (!basesControles || !basesControles.controles) {
+                              throw new Error('No se encontraron bases de controles para actualizar');
+                            }
+                            
+                            // Buscar y actualizar el requisito en basesControles
+                            const controlesActualizados = basesControles.controles.map(control => {
+                              if (control.id === controlId && control.requisitos) {
+                                const requisitosActualizados = control.requisitos.map(requisito => {
+                                  const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                                  const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                                  const coincidePorId = requisito.id === requisitoId;
+                                  
+                                  if (coincidePorClave || coincidePorId) {
+                                    const conversacionActual = Array.isArray(requisito.conversacion_observaciones) 
+                                      ? requisito.conversacion_observaciones 
+                                      : (typeof requisito.conversacion_observaciones === 'string' 
+                                        ? JSON.parse(requisito.conversacion_observaciones || '[]') 
+                                        : []);
+                                    return {
+                                      ...requisito,
+                                      conversacion_observaciones: [...conversacionActual, nuevoMensaje],
+                                      ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
+                                    };
+                                  }
+                                  return requisito;
+                                });
+                                return { ...control, requisitos: requisitosActualizados };
+                              }
+                              return control;
+                            });
+                            
+                            const nuevasBasesControles = { ...basesControles, controles: controlesActualizados };
+                            
+                            // Actualizar el estado local
+                            setBasesControles(nuevasBasesControles);
+                            
+                            // Actualizar el item del modal
+                            const conversacionActualItem = Array.isArray(itemModal.conversacion_observaciones) 
+                              ? itemModal.conversacion_observaciones 
+                              : [];
+                            const itemActualizado = {
+                              ...itemModal,
+                              conversacion_observaciones: [...conversacionActualItem, nuevoMensaje]
+                            };
+                            setModalValidacionObservacion({ ...modalValidacionObservacion, item: itemActualizado });
+                            
+                            // Guardar en la carpeta padre (nivel 1)
+                            const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+                            if (!carpetaPadreId) {
+                              throw new Error('No se encontró la carpeta padre para guardar el mensaje');
+                            }
+                            
+                            // Obtener el nombre y descripción de la carpeta padre
+                            let nombrePadre = carpetaActual.nombre;
+                            let descripcionPadre = carpetaActual.descripcion || '';
+                            
+                            try {
+                              const resPadre = await fetch(`${API_BASE}/archivos/carpetas.php?id=${carpetaPadreId}`);
+                              if (resPadre.ok) {
+                                const dataPadre = await resPadre.json();
+                                if (dataPadre && !dataPadre.error) {
+                                  const carpetaPadre = Array.isArray(dataPadre) ? dataPadre[0] : dataPadre;
+                                  nombrePadre = carpetaPadre.nombre || nombrePadre;
+                                  descripcionPadre = carpetaPadre.descripcion || descripcionPadre;
+                                }
+                              }
+                            } catch (error) {
+                              console.warn('[Foro Observaciones] No se pudo obtener datos de carpeta padre:', error);
+                            }
+                            
+                            const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                id: carpetaPadreId,
+                                nombre: nombrePadre,
+                                descripcion: descripcionPadre,
+                                usuario_id: user.id,
+                                bases_controles: JSON.stringify(nuevasBasesControles)
+                              })
+                            });
+                            
+                            const data = await res.json();
+                            if (!data.success) {
+                              throw new Error(data.error || 'Error al guardar el mensaje en base de datos');
+                            }
+                            
+                            // CRÍTICO: Recargar basesControles desde el servidor para asegurar sincronización
+                            await cargarBasesControles(carpetaActual.id);
+                            
+                            // Actualizar el item del modal con los datos recargados
+                            const itemRecargado = basesControles?.controles?.flatMap(control => 
+                              control.requisitos?.filter(requisito => {
+                                const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                                const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                                const coincidePorId = requisito.id === requisitoId;
+                                return coincidePorClave || coincidePorId;
+                              }) || []
+                            )?.[0];
+                            
+                            if (itemRecargado) {
+                              setModalValidacionObservacion({ 
+                                ...modalValidacionObservacion, 
+                                item: {
+                                  ...itemModal,
+                                  ...itemRecargado,
+                                  claveUnica: itemModal.claveUnica,
+                                  requisitoId: itemModal.requisitoId,
+                                  controlId: itemModal.controlId
+                                }
+                              });
+                            }
+                            
+                            // Limpiar el formulario
+                            if (textoInput) textoInput.value = '';
+                            if (archivosInput) archivosInput.value = '';
+                            const fileList = document.getElementById('lista-archivos-observaciones');
+                            if (fileList) fileList.innerHTML = '';
+                            
+                            mostrarNotificacion('✓ Mensaje guardado correctamente', 'success');
+                          } else {
+                            // Para nivel 3+, actualizar lineaBase o lineaBaseMitigadores
+                            const esPreventivo = modalValidacionObservacion.tipo === 'preventivo';
+                            const datosAGuardar = esPreventivo ? lineaBase : lineaBaseMitigadores;
+                            const nuevaLista = [...datosAGuardar];
+                            const itemIndex = modalValidacionObservacion.itemIndex;
+                            
+                            if (nuevaLista[itemIndex]) {
+                              const conversacionActual = Array.isArray(nuevaLista[itemIndex].conversacion_observaciones) 
+                                ? nuevaLista[itemIndex].conversacion_observaciones 
+                                : [];
+                              nuevaLista[itemIndex] = {
+                                ...nuevaLista[itemIndex],
+                                conversacion_observaciones: [...conversacionActual, nuevoMensaje]
+                              };
+                              
+                              if (esPreventivo) {
+                                setLineaBase(nuevaLista);
+                              } else {
+                                setLineaBaseMitigadores(nuevaLista);
+                              }
+                              
+                              setModalValidacionObservacion({ 
+                                ...modalValidacionObservacion, 
+                                item: nuevaLista[itemIndex] 
+                              });
+                              
+                              // Limpiar el formulario
+                              if (textoInput) textoInput.value = '';
+                              if (archivosInput) archivosInput.value = '';
+                              const fileList = document.getElementById('lista-archivos-observaciones');
+                              if (fileList) fileList.innerHTML = '';
+                              
+                              mostrarNotificacion('✓ Mensaje guardado correctamente', 'success');
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Error guardando mensaje:', error);
+                          mostrarNotificacion('✗ Error al guardar el mensaje: ' + error.message, 'error');
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        background: '#ffc107',
+                        color: '#856404',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <i className="fa fa-paper-plane"></i> Enviar mensaje
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -21951,6 +24846,124 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                 onClick={async () => {
                   // Guardar cambios antes de cerrar
                   try {
+                    const esNivel2 = rutaNavegacion.length === 2;
+                    
+                    // CRÍTICO: Para nivel 2, guardar en basesControles (carpeta padre nivel 1)
+                    if (esNivel2) {
+                      const itemModal = modalValidacionObservacion.item || {};
+                      const claveUnica = itemModal.claveUnica;
+                      const requisitoId = itemModal.requisitoId;
+                      const controlId = itemModal.controlId;
+                      
+                      if (!basesControles || !basesControles.controles) {
+                        mostrarNotificacion('✗ Error: No se encontraron bases de controles para guardar', 'error');
+                        return;
+                      }
+                      
+                      // CRÍTICO: Actualizar el requisito en basesControles con los datos del modal antes de guardar
+                      const controlesActualizados = basesControles.controles.map(control => {
+                        if (control.id === controlId && control.requisitos) {
+                          const requisitosActualizados = control.requisitos.map(requisito => {
+                            const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                            const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                            const coincidePorId = requisito.id === requisitoId;
+                            
+                            if (coincidePorClave || coincidePorId) {
+                              // Actualizar el requisito con los datos del modal
+                              // Preservar conversacion_observaciones del item del modal si existe, sino usar la del requisito
+                              const conversacionObservaciones = Array.isArray(itemModal.conversacion_observaciones) 
+                                ? itemModal.conversacion_observaciones 
+                                : (Array.isArray(requisito.conversacion_observaciones) 
+                                  ? requisito.conversacion_observaciones 
+                                  : (typeof requisito.conversacion_observaciones === 'string' && requisito.conversacion_observaciones 
+                                    ? JSON.parse(requisito.conversacion_observaciones) 
+                                    : []));
+                              
+                              return {
+                                ...requisito,
+                                estado_validacion: itemModal.estado_validacion !== undefined ? itemModal.estado_validacion : (requisito.estado_validacion || null),
+                                comentario_validacion: itemModal.comentario_validacion !== undefined ? itemModal.comentario_validacion : (requisito.comentario_validacion || ''),
+                                usuario_validacion: itemModal.usuario_validacion || requisito.usuario_validacion || '',
+                                fecha_validacion: itemModal.fecha_validacion || requisito.fecha_validacion || null,
+                                ponderacion: itemModal.ponderacion !== undefined ? itemModal.ponderacion : (requisito.ponderacion !== undefined ? requisito.ponderacion : (itemModal.estado_validacion === 'validado' ? 100 : 0)),
+                                conversacion_observaciones: conversacionObservaciones,
+                                ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
+                              };
+                            }
+                            return requisito;
+                          });
+                          return { ...control, requisitos: requisitosActualizados };
+                        }
+                        return control;
+                      });
+                      
+                      const nuevasBasesControles = { ...basesControles, controles: controlesActualizados };
+                      
+                      // Guardar basesControles en la carpeta padre (nivel 1)
+                      const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+                      if (!carpetaPadreId) {
+                        mostrarNotificacion('✗ Error: No se encontró la carpeta padre para guardar', 'error');
+                        return;
+                      }
+                      
+                      // Obtener el nombre y descripción de la carpeta padre
+                      let nombrePadre = carpetaActual.nombre;
+                      let descripcionPadre = carpetaActual.descripcion || '';
+                      
+                      try {
+                        const resPadre = await fetch(`${API_BASE}/archivos/carpetas.php?id=${carpetaPadreId}`);
+                        if (resPadre.ok) {
+                          const dataPadre = await resPadre.json();
+                          if (dataPadre && !dataPadre.error) {
+                            const carpetaPadre = Array.isArray(dataPadre) ? dataPadre[0] : dataPadre;
+                            nombrePadre = carpetaPadre.nombre || nombrePadre;
+                            descripcionPadre = carpetaPadre.descripcion || descripcionPadre;
+                          }
+                        }
+                      } catch (error) {
+                        console.warn('[Guardar Validación] No se pudo obtener datos de carpeta padre:', error);
+                      }
+                      
+                      const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          id: carpetaPadreId,
+                          nombre: nombrePadre,
+                          descripcion: descripcionPadre,
+                          usuario_id: user.id,
+                          bases_controles: JSON.stringify(nuevasBasesControles)
+                        })
+                      });
+                      
+                      const data = await res.json();
+                      if (!data.success) {
+                        throw new Error(data.error || 'Error al guardar en base de datos');
+                      }
+                      
+                      // Actualizar el estado local de basesControles
+                      setBasesControles(nuevasBasesControles);
+                      
+                      // Recargar basesControles desde el servidor para asegurar sincronización
+                      await cargarBasesControles(carpetaActual.id);
+                      
+                      // Recargar promedio de ponderación
+                      try {
+                        const resPromedio = await fetch(`${API_BASE}/archivos/promedio_ponderacion.php?carpeta_id=${carpetaActual.id}`);
+                        const dataPromedio = await resPromedio.json();
+                        if (dataPromedio.success) {
+                          setPromedioPonderacionActual(dataPromedio.promedio_general);
+                        }
+                      } catch (error) {
+                        console.error('Error recargando promedio:', error);
+                      }
+                      
+                      mostrarNotificacion('✓ Validación guardada correctamente', 'success');
+                      setModalValidacionObservacion(null);
+                      return;
+                    }
+                    
+                    // Para nivel 3+, usar el flujo original
                     const esPreventivo = modalValidacionObservacion.tipo === 'preventivo';
                     const datosAGuardar = esPreventivo ? lineaBase : lineaBaseMitigadores;
                     
@@ -22115,6 +25128,426 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               >
                 <i className="fa fa-times" style={{ marginRight: '6px' }}></i>
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Programar Aviso por Correo - Nivel 2 */}
+      {modalProgramarAviso && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setModalProgramarAviso(null);
+          }
+        }}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+              padding: '1rem 1.5rem',
+              color: 'white',
+              boxShadow: '0 2px 10px rgba(40, 167, 69, 0.3)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '1.2rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <i className="fa fa-bell" style={{ fontSize: '1.1rem' }}></i>
+                Programar Aviso por Correo Electrónico
+              </h2>
+              <button
+                onClick={() => setModalProgramarAviso(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                title="Cerrar"
+              >
+                <i className="fa fa-times"></i>
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ 
+                  background: '#e8f5e9', 
+                  padding: '0.75rem', 
+                  borderRadius: '6px', 
+                  marginBottom: '1rem',
+                  borderLeft: '4px solid #28a745'
+                }}>
+                  <div style={{ fontSize: '13px', color: '#2e7d32', fontWeight: '600', marginBottom: '0.25rem' }}>
+                    <i className="fa fa-info-circle" style={{ marginRight: '6px' }}></i>
+                    Información del Control
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#388e3c', lineHeight: '1.6' }}>
+                    <strong>Código:</strong> {modalProgramarAviso.item?.codigo || 'N/A'}<br/>
+                    <strong>Requisito:</strong> {modalProgramarAviso.item?.requisito || 'N/A'}<br/>
+                    <strong>Monitoreo:</strong> {formProgramarAviso.monitoreo || 'N/A'}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '0.5rem', 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: '#495057' 
+                  }}>
+                    Fecha de Inicio <span style={{ color: '#dc3545' }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formProgramarAviso.fecha_inicio}
+                    onChange={(e) => {
+                      const nuevaFechaInicio = e.target.value;
+                      const fechaInicioObj = new Date(nuevaFechaInicio);
+                      const fechaLimiteObj = new Date(formProgramarAviso.fecha_limite);
+                      
+                      // Validar que la fecha de inicio no sea en el pasado
+                      const hoy = new Date();
+                      hoy.setHours(0, 0, 0, 0);
+                      if (fechaInicioObj < hoy) {
+                        mostrarNotificacion('✗ La fecha de inicio no puede ser en el pasado', 'error');
+                        return;
+                      }
+                      
+                      // Si la fecha de inicio cambia, recalcular fecha límite y recordatorio
+                      let nuevaFechaLimite = fechaLimiteObj;
+                      if (nuevaFechaInicio) {
+                        nuevaFechaLimite = new Date(fechaInicioObj);
+                        const monitoreo = formProgramarAviso.monitoreo || '';
+                        if (monitoreo.toLowerCase().includes('mensual')) {
+                          nuevaFechaLimite.setMonth(nuevaFechaLimite.getMonth() + 1);
+                        } else if (monitoreo.toLowerCase().includes('trimestral')) {
+                          nuevaFechaLimite.setMonth(nuevaFechaLimite.getMonth() + 3);
+                        } else if (monitoreo.toLowerCase().includes('semestral')) {
+                          nuevaFechaLimite.setMonth(nuevaFechaLimite.getMonth() + 6);
+                        } else if (monitoreo.toLowerCase().includes('anual')) {
+                          nuevaFechaLimite.setFullYear(nuevaFechaLimite.getFullYear() + 1);
+                        }
+                      }
+                      
+                      // Calcular fecha de recordatorio (3 días antes)
+                      const nuevaFechaRecordatorio = new Date(nuevaFechaLimite);
+                      nuevaFechaRecordatorio.setDate(nuevaFechaRecordatorio.getDate() - 3);
+                      
+                      const formatearFecha = (fecha) => {
+                        const year = fecha.getFullYear();
+                        const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                        const day = String(fecha.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                      };
+                      
+                      setFormProgramarAviso({
+                        ...formProgramarAviso,
+                        fecha_inicio: nuevaFechaInicio,
+                        fecha_limite: formatearFecha(nuevaFechaLimite),
+                        fecha_recordatorio: formatearFecha(nuevaFechaRecordatorio)
+                      });
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '2px solid #ced4da',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '0.5rem', 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: '#495057' 
+                  }}>
+                    Fecha Límite <span style={{ color: '#dc3545' }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formProgramarAviso.fecha_limite}
+                    onChange={(e) => {
+                      const nuevaFechaLimite = e.target.value;
+                      const fechaLimiteObj = new Date(nuevaFechaLimite);
+                      
+                      // Validar que la fecha límite no sea antes de la fecha de inicio
+                      const fechaInicioObj = new Date(formProgramarAviso.fecha_inicio);
+                      if (fechaLimiteObj < fechaInicioObj) {
+                        mostrarNotificacion('✗ La fecha límite no puede ser anterior a la fecha de inicio', 'error');
+                        return;
+                      }
+                      
+                      // Calcular fecha de recordatorio (3 días antes)
+                      const nuevaFechaRecordatorio = new Date(fechaLimiteObj);
+                      nuevaFechaRecordatorio.setDate(nuevaFechaRecordatorio.getDate() - 3);
+                      
+                      const formatearFecha = (fecha) => {
+                        const year = fecha.getFullYear();
+                        const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                        const day = String(fecha.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                      };
+                      
+                      setFormProgramarAviso({
+                        ...formProgramarAviso,
+                        fecha_limite: nuevaFechaLimite,
+                        fecha_recordatorio: formatearFecha(nuevaFechaRecordatorio)
+                      });
+                    }}
+                    min={formProgramarAviso.fecha_inicio || new Date().toISOString().split('T')[0]}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '2px solid #ced4da',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                  <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '0.25rem' }}>
+                    Calculada automáticamente según el período de monitoreo
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '0.5rem', 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: '#495057' 
+                  }}>
+                    Fecha de Recordatorio
+                  </label>
+                  <input
+                    type="date"
+                    value={formProgramarAviso.fecha_recordatorio}
+                    readOnly
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '2px solid #ced4da',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      background: '#f8f9fa',
+                      color: '#6c757d'
+                    }}
+                  />
+                  <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '0.25rem' }}>
+                    Se calcula automáticamente 3 días antes de la fecha límite
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ 
+              padding: '1rem 1.5rem',
+              borderTop: '2px solid #e9ecef',
+              background: '#f8f9fa',
+              display: 'flex', 
+              justifyContent: 'flex-end',
+              gap: '0.5rem'
+            }}>
+              <button
+                onClick={async () => {
+                  try {
+                    if (!formProgramarAviso.fecha_inicio || !formProgramarAviso.fecha_limite) {
+                      mostrarNotificacion('✗ Por favor complete todos los campos requeridos', 'error');
+                      return;
+                    }
+
+                    // Guardar configuración de aviso en basesControles
+                    const item = modalProgramarAviso.item;
+                    const controlIndex = modalProgramarAviso.controlIndex;
+                    const requisitoIndex = modalProgramarAviso.requisitoIndex;
+
+                    if (controlIndex !== undefined && requisitoIndex !== undefined && requisitoIndex >= 0) {
+                      const nuevasBases = JSON.parse(JSON.stringify(basesControles));
+                      
+                      // Agregar configuración de aviso al requisito
+                      nuevasBases.controles[controlIndex].requisitos[requisitoIndex].aviso_programado = {
+                        fecha_inicio: formProgramarAviso.fecha_inicio,
+                        fecha_limite: formProgramarAviso.fecha_limite,
+                        fecha_recordatorio: formProgramarAviso.fecha_recordatorio,
+                        monitoreo: formProgramarAviso.monitoreo,
+                        programado_por: user.id,
+                        programado_por_nombre: user.nombre || user.email,
+                        programado_en: new Date().toISOString(),
+                        activo: true
+                      };
+                      
+                      nuevasBases.controles[controlIndex].requisitos[requisitoIndex].ultimo_usuario_edito = obtenerUltimoUsuarioEditoString(user);
+                      
+                      // Guardar en la carpeta padre (nivel 1)
+                      const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+                      if (!carpetaPadreId) {
+                        throw new Error('No se encontró la carpeta padre para guardar el aviso');
+                      }
+                      
+                      // Obtener nombre y descripción de la carpeta padre
+                      let nombrePadre = carpetaActual.nombre;
+                      let descripcionPadre = carpetaActual.descripcion || '';
+                      
+                      try {
+                        const resPadre = await fetch(`${API_BASE}/archivos/carpetas.php?id=${carpetaPadreId}`);
+                        if (resPadre.ok) {
+                          const dataPadre = await resPadre.json();
+                          if (dataPadre && !dataPadre.error) {
+                            const carpetaPadre = Array.isArray(dataPadre) ? dataPadre[0] : dataPadre;
+                            nombrePadre = carpetaPadre.nombre || nombrePadre;
+                            descripcionPadre = carpetaPadre.descripcion || descripcionPadre;
+                          }
+                        }
+                      } catch (error) {
+                        console.warn('[Programar Aviso] No se pudo obtener datos de carpeta padre:', error);
+                      }
+                      
+                      const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          id: carpetaPadreId,
+                          nombre: nombrePadre,
+                          descripcion: descripcionPadre,
+                          usuario_id: user.id,
+                          bases_controles: JSON.stringify(nuevasBases)
+                        })
+                      });
+                      
+                      const data = await res.json();
+                      if (!data.success) {
+                        throw new Error(data.error || 'Error al guardar en base de datos');
+                      }
+                      
+                      // Actualizar el estado local
+                      setBasesControles(nuevasBases);
+                      
+                      // Recargar basesControles desde el servidor
+                      await cargarBasesControles(carpetaActual.id);
+                      
+                      mostrarNotificacion('✓ Aviso programado correctamente. Se enviará un correo 3 días antes de la fecha límite.', 'success', 5000);
+                      setModalProgramarAviso(null);
+                    } else {
+                      throw new Error('No se pudo identificar el item para programar el aviso');
+                    }
+                  } catch (error) {
+                    console.error('Error programando aviso:', error);
+                    mostrarNotificacion('✗ Error al programar aviso: ' + error.message, 'error', 5000);
+                  }
+                }}
+                style={{
+                  padding: '10px 18px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: '#28a745',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#218838';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 4px 8px rgba(40, 167, 69, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#28a745';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <i className="fa fa-bell" style={{ marginRight: '4px' }}></i>
+                Programar Aviso
+              </button>
+              <button
+                onClick={() => setModalProgramarAviso(null)}
+                style={{
+                  padding: '10px 18px',
+                  border: '2px solid #6c757d',
+                  borderRadius: '6px',
+                  background: 'white',
+                  color: '#6c757d',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#6c757d';
+                  e.target.style.color = 'white';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 4px 8px rgba(108, 117, 125, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'white';
+                  e.target.style.color = '#6c757d';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <i className="fa fa-times" style={{ marginRight: '6px' }}></i>
+                Cancelar
               </button>
             </div>
           </div>
@@ -22542,13 +25975,28 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
               <button
                 onClick={async () => {
                   setPestanaModalLineaBase('documentos');
-                  if (formLineaBase.id) {
+                  // CRÍTICO: Para nivel 2, usar claveUnica como identificador principal
+                  const esNivel2 = rutaNavegacion.length === 2;
+                  
+                  if (esNivel2) {
+                    // Para nivel 2, usar claveUnica (código + requisito) como identificador principal
+                    const claveUnica = formLineaBase.claveUnica;
+                    const requisitoId = formLineaBase.requisitoId;
+                    if (claveUnica || requisitoId) {
+                      const identificador = claveUnica || requisitoId;
+                      console.log('[Documentos] Nivel 2: Cargando documentos con claveUnica (código + requisito):', identificador);
+                      cargarDocumentosLineaBase(identificador, null);
+                    } else {
+                      mostrarNotificacion('✗ Error: No se pudo identificar el item (claveUnica no encontrada). Cierre el modal y vuelva a intentar.', 'error');
+                    }
+                  } else if (formLineaBase.id) {
+                    // Para nivel 3+, usar el ID de linea_base
                     cargarDocumentosLineaBase(formLineaBase.id, null);
                   } else {
-                    // Si no tiene ID, mostrar mensaje y ofrecer guardar primero
+                    // Si no tiene ID (nivel 3+), mostrar mensaje y ofrecer guardar primero
                     mostrarNotificacion('⚠️ Guardando línea base para habilitar documentos...', 'info');
                     
-                    // Intentar guardar la línea base para obtener un ID
+                    // Intentar guardar la línea base para obtener un ID (solo nivel 3+)
                     try {
                       const esPreventivo = modalEditarLineaBase?.tipo === 'preventivo';
                       const datosAGuardar = esPreventivo ? lineaBase : lineaBaseMitigadores;
@@ -23388,7 +26836,13 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         Array.from(archivosInput.files).forEach(file => formData.append('archivos[]', file));
                         formData.append('carpeta_id', carpetaActual?.id);
                         formData.append('tipo', 'foro_linea_base');
-                        formData.append('item_id', formLineaBase.id || 'nuevo');
+                        
+                        // CRÍTICO: Para nivel 2, usar claveUnica como item_id
+                        const esNivel2 = rutaNavegacion.length === 2;
+                        const itemId = esNivel2 
+                          ? (formLineaBase.claveUnica || formLineaBase.requisitoId || 'nuevo')
+                          : (formLineaBase.id || 'nuevo');
+                        formData.append('item_id', itemId);
                         
                         try {
                           const res = await fetch(`${API_BASE}/archivos/subir_respaldo.php`, {
@@ -23423,11 +26877,98 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       };
                       setFormLineaBase(nuevoFormLineaBase);
 
-                      // Actualizar lineaBase y guardar automáticamente
+                      // Actualizar y guardar automáticamente
                       try {
                         const esMitigador = modalEditarLineaBase?.tipo === 'mitigador';
+                        const esNivel2 = rutaNavegacion.length === 2;
                         
-                        if (esMitigador) {
+                        // CRÍTICO: Para nivel 2, actualizar basesControles usando claveUnica
+                        if (esNivel2) {
+                          if (!formLineaBase.claveUnica && !formLineaBase.requisitoId) {
+                            throw new Error('No se encontró la clave única del item para guardar el mensaje');
+                          }
+                          
+                          const claveUnica = formLineaBase.claveUnica;
+                          const requisitoId = formLineaBase.requisitoId;
+                          const controlId = formLineaBase.controlId;
+                          
+                          if (!basesControles || !basesControles.controles) {
+                            throw new Error('No se encontraron bases de controles para actualizar');
+                          }
+                          
+                          // Buscar y actualizar el requisito en basesControles usando claveUnica
+                          const controlesActualizados = basesControles.controles.map(control => {
+                            if (control.id === controlId && control.requisitos) {
+                              const requisitosActualizados = control.requisitos.map(requisito => {
+                                const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                                const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                                const coincidePorId = requisito.id === requisitoId;
+                                
+                                if (coincidePorClave || coincidePorId) {
+                                  return {
+                                    ...requisito,
+                                    conversacion_seguimiento: nuevoFormLineaBase.conversacion_seguimiento || [],
+                                    ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
+                                  };
+                                }
+                                return requisito;
+                              });
+                              return { ...control, requisitos: requisitosActualizados };
+                            }
+                            return control;
+                          });
+                          
+                          const nuevasBasesControles = {
+                            ...basesControles,
+                            controles: controlesActualizados
+                          };
+                          
+                          // Guardar en base de datos (carpeta padre nivel 1)
+                          // CRÍTICO: Para nivel 2, SIEMPRE guardar en la carpeta padre (nivel 1), no en carpetaActual.id
+                          const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+                          if (!carpetaPadreId) {
+                            throw new Error('No se encontró la carpeta padre (nivel 1) para guardar el mensaje. Los datos deben guardarse en el nivel 1.');
+                          }
+                          
+                          // Obtener el nombre y descripción de la carpeta padre
+                          let nombrePadre = carpetaActual.nombre;
+                          let descripcionPadre = carpetaActual.descripcion || '';
+                          
+                          try {
+                            const resPadre = await fetch(`${API_BASE}/archivos/carpetas.php?id=${carpetaPadreId}`);
+                            if (resPadre.ok) {
+                              const dataPadre = await resPadre.json();
+                              if (dataPadre && !dataPadre.error) {
+                                const carpetaPadre = Array.isArray(dataPadre) ? dataPadre[0] : dataPadre;
+                                nombrePadre = carpetaPadre.nombre || nombrePadre;
+                                descripcionPadre = carpetaPadre.descripcion || descripcionPadre;
+                              }
+                            }
+                          } catch (error) {
+                            console.warn('[Guardar Mensaje Foro] No se pudo obtener datos de carpeta padre:', error);
+                          }
+                          
+                          const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              id: carpetaPadreId,
+                              nombre: nombrePadre,
+                              descripcion: descripcionPadre,
+                              usuario_id: user.id,
+                              bases_controles: JSON.stringify(nuevasBasesControles)
+                            })
+                          });
+                          
+                          const data = await res.json();
+                          if (!data.success) {
+                            throw new Error(data.error || 'Error al guardar el mensaje en base de datos');
+                          }
+                          
+                          // Actualizar el estado
+                          setBasesControles(nuevasBasesControles);
+                          
+                        } else if (esMitigador) {
                           const nuevaLineaBase = [...lineaBaseMitigadores];
                           nuevaLineaBase[modalEditarLineaBase.index] = {
                             ...nuevaLineaBase[modalEditarLineaBase.index],
@@ -23450,13 +26991,16 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                         mostrarNotificacion('✓ Mensaje guardado correctamente', 'success');
                       } catch (error) {
                         console.error('Error al guardar mensaje:', error);
-                        mostrarNotificacion('✗ Error al guardar mensaje', 'error');
+                        mostrarNotificacion('✗ Error al guardar mensaje: ' + (error.message || 'Error desconocido'), 'error');
                       }
 
                       // Limpiar formulario
                       textoInput.value = '';
                       archivosInput.value = '';
-                      document.getElementById('lista-archivos-nuevos').innerHTML = '';
+                      const listaArchivos = document.getElementById('lista-archivos-nuevos');
+                      if (listaArchivos) {
+                        listaArchivos.innerHTML = '';
+                      }
                     }}
                     style={{ 
                       background: '#17a2b8',
@@ -24198,8 +27742,117 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                   try {
                     setGuardandoLineaBase(true);
                     const esMitigador = modalEditarLineaBase?.tipo === 'mitigador';
+                    const esNivel2 = rutaNavegacion.length === 2;
                     
-                    if (esMitigador) {
+                    // CRÍTICO: Para nivel 2, actualizar basesControles usando claveUnica
+                    if (esNivel2) {
+                      if (!formLineaBase.claveUnica && !formLineaBase.requisitoId) {
+                        throw new Error('No se encontró la clave única del item. Por favor, cierre y vuelva a abrir el modal.');
+                      }
+                      
+                      // Buscar y actualizar el requisito en basesControles usando claveUnica
+                      const claveUnica = formLineaBase.claveUnica;
+                      const requisitoId = formLineaBase.requisitoId;
+                      const controlId = formLineaBase.controlId;
+                      
+                      if (!basesControles || !basesControles.controles) {
+                        throw new Error('No se encontraron bases de controles para actualizar');
+                      }
+                      
+                      // Buscar el control y requisito correspondiente usando claveUnica
+                      const controlesActualizados = basesControles.controles.map(control => {
+                        if (control.id === controlId && control.requisitos) {
+                          const requisitosActualizados = control.requisitos.map(requisito => {
+                            // Identificar por claveUnica: codigo_requisito_id
+                            const claveUnicaRequisito = `${control.codigo || ''}_${requisito.requisito || ''}_${requisito.id}`;
+                            const coincidePorClave = claveUnica && claveUnicaRequisito === claveUnica;
+                            const coincidePorId = requisito.id === requisitoId;
+                            
+                            if (coincidePorClave || coincidePorId) {
+                              // Actualizar el requisito con los datos del formulario
+                              return {
+                                ...requisito,
+                                verificador_responsable: formLineaBase.verificador_responsable || '',
+                                fecha_verificacion: formLineaBase.fecha_verificacion || '',
+                                implementado_estandar_desempeno: formLineaBase.implementado_estandar_desempeno || '',
+                                accion_a_ejecutar: formLineaBase.accion_a_ejecutar || '',
+                                responsable_cierre_accion: formLineaBase.responsable_cierre_accion || '',
+                                fecha_cierre: formLineaBase.fecha_cierre || '',
+                                criticidad: formLineaBase.criticidad || '',
+                                porcentaje_avance_implementacion_accion: formLineaBase.porcentaje_avance_implementacion_accion || '',
+                                nombre_dueno_control_critico_tecnico: formLineaBase.nombre_dueno_control_critico_tecnico || '',
+                                comentario_trabajador: formLineaBase.comentario_trabajador || '',
+                                conversacion_seguimiento: formLineaBase.conversacion_seguimiento || [],
+                                estado_validacion: formLineaBase.estado_validacion || '',
+                                ponderacion: formLineaBase.ponderacion || '',
+                                ultimo_usuario_edito: obtenerUltimoUsuarioEditoString(user)
+                              };
+                            }
+                            return requisito;
+                          });
+                          return { ...control, requisitos: requisitosActualizados };
+                        }
+                        return control;
+                      });
+                      
+                      // Actualizar basesControles
+                      const nuevasBasesControles = {
+                        ...basesControles,
+                        controles: controlesActualizados
+                      };
+                      
+                      // Guardar en base de datos (carpeta padre nivel 1)
+                      // CRÍTICO: Para nivel 2, SIEMPRE guardar en la carpeta padre (nivel 1), no en carpetaActual.id
+                      const carpetaPadreId = carpetaActual?.carpeta_padre_id;
+                      if (!carpetaPadreId) {
+                        throw new Error('No se encontró la carpeta padre (nivel 1) para guardar los cambios. Los datos deben guardarse en el nivel 1.');
+                      }
+                      
+                      // Obtener el nombre y descripción de la carpeta padre para guardar correctamente
+                      let nombrePadre = carpetaActual.nombre;
+                      let descripcionPadre = carpetaActual.descripcion || '';
+                      
+                      // Intentar obtener los datos de la carpeta padre
+                      try {
+                        const resPadre = await fetch(`${API_BASE}/archivos/carpetas.php?id=${carpetaPadreId}`);
+                        if (resPadre.ok) {
+                          const dataPadre = await resPadre.json();
+                          if (dataPadre && !dataPadre.error) {
+                            const carpetaPadre = Array.isArray(dataPadre) ? dataPadre[0] : dataPadre;
+                            nombrePadre = carpetaPadre.nombre || nombrePadre;
+                            descripcionPadre = carpetaPadre.descripcion || descripcionPadre;
+                          }
+                        }
+                      } catch (error) {
+                        console.warn('[Guardar Cambios] No se pudo obtener datos de carpeta padre, usando valores por defecto:', error);
+                      }
+                      
+                      const res = await fetch(`${API_BASE}/archivos/carpetas.php`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          id: carpetaPadreId,
+                          nombre: nombrePadre,
+                          descripcion: descripcionPadre,
+                          usuario_id: user.id,
+                          bases_controles: JSON.stringify(nuevasBasesControles)
+                        })
+                      });
+                      
+                      const data = await res.json();
+                      if (!data.success) {
+                        throw new Error(data.error || 'Error al guardar en base de datos');
+                      }
+                      
+                      // CRÍTICO: Actualizar el estado DESPUÉS de guardar exitosamente
+                      // Esto asegura que la tabla se regenere con los datos actualizados
+                      setBasesControles(nuevasBasesControles);
+                      
+                      console.log('[Guardar Cambios] Nivel 2: Datos guardados correctamente en carpeta padre:', carpetaPadreId);
+                      
+                      setModalEditarLineaBase(null);
+                      mostrarNotificacion('✓ Cambios guardados correctamente', 'success');
+                    } else if (esMitigador) {
                       // Actualizar el item en lineaBaseMitigadores
                       const nuevaLineaBase = [...lineaBaseMitigadores];
                       const itemActualizado = {
@@ -24213,6 +27866,9 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       
                       // Guardar en base de datos PASANDO LOS DATOS ACTUALIZADOS
                       await guardarLineaBaseMitigadores(nuevaLineaBase);
+                      
+                      setModalEditarLineaBase(null);
+                      mostrarNotificacion('✓ Cambios guardados correctamente', 'success');
                     } else {
                       // Actualizar el item en lineaBase (preventivo)
                       const nuevaLineaBase = [...lineaBase];
@@ -24240,10 +27896,10 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
                       // Guardar en base de datos PASANDO LOS DATOS ACTUALIZADOS
                       // IMPORTANTE: Se envía TODA la línea base para evitar que otros registros se marquen como eliminados
                       await guardarLineaBase(nuevaLineaBase);
-                    }
                     
                     setModalEditarLineaBase(null);
                     mostrarNotificacion('✓ Cambios guardados correctamente', 'success');
+                    }
                   } catch (error) {
                     console.error('Error al guardar cambios desde modal:', error);
                     mostrarNotificacion('✗ Error al guardar cambios: ' + (error.message || 'Error desconocido'), 'error', 5000);
@@ -24444,9 +28100,741 @@ const construirAnalisisClonadoSinEvidencias = (data) => {
           }
         }
       `}</style>
+
+      {/* Modal de Información Adicional del Control Crítico */}
+      {modalInfoAdicional && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            animation: 'fadeIn 0.2s ease-in-out',
+            padding: '1rem'
+          }}
+          onClick={() => setModalInfoAdicional(null)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '0',
+              maxWidth: '800px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              animation: 'slideUp 0.3s ease-out',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                background: '#17a2b8',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: 'white'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <i className="fa fa-info-circle" style={{ fontSize: '24px' }}></i>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700' }}>
+                    Información Adicional
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', opacity: 0.9 }}>
+                    {modalInfoAdicional.control?.codigo || 'Sin código'} - {modalInfoAdicional.control?.nombre || 'Sin nombre'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalInfoAdicional(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                <i className="fa fa-times"></i>
+              </button>
+            </div>
+
+            {/* Contenido con scroll */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+              {editandoBases ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Objetivos */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#495057', fontSize: '14px' }}>
+                      <i className="fa fa-bullseye" style={{ marginRight: '6px', color: '#17a2b8' }}></i>
+                      OBJETIVOS
+                    </label>
+                    <textarea
+                      value={modalInfoAdicional.control?.objetivos || ''}
+                      onChange={(e) => {
+                        const controlActualizado = {
+                          ...modalInfoAdicional.control,
+                          objetivos: e.target.value
+                        };
+                        actualizarControlCritico(modalInfoAdicional.controlId, 'objetivos', e.target.value);
+                        setModalInfoAdicional({ ...modalInfoAdicional, control: controlActualizado });
+                      }}
+                      placeholder="Asegurar que toda persona que realice intervenciones en sistemas eléctricos..."
+                      style={{
+                        width: '100%',
+                        minHeight: '100px',
+                        padding: '0.75rem',
+                        border: '1px solid #17a2b8',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.5',
+                        background: '#e7f3ff',
+                        color: '#212529'
+                      }}
+                    />
+                  </div>
+
+                  {/* Preguntas Trabajador/a */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#495057', fontSize: '14px' }}>
+                      <i className="fa fa-question-circle" style={{ marginRight: '6px', color: '#17a2b8' }}></i>
+                      PREGUNTAS TRABAJADOR/A
+                    </label>
+                    <textarea
+                      value={modalInfoAdicional.control?.preguntas_trabajador || ''}
+                      onChange={(e) => {
+                        const controlActualizado = {
+                          ...modalInfoAdicional.control,
+                          preguntas_trabajador: e.target.value
+                        };
+                        actualizarControlCritico(modalInfoAdicional.controlId, 'preguntas_trabajador', e.target.value);
+                        setModalInfoAdicional({ ...modalInfoAdicional, control: controlActualizado });
+                      }}
+                      placeholder="¿Cuento con mi Licencia Eléctrica vigente..."
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        padding: '0.75rem',
+                        border: '1px solid #17a2b8',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.5',
+                        background: '#e0f7fa',
+                        color: '#212529'
+                      }}
+                    />
+                  </div>
+
+                  {/* Preguntas Supervisor/a */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#495057', fontSize: '14px' }}>
+                      <i className="fa fa-question-circle" style={{ marginRight: '6px', color: '#ffc107' }}></i>
+                      PREGUNTAS SUPERVISOR/A
+                    </label>
+                    <textarea
+                      value={modalInfoAdicional.control?.preguntas_supervisor || ''}
+                      onChange={(e) => {
+                        const controlActualizado = {
+                          ...modalInfoAdicional.control,
+                          preguntas_supervisor: e.target.value
+                        };
+                        actualizarControlCritico(modalInfoAdicional.controlId, 'preguntas_supervisor', e.target.value);
+                        setModalInfoAdicional({ ...modalInfoAdicional, control: controlActualizado });
+                      }}
+                      placeholder="¿Verifiqué que todo el personal a cargo..."
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        padding: '0.75rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.5',
+                        background: '#fffbf0',
+                        color: '#212529'
+                      }}
+                    />
+                  </div>
+
+                  {/* Preguntas Ejecutivo/a */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#495057', fontSize: '14px' }}>
+                      <i className="fa fa-question-circle" style={{ marginRight: '6px', color: '#17a2b8' }}></i>
+                      PREGUNTAS EJECUTIVO/A
+                    </label>
+                    <textarea
+                      value={modalInfoAdicional.control?.preguntas_ejecutivo || ''}
+                      onChange={(e) => {
+                        const controlActualizado = {
+                          ...modalInfoAdicional.control,
+                          preguntas_ejecutivo: e.target.value
+                        };
+                        actualizarControlCritico(modalInfoAdicional.controlId, 'preguntas_ejecutivo', e.target.value);
+                        setModalInfoAdicional({ ...modalInfoAdicional, control: controlActualizado });
+                      }}
+                      placeholder="¿Se cuenta con un sistema de autorización..."
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        padding: '0.75rem',
+                        border: '1px solid #17a2b8',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.5',
+                        background: '#e0f7fa',
+                        color: '#212529'
+                      }}
+                    />
+                  </div>
+
+                  {/* Desviaciones */}
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '700', color: '#495057', fontSize: '14px' }}>
+                      <i className="fa fa-exclamation-triangle" style={{ marginRight: '6px', color: '#dc3545' }}></i>
+                      DESVIACIONES AL CONTROL CRÍTICO (EJEMPLOS)
+                    </label>
+                    <textarea
+                      value={modalInfoAdicional.control?.desviaciones || ''}
+                      onChange={(e) => {
+                        const controlActualizado = {
+                          ...modalInfoAdicional.control,
+                          desviaciones: e.target.value
+                        };
+                        actualizarControlCritico(modalInfoAdicional.controlId, 'desviaciones', e.target.value);
+                        setModalInfoAdicional({ ...modalInfoAdicional, control: controlActualizado });
+                      }}
+                      placeholder="Personal realiza intervención de sistemas eléctricos sin contar con el nivel de autorización..."
+                      style={{
+                        width: '100%',
+                        minHeight: '120px',
+                        padding: '0.75rem',
+                        border: '1px solid #dc3545',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        lineHeight: '1.5',
+                        background: '#ffebee',
+                        color: '#212529'
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Objetivos */}
+                  {modalInfoAdicional.control?.objetivos && (
+                    <div style={{
+                      background: '#e7f3ff',
+                      border: '1px solid #17a2b8',
+                      borderRadius: '8px',
+                      padding: '1rem'
+                    }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#17a2b8', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa fa-bullseye"></i>
+                        OBJETIVOS
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#495057', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                        {modalInfoAdicional.control.objetivos}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Preguntas Trabajador/a */}
+                  {modalInfoAdicional.control?.preguntas_trabajador && (
+                    <div style={{
+                      background: '#fff8e1',
+                      border: '1px solid #17a2b8',
+                      borderRadius: '8px',
+                      padding: '1rem'
+                    }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#17a2b8', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa fa-question-circle"></i>
+                        PREGUNTAS TRABAJADOR/A
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#495057', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                        {modalInfoAdicional.control.preguntas_trabajador}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Preguntas Supervisor/a */}
+                  {modalInfoAdicional.control?.preguntas_supervisor && (
+                    <div style={{
+                      background: '#fffbf0',
+                      border: '1px solid #ffc107',
+                      borderRadius: '8px',
+                      padding: '1rem'
+                    }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#856404', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa fa-question-circle"></i>
+                        PREGUNTAS SUPERVISOR/A
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#495057', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                        {modalInfoAdicional.control.preguntas_supervisor}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Preguntas Ejecutivo/a */}
+                  {modalInfoAdicional.control?.preguntas_ejecutivo && (
+                    <div style={{
+                      background: '#e0f7fa',
+                      border: '1px solid #17a2b8',
+                      borderRadius: '8px',
+                      padding: '1rem'
+                    }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#17a2b8', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa fa-question-circle"></i>
+                        PREGUNTAS EJECUTIVO/A
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#495057', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                        {modalInfoAdicional.control.preguntas_ejecutivo}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Desviaciones */}
+                  {modalInfoAdicional.control?.desviaciones && (
+                    <div style={{
+                      background: '#ffebee',
+                      border: '1px solid #dc3545',
+                      borderRadius: '8px',
+                      padding: '1rem'
+                    }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#dc3545', fontSize: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <i className="fa fa-exclamation-triangle"></i>
+                        DESVIACIONES AL CONTROL CRÍTICO (EJEMPLOS)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#495057', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                        {modalInfoAdicional.control.desviaciones}
+                      </p>
+                    </div>
+                  )}
+
+                  {!modalInfoAdicional.control?.objetivos && 
+                   !modalInfoAdicional.control?.preguntas_trabajador && 
+                   !modalInfoAdicional.control?.preguntas_supervisor && 
+                   !modalInfoAdicional.control?.preguntas_ejecutivo && 
+                   !modalInfoAdicional.control?.desviaciones && (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6c757d' }}>
+                      <i className="fa fa-info-circle" style={{ fontSize: '48px', marginBottom: '1rem', opacity: 0.3 }}></i>
+                      <p style={{ fontSize: '14px', margin: 0 }}>
+                        No hay información adicional registrada para este control.
+                        {canEditFiles(user) && ' Activa el modo edición para agregar información.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #e9ecef',
+                display: 'flex',
+                justifyContent: 'flex-end'
+              }}
+            >
+              <button
+                onClick={() => setModalInfoAdicional(null)}
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  background: '#17a2b8',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.target.style.opacity = '1'}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Notificación Moderno */}
+      {modalNotificacion && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            animation: 'fadeIn 0.2s ease-in-out'
+          }}
+          onClick={() => setModalNotificacion(null)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '0',
+              maxWidth: '450px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              overflow: 'hidden',
+              animation: 'slideUp 0.3s ease-out',
+              transform: 'scale(1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header con color según tipo */}
+            <div
+              style={{
+                background:
+                  modalNotificacion.tipo === 'success' ? '#28a745' :
+                  modalNotificacion.tipo === 'error' ? '#dc3545' :
+                  modalNotificacion.tipo === 'warning' ? '#ffc107' :
+                  '#17a2b8',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}
+            >
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  color: '#fff'
+                }}
+              >
+                {modalNotificacion.tipo === 'success' && <i className="fa fa-check-circle"></i>}
+                {modalNotificacion.tipo === 'error' && <i className="fa fa-exclamation-circle"></i>}
+                {modalNotificacion.tipo === 'warning' && <i className="fa fa-exclamation-triangle"></i>}
+                {modalNotificacion.tipo === 'info' && <i className="fa fa-info-circle"></i>}
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: '1.1rem',
+                    fontWeight: '700',
+                    color: '#fff'
+                  }}
+                >
+                  {modalNotificacion.titulo ||
+                    (modalNotificacion.tipo === 'success' ? 'Éxito' :
+                      modalNotificacion.tipo === 'error' ? 'Error' :
+                        modalNotificacion.tipo === 'warning' ? 'Advertencia' :
+                          'Información')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setModalNotificacion(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                <i className="fa fa-times"></i>
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div style={{ padding: '1.5rem' }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.95rem',
+                  color: '#495057',
+                  lineHeight: '1.6'
+                }}
+              >
+                {modalNotificacion.mensaje}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #e9ecef',
+                display: 'flex',
+                justifyContent: 'flex-end'
+              }}
+            >
+              <button
+                onClick={() => setModalNotificacion(null)}
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  background:
+                    modalNotificacion.tipo === 'success' ? '#28a745' :
+                      modalNotificacion.tipo === 'error' ? '#dc3545' :
+                        modalNotificacion.tipo === 'warning' ? '#ffc107' :
+                          '#17a2b8',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.target.style.opacity = '1'}
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación Moderno */}
+      {modalConfirmacion && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            animation: 'fadeIn 0.2s ease-in-out'
+          }}
+          onClick={() => {
+            if (modalConfirmacion.onCancel) {
+              modalConfirmacion.onCancel();
+            } else {
+              setModalConfirmacion(null);
+            }
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '0',
+              maxWidth: '450px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              overflow: 'hidden',
+              animation: 'slideUp 0.3s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                background: '#17a2b8',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}
+            >
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  color: '#fff'
+                }}
+              >
+                <i className="fa fa-question-circle"></i>
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: '1.1rem',
+                    fontWeight: '700',
+                    color: '#fff'
+                  }}
+                >
+                  {modalConfirmacion.titulo}
+                </h3>
+              </div>
+            </div>
+
+            {/* Contenido */}
+            <div style={{ padding: '1.5rem' }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.95rem',
+                  color: '#495057',
+                  lineHeight: '1.6'
+                }}
+              >
+                {modalConfirmacion.mensaje}
+              </p>
+            </div>
+
+            {/* Footer con botones */}
+            <div
+              style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #e9ecef',
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'flex-end'
+              }}
+            >
+              <button
+                onClick={() => {
+                  if (modalConfirmacion.onCancel) {
+                    modalConfirmacion.onCancel();
+                  } else {
+                    setModalConfirmacion(null);
+                  }
+                }}
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  background: '#fff',
+                  color: '#495057',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#f8f9fa';
+                  e.target.style.borderColor = '#dee2e6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#fff';
+                  e.target.style.borderColor = '#e2e8f0';
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (modalConfirmacion.onConfirm) {
+                    modalConfirmacion.onConfirm();
+                  } else {
+                    setModalConfirmacion(null);
+                  }
+                }}
+                style={{
+                  padding: '0.6rem 1.5rem',
+                  background: '#17a2b8',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.target.style.opacity = '1'}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px) scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
+        }
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default GestorArchivos;
-

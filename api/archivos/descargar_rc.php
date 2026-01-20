@@ -4,25 +4,43 @@
  * Mantiene la estructura de árbol de carpetas para fácil análisis en Windows
  */
 
-// Aumentar límites para archivos grandes
-ini_set('memory_limit', '1024M');
-ini_set('max_execution_time', 600);
-set_time_limit(600);
+// CRÍTICO: Desactivar errores que puedan generar output antes de headers
+error_reporting(0);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// CRÍTICO: Limpiar cualquier output buffer existente
+while (ob_get_level()) {
+    ob_end_clean();
+}
+
+// Aumentar límites para archivos grandes - sin limitaciones
+ini_set('memory_limit', '2048M');
+ini_set('max_execution_time', 0); // Sin límite de tiempo
+set_time_limit(0); // Sin límite de tiempo
+ini_set('max_input_time', 0);
+ini_set('post_max_size', '0');
+ini_set('upload_max_filesize', '0');
 
 // Evitar timeout del servidor web
 ignore_user_abort(true);
 
-// Desactivar compresión que puede causar timeout
+// CRÍTICO: Desactivar TODA compresión de salida que puede corromper el ZIP binario
 if (function_exists('apache_setenv')) {
     @apache_setenv('no-gzip', '1');
 }
 @ini_set('zlib.output_compression', 'Off');
+@ini_set('output_buffering', 'Off');
+@ini_set('output_compression', 'Off');
+if (function_exists('ini_set')) {
+    @ini_set('zlib.output_compression', 'Off');
+}
 
+// Headers CORS solo para OPTIONS (no para la descarga del ZIP)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
@@ -39,8 +57,29 @@ if (!$carpeta_id) {
 }
 
 try {
+    // Función para obtener el nivel de una carpeta
+    function obtenerNivelCarpeta($pdo, $carpeta_id) {
+        $nivel = 1;
+        $carpeta_actual_id = $carpeta_id;
+        
+        while ($carpeta_actual_id) {
+            $stmt = $pdo->prepare("SELECT carpeta_padre_id FROM carpetas WHERE id = ? AND activo = 1");
+            $stmt->execute([$carpeta_actual_id]);
+            $padre = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($padre && $padre['carpeta_padre_id']) {
+                $nivel++;
+                $carpeta_actual_id = $padre['carpeta_padre_id'];
+            } else {
+                break;
+            }
+        }
+        
+        return $nivel;
+    }
+    
     // Obtener información de la carpeta principal
-    $stmt = $pdo->prepare("SELECT id, nombre FROM carpetas WHERE id = ? AND activo = 1");
+    $stmt = $pdo->prepare("SELECT id, nombre, carpeta_padre_id FROM carpetas WHERE id = ? AND activo = 1");
     $stmt->execute([$carpeta_id]);
     $carpetaPrincipal = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -51,8 +90,28 @@ try {
         exit;
     }
     
-    // Crear nombre seguro para el ZIP
-    $nombreRC = preg_replace('/[^a-zA-Z0-9_-]/', '_', $carpetaPrincipal['nombre']);
+    // Determinar el nivel de la carpeta
+    $nivelCarpeta = obtenerNivelCarpeta($pdo, $carpeta_id);
+    
+    // Si es nivel 1, obtener la carpeta padre (nivel 0) para incluir todo
+    $carpetaIdInicio = $carpeta_id;
+    $carpetaNombreInicio = $carpetaPrincipal['nombre'];
+    
+    if ($nivelCarpeta === 1 && $carpetaPrincipal['carpeta_padre_id']) {
+        // Obtener carpeta nivel 0 (padre)
+        $stmtPadre = $pdo->prepare("SELECT id, nombre FROM carpetas WHERE id = ? AND activo = 1");
+        $stmtPadre->execute([$carpetaPrincipal['carpeta_padre_id']]);
+        $carpetaNivel0 = $stmtPadre->fetch(PDO::FETCH_ASSOC);
+        
+        if ($carpetaNivel0) {
+            // Usar la carpeta nivel 0 como raíz
+            $carpetaIdInicio = $carpetaNivel0['id'];
+            $carpetaNombreInicio = $carpetaNivel0['nombre'];
+        }
+    }
+    
+    // Crear nombre seguro para el ZIP usando la carpeta de inicio (nivel 0 si es nivel 1)
+    $nombreRC = preg_replace('/[^a-zA-Z0-9_-]/', '_', $carpetaNombreInicio);
     $fechaHoy = date('Y-m-d_H-i');
     $nombreZip = "{$nombreRC}_{$fechaHoy}.zip";
     
@@ -65,8 +124,9 @@ try {
         throw new Exception("No se pudo crear el archivo ZIP");
     }
     
-    // Usar compresión rápida para evitar timeout
-    $zip->setCompressionIndex(0, ZipArchive::CM_STORE); // Sin compresión = más rápido
+    // Usar compresión mínima para balance entre velocidad y tamaño
+    // CM_DEFLATE con nivel 1 es rápido pero aún reduce el tamaño
+    // Configuramos esto después de agregar cada archivo
     
     // Directorio base para los archivos
     $baseDir = dirname(dirname(__DIR__));
@@ -323,15 +383,19 @@ try {
         }
     }
     
-    // Procesar la carpeta principal
-    $nombreCarpetaRaiz = preg_replace('/[^a-zA-Z0-9_\- áéíóúÁÉÍÓÚñÑ]/', '_', $carpetaPrincipal['nombre']);
-    agregarCarpetaAlZip($pdo, $zip, $carpeta_id, $nombreCarpetaRaiz, $baseDir);
+    // Procesar desde la carpeta de inicio (nivel 0 si se descarga desde nivel 1)
+    $nombreCarpetaRaiz = preg_replace('/[^a-zA-Z0-9_\- áéíóúÁÉÍÓÚñÑ]/', '_', $carpetaNombreInicio);
+    agregarCarpetaAlZip($pdo, $zip, $carpetaIdInicio, $nombreCarpetaRaiz, $baseDir);
     
     // Agregar un archivo README
-    $readme = "=== RESPALDO DE {$carpetaPrincipal['nombre']} ===\n\n";
+    $readme = "=== RESPALDO DE {$carpetaNombreInicio} ===\n\n";
     $readme .= "Fecha de exportación: " . date('d/m/Y H:i:s') . "\n";
-    $readme .= "Carpeta ID: {$carpeta_id}\n\n";
-    $readme .= "Estructura:\n";
+    $readme .= "Carpeta ID de inicio: {$carpetaIdInicio}\n";
+    if ($nivelCarpeta === 1) {
+        $readme .= "Carpeta ID solicitada (Nivel 1): {$carpeta_id}\n";
+        $readme .= "NOTA: Se incluyó toda la estructura desde el Nivel 0 hacia abajo\n";
+    }
+    $readme .= "\nEstructura:\n";
     $readme .= "- /Archivos: Archivos de la pestaña Archivos\n";
     $readme .= "- /Linea_Base: Evidencias de controles preventivos\n";
     $readme .= "- /Linea_Base_Mitigadores: Evidencias de controles mitigadores\n";
@@ -340,36 +404,157 @@ try {
     
     $zip->addFromString($nombreCarpetaRaiz . '/_LEEME.txt', $readme);
     
-    // Cerrar ZIP
+    // Cerrar ZIP correctamente
     $numArchivos = $zip->numFiles;
-    $zip->close();
+    $closeResult = $zip->close();
     
-    // Verificar que el ZIP se creó
-    if (!file_exists($zipPath) || filesize($zipPath) === 0) {
-        throw new Exception("El archivo ZIP está vacío o no se pudo crear");
+    if (!$closeResult) {
+        // Intentar eliminar el archivo corrupto si existe
+        @unlink($zipPath);
+        throw new Exception("Error al cerrar el archivo ZIP. Código de error: " . $zip->getStatusString());
     }
     
-    // Enviar archivo ZIP
-    header('Content-Type: application/zip');
-    header('Content-Disposition: attachment; filename="' . $nombreZip . '"');
-    header('Content-Length: ' . filesize($zipPath));
-    header('Cache-Control: no-cache, must-revalidate');
-    header('Pragma: public');
+    // Verificar que el ZIP se creó y es válido
+    if (!file_exists($zipPath)) {
+        throw new Exception("El archivo ZIP no se pudo crear en: " . $zipPath);
+    }
     
-    // Limpiar buffer de salida
-    if (ob_get_level()) {
+    $fileSizeCheck = filesize($zipPath);
+    if ($fileSizeCheck === 0 || $fileSizeCheck === false) {
+        @unlink($zipPath);
+        throw new Exception("El archivo ZIP está vacío o no se pudo crear correctamente");
+    }
+    
+    // Validar que el ZIP no esté corrupto intentando abrirlo
+    $testZip = new ZipArchive();
+    $testResult = $testZip->open($zipPath, ZipArchive::CHECKCONS);
+    if ($testResult !== TRUE) {
+        @unlink($zipPath);
+        throw new Exception("El archivo ZIP está corrupto. Código de error: " . $testResult);
+    }
+    $testZip->close();
+    
+    // Obtener tamaño del archivo ANTES de limpiar buffers
+    $fileSize = filesize($zipPath);
+    
+    // CRÍTICO: Deshabilitar compresión de salida ANTES de limpiar buffers
+    if (function_exists('apache_setenv')) {
+        @apache_setenv('no-gzip', '1');
+    }
+    @ini_set('zlib.output_compression', 'Off');
+    if (function_exists('ini_set')) {
+        @ini_set('output_buffering', 'Off');
+        @ini_set('output_compression', 'Off');
+    }
+    
+    // CRÍTICO: Limpiar TODOS los buffers de salida
+    while (ob_get_level()) {
         ob_end_clean();
     }
     
-    readfile($zipPath);
+    // Desactivar cualquier compresión adicional
+    if (function_exists('apache_setenv')) {
+        @apache_setenv('no-gzip', '1');
+    }
     
-    // Eliminar archivo temporal
+    // Enviar headers en el orden correcto (sin Access-Control antes de Content-Type)
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . addslashes($nombreZip) . '"');
+    header('Content-Length: ' . $fileSize);
+    header('Cache-Control: no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    header("Access-Control-Allow-Origin: *");
+    
+    // Asegurar que no hay output antes de enviar el archivo
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    // Leer y enviar el archivo
+    $handle = @fopen($zipPath, 'rb');
+    if ($handle === false) {
+        throw new Exception("No se pudo abrir el archivo ZIP para lectura");
+    }
+    
+    // Enviar el archivo en chunks (8KB es más seguro para evitar problemas)
+    $chunkSize = 8192; // 8KB chunks
+    $sent = 0;
+    while (!feof($handle)) {
+        $chunk = @fread($handle, $chunkSize);
+        if ($chunk === false) {
+            break;
+        }
+        if (strlen($chunk) > 0) {
+            echo $chunk;
+            $sent += strlen($chunk);
+            // Flush sin ob_flush para evitar problemas
+            if (function_exists('fastcgi_finish_request')) {
+                // Para FastCGI
+                flush();
+            } else {
+                // Para mod_php
+                flush();
+            }
+        }
+    }
+    fclose($handle);
+    
+    // Verificar que se envió todo el archivo
+    if ($sent !== $fileSize) {
+        // Log del error pero no lanzar excepción (ya se envió parte)
+        error_log("Warning: ZIP parcial enviado. Esperado: $fileSize, Enviado: $sent");
+    }
+    
+    // Eliminar archivo temporal después de enviarlo
     @unlink($zipPath);
     
+    // Asegurar que no hay más output
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+    
+    exit; // Importante: salir después de enviar el archivo
+    
 } catch (Exception $e) {
+    // Limpiar buffer antes de enviar error
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Log del error para debugging (opcional, descomentar si es necesario)
+    // error_log("Error en descargar_rc.php: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+    
     http_response_code(500);
-    header('Content-Type: application/json');
-    echo json_encode(['error' => 'Error al generar ZIP: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    header('Content-Type: application/json; charset=utf-8');
+    header("Access-Control-Allow-Origin: *");
+    
+    // Mensaje de error más informativo en desarrollo, mensaje genérico en producción
+    $mensajeError = 'Error al generar ZIP: ' . $e->getMessage();
+    if (strpos($_SERVER['HTTP_HOST'], 'localhost') === false && strpos($_SERVER['HTTP_HOST'], '127.0.0.1') === false) {
+        // Producción - mensaje genérico
+        $mensajeError = 'Error al generar el archivo ZIP. Por favor, contacte al administrador.';
+    }
+    
+    echo json_encode(['error' => $mensajeError], JSON_UNESCAPED_UNICODE);
+    exit;
+} catch (Throwable $e) {
+    // Capturar cualquier otro tipo de error (PHP 7+)
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    header("Access-Control-Allow-Origin: *");
+    
+    $mensajeError = 'Error al generar ZIP: ' . $e->getMessage();
+    if (strpos($_SERVER['HTTP_HOST'], 'localhost') === false && strpos($_SERVER['HTTP_HOST'], '127.0.0.1') === false) {
+        $mensajeError = 'Error al generar el archivo ZIP. Por favor, contacte al administrador.';
+    }
+    
+    echo json_encode(['error' => $mensajeError], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 ?>
 

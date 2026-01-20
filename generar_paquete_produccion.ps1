@@ -49,6 +49,7 @@ Write-Host "   Build copiado" -ForegroundColor Green
 
 # Paso 5: Copiar API (excluyendo archivos temporales y backups)
 Write-Host "[5/7] Copiando API (excluyendo temporales)..." -ForegroundColor Yellow
+Write-Host "   Incluyendo: vendor/PHPMailer, email_functions_real.php y todos los endpoints" -ForegroundColor Gray
 
 # Crear carpeta api en deploy
 New-Item -ItemType Directory -Path "$deployDir\api" -Force | Out-Null
@@ -212,7 +213,26 @@ if ($missingReports.Count -gt 0) {
 $criticalFiles = @(
     "api\archivos\linea_base_carpetas.php",
     "api\archivos\carpetas.php",
-    "api\carpetas.php"
+    "api\carpetas.php",
+    # Nuevos archivos para nivel 2 (bases_controles)
+    "api\archivos\bases_controles_carpetas.php",
+    "api\archivos\bases_controles_archivos.php",
+    # Sistema de tareas
+    "api\archivos\carpeta_tareas.php",
+    "api\archivos\carpeta_tarea_comentarios.php",
+    "api\archivos\carpeta_tarea_asignaciones.php",
+    "api\archivos\carpeta_tarea_adjuntos.php",
+    # Sistema de correos
+    "api\utils\email_functions_real.php",
+    # PHPMailer (necesario para envío de correos)
+    "api\vendor\autoload.php",
+    "api\vendor\phpmailer\phpmailer\src\PHPMailer.php",
+    "api\vendor\phpmailer\phpmailer\src\SMTP.php",
+    "api\vendor\phpmailer\phpmailer\src\Exception.php",
+    # Cálculo de promedios
+    "api\archivos\promedio_ponderacion.php",
+    # Descarga de ZIP mejorada (nivel 1 con nivel 0 completo, sin límites)
+    "api\archivos\descargar_rc.php"
 )
 $missingCritical = @()
 foreach ($file in $criticalFiles) {
@@ -227,7 +247,7 @@ if ($missingCritical.Count -gt 0) {
         Write-Host "     - $file" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "   Archivos críticos incluidos" -ForegroundColor Green
+    Write-Host "   Archivos críticos incluidos (incluyendo nuevas mejoras)" -ForegroundColor Green
 }
 
 Write-Host "   Archivos de configuración creados" -ForegroundColor Green
@@ -302,6 +322,16 @@ $checks = @{
     "Reporte PDF" = Test-Path "$deployDir\api\dashboard\generar_reporte_pdf.php"
     "linea_base_carpetas.php" = Test-Path "$deployDir\api\archivos\linea_base_carpetas.php"
     "carpetas.php" = Test-Path "$deployDir\api\carpetas.php"
+    "bases_controles_carpetas.php" = Test-Path "$deployDir\api\archivos\bases_controles_carpetas.php"
+    "bases_controles_archivos.php" = Test-Path "$deployDir\api\archivos\bases_controles_archivos.php"
+    "carpeta_tareas.php" = Test-Path "$deployDir\api\archivos\carpeta_tareas.php"
+    "carpeta_tarea_comentarios.php" = Test-Path "$deployDir\api\archivos\carpeta_tarea_comentarios.php"
+    "carpeta_tarea_adjuntos.php" = Test-Path "$deployDir\api\archivos\carpeta_tarea_adjuntos.php"
+    "email_functions_real.php" = Test-Path "$deployDir\api\utils\email_functions_real.php"
+    "promedio_ponderacion.php" = Test-Path "$deployDir\api\archivos\promedio_ponderacion.php"
+    "descargar_rc.php" = Test-Path "$deployDir\api\archivos\descargar_rc.php"
+    "vendor/autoload.php" = Test-Path "$deployDir\api\vendor\autoload.php"
+    "PHPMailer.php" = Test-Path "$deployDir\api\vendor\phpmailer\phpmailer\src\PHPMailer.php"
     "Archivos públicos" = Test-Path "$deployDir\public"
 }
 
@@ -325,6 +355,14 @@ $zipApiFiles = $zipEntries | Where-Object { $_ -like "api/*.php" }
 $zipReportHtml = $zipEntries | Where-Object { $_ -eq "api/dashboard/generar_reporte_html.php" -or $_ -like "*generar_reporte_html.php" }
 $zipReportPdf = $zipEntries | Where-Object { $_ -eq "api/dashboard/generar_reporte_pdf.php" -or $_ -like "*generar_reporte_pdf.php" }
 $zipLineaBase = $zipEntries | Where-Object { $_ -like "*linea_base_carpetas.php" }
+$zipBasesControlesCarpetas = $zipEntries | Where-Object { $_ -like "*bases_controles_carpetas.php" }
+$zipBasesControlesArchivos = $zipEntries | Where-Object { $_ -like "*bases_controles_archivos.php" }
+$zipCarpetaTareas = $zipEntries | Where-Object { $_ -like "*carpeta_tareas.php" -and $_ -notlike "*backup*" -and $_ -notlike "*nuevo*" }
+$zipCarpetaTareaComentarios = $zipEntries | Where-Object { $_ -like "*carpeta_tarea_comentarios.php" }
+$zipCarpetaTareaAdjuntos = $zipEntries | Where-Object { $_ -like "*carpeta_tarea_adjuntos.php" }
+$zipEmailFunctions = $zipEntries | Where-Object { $_ -like "*email_functions_real.php" }
+$zipPromedioPonderacion = $zipEntries | Where-Object { $_ -like "*promedio_ponderacion.php" }
+$zipDescargarRc = $zipEntries | Where-Object { $_ -like "*descargar_rc.php" -and $_ -notlike "*backup*" -and $_ -notlike "*temp*" }
 
 if ($zipBuildJs) {
     Write-Host "   [OK] Build JS verificado en ZIP" -ForegroundColor Green
@@ -340,6 +378,45 @@ if ($zipReportPdf) {
 }
 if ($zipLineaBase) {
     Write-Host "   [OK] linea_base_carpetas.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipBasesControlesCarpetas) {
+    Write-Host "   [OK] bases_controles_carpetas.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipBasesControlesArchivos) {
+    Write-Host "   [OK] bases_controles_archivos.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipCarpetaTareas) {
+    Write-Host "   [OK] carpeta_tareas.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipCarpetaTareaComentarios) {
+    Write-Host "   [OK] carpeta_tarea_comentarios.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipCarpetaTareaAdjuntos) {
+    Write-Host "   [OK] carpeta_tarea_adjuntos.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipEmailFunctions) {
+    Write-Host "   [OK] email_functions_real.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipPromedioPonderacion) {
+    Write-Host "   [OK] promedio_ponderacion.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipDescargarRc) {
+    Write-Host "   [OK] descargar_rc.php verificado en ZIP" -ForegroundColor Green
+}
+
+# Verificar PHPMailer y vendor
+$zipVendorAutoload = $zipEntries | Where-Object { $_ -like "*vendor/autoload.php" -or $_ -like "*api/vendor/autoload.php" }
+$zipPHPMailer = $zipEntries | Where-Object { $_ -like "*PHPMailer.php" }
+$zipSMTP = $zipEntries | Where-Object { $_ -like "*SMTP.php" }
+
+if ($zipVendorAutoload) {
+    Write-Host "   [OK] vendor/autoload.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipPHPMailer) {
+    Write-Host "   [OK] PHPMailer.php verificado en ZIP" -ForegroundColor Green
+}
+if ($zipSMTP) {
+    Write-Host "   [OK] SMTP.php verificado en ZIP" -ForegroundColor Green
 }
 
 Write-Host ""
@@ -364,6 +441,35 @@ Write-Host "   api/config/config.php" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "5. NO se copiaron archivos de uploads para no sobrescribir" -ForegroundColor Yellow
 Write-Host "   producción. La estructura de carpetas está vacía." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "6. NUEVAS MEJORAS INCLUIDAS EN ESTE PAQUETE:" -ForegroundColor White
+Write-Host "   [OK] Sistema de Tareas completo (creacion, comentarios, adjuntos)" -ForegroundColor Green
+Write-Host "   [OK] Envio de correos electronicos para tareas y avisos" -ForegroundColor Green
+Write-Host "   [OK] PHPMailer incluido (biblioteca para envio de correos)" -ForegroundColor Green
+Write-Host "   [OK] Gestion de documentos para nivel 2 (bases_controles)" -ForegroundColor Green
+Write-Host "   [OK] Calculo de promedios de ponderacion mejorado" -ForegroundColor Green
+Write-Host "   [OK] Sistema de programar avisos por correo (nivel 2)" -ForegroundColor Green
+Write-Host "   [OK] Foro de observaciones mejorado" -ForegroundColor Green
+Write-Host "   [OK] Validacion y observaciones para nivel 2" -ForegroundColor Green
+Write-Host "   [OK] Descarga ZIP mejorada (nivel 1 incluye nivel 0 completo)" -ForegroundColor Green
+Write-Host "   [OK] Barra de progreso de descarga en tiempo real" -ForegroundColor Green
+Write-Host "   [OK] Sin limitaciones de tamaño o tiempo para descargas" -ForegroundColor Green
+Write-Host ""
+Write-Host "7. VERIFICACION DE DEPENDENCIAS:" -ForegroundColor White
+Write-Host "   [OK] PHPMailer (api/vendor/phpmailer/) - Para envio de correos" -ForegroundColor Green
+Write-Host "   [OK] Composer autoload (api/vendor/autoload.php)" -ForegroundColor Green
+Write-Host ""
+Write-Host "8. IMPORTANTE: Verificar que las tablas de tareas existan:" -ForegroundColor White
+Write-Host "   - carpeta_tareas" -ForegroundColor Yellow
+Write-Host "   - carpeta_tarea_asignaciones" -ForegroundColor Yellow
+Write-Host "   - carpeta_tarea_comentarios" -ForegroundColor Yellow
+Write-Host "   - carpeta_tarea_adjuntos" -ForegroundColor Yellow
+Write-Host "   Si no existen, ejecutar: recrear_tabla_carpeta_tareas.sql" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "9. IMPORTANTE: Verificar que las tablas de bases_controles existan:" -ForegroundColor White
+Write-Host "   - bases_controles_carpetas" -ForegroundColor Yellow
+Write-Host "   - bases_controles_archivos" -ForegroundColor Yellow
+Write-Host "   (Se crean automáticamente al usar las funciones)" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
